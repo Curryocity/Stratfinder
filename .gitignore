@@ -2,6 +2,7 @@
 build/
 out/
 bin/
+src/main
 
 # CMake
 CMakeFiles/

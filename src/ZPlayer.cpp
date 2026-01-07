@@ -6,9 +6,7 @@ float ZPlayer::SIN_TABLE[65536];
 float ZPlayer::sin45 = 0.0f;
 float ZPlayer::cos45 = 0.0f;
 
-/*
- * Precompute sine table.
- */
+/* Precompute sine table */
 void ZPlayer::init() {
     for (int i = 0; i < 65536; ++i) {
         SIN_TABLE[i] = std::sin(i * M_PI * 2.0 / 65536.0);
@@ -29,13 +27,9 @@ inline float ZPlayer::cos(float deg) {
 }
 
 /*
- * Only covers simple forward and backward movement
+ * Used for zSolver, sprinted 45 zAxis movement only
  */
-void ZPlayer::simpleMove(float moveVec,
-                          bool airborne,
-                          int movementType,
-                          bool has45,
-                          int repeat) {
+void ZPlayer::simpleMove(float moveVec, bool airborne, bool sprintJumpQ, int repeat) {
     while (repeat--) {
 
         float slip = airborne ? 1.0f : GROUND_SLIP;
@@ -51,17 +45,11 @@ void ZPlayer::simpleMove(float moveVec,
         // no acceleration
         if(moveVec == 0){
             prev_slip = slip;
-            prev_sprint = movementType >= SPRINT;
             continue;
         } 
 
-        /* base movement */
-        float accel = airborne ? 0.02f : 0.1f;
-        bool sprint = movementType >= SPRINT;
-
-        /* sprint multiplier */
-        if ((sprint && !airborne) || ( ((prev_sprint && sprint_delay) || (sprint && !sprint_delay)) && airborne))
-            accel *= 1.300000011920929f;
+        /* base movement(force sprinted) */
+        float accel = (airborne ? 0.02f : 0.1f) * 1.300000011920929f;
 
         /* ground drag */
         if (!airborne) {
@@ -70,30 +58,23 @@ void ZPlayer::simpleMove(float moveVec,
         }
 
         /* sprint-jump boost */
-        if (movementType == SPRINTJUMP)
+        if (sprintJumpQ)
             vz += moveVec * 0.2f;
 
         /* replicate "forward" & "strafe" in the code */
-        float mu = 1.0f;
+        float mu = 0.98f;
 
-        /* sneak slowdown */
-        if (movementType == SNEAK) 
-            mu *= 0.3f;
-
-        mu *= 0.98f;
-
-        /* normalize */
-        float dist = has45 ? std::sqrtf(mu * mu + mu * mu) : mu;
+        /* normalize, no 45 on sprintjump tick */
+        float dist = sprintJumpQ ? mu : std::sqrtf(mu * mu + mu * mu);
         if (dist > 1.0f)
             accel /= dist;
 
         mu *= accel;
 
         /* apply motion */
-        vz += moveVec * (has45 ? (mu * cos45 + mu * sin45) : mu);
+        vz += moveVec * (sprintJumpQ ? mu : (mu * cos45 + mu * sin45));
 
         prev_slip = slip;
-        prev_sprint = sprint;
     }
 }
 
@@ -159,27 +140,33 @@ void ZPlayer::loadState(){
     prev_sprint = savestate.prev_sprint;
 }
 
-void ZPlayer::st(int duration){
-    simpleMove(0, GROUND, NONE, NO45, duration);
+void ZPlayer::sj45(float moveVec, int duration){
+    simpleMove(moveVec, GROUND, true, 1);
+    simpleMove(moveVec, AIR, false, duration - 1);
 }
 
-void ZPlayer::sta(int duration){
-    simpleMove(0, AIR, NONE, NO45, duration);
+void ZPlayer::sj45(int duration){
+    sj45(FORWARD, duration);
 }
 
-void ZPlayer::chained_sj(int airtime, int repeat){
-    while (repeat--) 
-        sj(FORWARD, airtime);
+void ZPlayer::sa45(float moveVec, int duration){
+    simpleMove(moveVec, AIR, false, duration);
+}
+
+void ZPlayer::sa45(int duration){
+    sa45(FORWARD, duration);
+}
+
+void ZPlayer::s45(float moveVec, int duration){
+    simpleMove(moveVec, GROUND, false, duration);
+}
+
+void ZPlayer::s45(int duration){
+    s45(FORWARD, duration);
 }
 
 void ZPlayer::chained_sj45(int airtime, int repeat){
     while (repeat--) 
-        sj45(FORWARD, airtime);
+        sj45(airtime);
 }
-
-void ZPlayer::stj(int duration)
-{
-    simpleMove(0, GROUND, NONE, NO45, duration);
-}
-
 

@@ -9,8 +9,6 @@ void ZS::init(){
     ZPlayer::init();
 }
 
-float F = ZPlayer::FORWARD;
-
 // finds the optimal delayed speed: Given mm(no walls), mm-airtime
 ZS::mmStrat ZS::OptimalDelayed(double mm, int t)
 {
@@ -70,9 +68,9 @@ double ZS::delayloopEquilibrium(ZPlayer& p, double mm, int t, int jumps){
         p.resetAll();
         p.setVz(vi);
         p.sj45(m, 1);
-        p.sa45(F, t - 1);
+        p.sa45(t - 1);
         p.chained_sj45(t, jumps);
-        p.s45(F,1);
+        p.s45(1);
         return falseZtrueVz? p.getVz() : p.getZ();
     };
 
@@ -119,7 +117,7 @@ ZS::mmStrat ZS::OptimalNonDelayed(double mm, int t){
         p.resetAll();
         p.setVz(maxBwSpeed);
         p.sj45(m, 1);
-        p.sa45(F, t - 1);
+        p.sa45(t - 1);
         p.chained_sj45(t, c.o1.jumps);
         return falseZtrueVz? p.getVz() : p.getZ();
     };
@@ -154,7 +152,7 @@ ZS::mmStratBoth ZSolver::OptimalBoth(double mm, int t)
         p.resetAll();
         p.setVz(maxBwSpeed);
         p.sj45(m, 1);
-        p.sa45(F, t - 1);
+        p.sa45(t - 1);
         p.chained_sj45(t, c.o1.jumps);
         return falseZtrueVz? p.getVz() : p.getZ();
     };
@@ -182,11 +180,11 @@ ZS::Output1 ZS::mmHeuristics(ZPlayer& p, double mm, int t, bool delayQ, double k
         prevJump = p.getState();
         if(delayQ && jumps != 0)
             p.loadState(); //undo run 1t
-        p.sj45(F, t);
+        p.sj45(t);
         
         if(delayQ){
             p.saveState();
-            p.s45(F,1);
+            p.s45(1);
         } 
 
         if(p.getZ() > mm){
@@ -208,12 +206,12 @@ ZS::Output1 ZS::mmHeuristics(ZPlayer& p, double mm, int t, bool delayQ, double k
             int pessiTicks = 0;
             while (p.getZ() < mm){
                 pessiTicks ++;
-                p.sa45(F, 1);
+                p.sa45(1);
             }
             p.resetAll();
-            p.sa45(F, pessiTicks - 2); // do 2 tick less pessi to fit 1t run
+            p.sa45(pessiTicks - 2); // do 2 tick less pessi to fit 1t run
         }
-        p.s45(F, 1);
+        p.s45(1);
         bestBwSpeed = -p.getVz();
     }else{
         bestBwSpeed = knownBwCap;
@@ -222,7 +220,7 @@ ZS::Output1 ZS::mmHeuristics(ZPlayer& p, double mm, int t, bool delayQ, double k
     p.resetAll();
     p.setVz(bestBwSpeed);
     p.chained_sj45(t, jumps + 1);
-    if(delayQ) p.s45(F,1);
+    if(delayQ) p.s45(1);
     double bwmmDis = p.getZ();
 
     p.resetAll();
@@ -241,7 +239,7 @@ ZS::Output2 ZS::simpleBwmm(ZPlayer& p, double mm, int t, bool delayQ, Output1& o
     p.resetAll();
     p.setVz(reqBwSpeed);
     p.chained_sj45(t, o1.jumps + 1);
-    if(delayQ) p.s45(F,1);
+    if(delayQ) p.s45(1);
     bwmmSpeed = p.getVz();
 
     // Early Prune: If possible to bwmm/loop with reqBwSpeed < bestBwSpeed
@@ -260,10 +258,10 @@ ZS::Output3 ZS::tryRobo(ZPlayer& p, double mm, int t, bool delayQ, int jumps){
     if(jumps == 0) return Output3{false, 0};
 
     p.resetAll();
-    p.s45(F, 1);
+    p.s45(1);
     double hhSpeed = p.getVz(); 
     p.chained_sj45(t, jumps);
-    if(delayQ) p.s45(F,1);
+    if(delayQ) p.s45(1);
 
     double hhDis = p.getZ();
 
@@ -277,9 +275,9 @@ ZS::Output3 ZS::tryRobo(ZPlayer& p, double mm, int t, bool delayQ, int jumps){
     // the formula is v_0 = -0.13*(0.6/slip)^3/(1+0.91*slip), derived from v_0 + v_1 = 0
     double borderSpeed = -0.13/1.546;
     p.setVz(borderSpeed);
-    p.s45(F, 1);
+    p.s45(1);
     p.chained_sj45(t, jumps);
-    if(delayQ) p.s45(F,1);
+    if(delayQ) p.s45(1);
     double borderDis = p.getZ();
 
     double roboBwSpeed;
@@ -292,12 +290,12 @@ ZS::Output3 ZS::tryRobo(ZPlayer& p, double mm, int t, bool delayQ, int jumps){
     p.resetAll();
     p.setVz(roboBwSpeed);
 
-    p.s45(F,1);
-    p.sj45(F,1);
+    p.s45(1);
+    p.sj45(1);
     if(isTrueRobo) p.setZ(0);
-    p.sa45(F, t - 1);
+    p.sa45(t - 1);
     p.chained_sj45(t, jumps - 1);
-    if(delayQ) p.s45(F,1);
+    if(delayQ) p.s45(1);
 
     double roboSpeed = p.getVz();
     p.resetAll();
@@ -317,7 +315,7 @@ ZS::Output4 ZS::tryBwhh(ZPlayer& p, double mm, int t, bool delayQ, Output1& o1){
     p.resetAll();
     p.setVzAir(1);
     p.chained_sj45(t, o1.jumps);
-    if(delayQ) p.s45(F,1);
+    if(delayQ) p.s45(1);
     double z3 = p.getZ();
 
     // Lerp (0, jamDis), (z3, 1) to find (reqFwSpeed, mm)
@@ -329,7 +327,7 @@ ZS::Output4 ZS::tryBwhh(ZPlayer& p, double mm, int t, bool delayQ, Output1& o1){
         p.resetAll();
         p.setVz(vi);
         p.sj45(m, 1);
-        p.sa45(F, t - 1);
+        p.sa45(t - 1);
         return falseZtrueVz? p.getVz() : p.getZ();
     };
 
@@ -354,7 +352,7 @@ ZS::Output4 ZS::tryBwhh(ZPlayer& p, double mm, int t, bool delayQ, Output1& o1){
     p.resetAll();
     p.setVzAir(reqFwSpeed);
     p.chained_sj45(t, o1.jumps);
-    if(delayQ) p.s45(F,1);
+    if(delayQ) p.s45(1);
     double bwhhSpeed = p.getVz();
 
     if(-bwSpeedForBwhh < -o1.bestBwSpeed)

@@ -11,6 +11,9 @@ class ZSolver{
     static constexpr int BOOMERANG = 3; // Fw airspeed into sj45
     static constexpr int PENDULUM = 4; // Chained loops
 
+    static constexpr double groundInertia = 0.005/0.6/0.91;
+    static constexpr double airInertia = 0.005/0.91;
+
     struct halfStrat{
         int stratType;
         double optimalSpeed;

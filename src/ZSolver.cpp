@@ -206,11 +206,32 @@ ZS::Output2 ZS::slingShot(ZPlayer& p, double mm, int t, bool delayQ, Output1& o1
     bool poss = false;
     std::cout << "Required BW speed: " << reqBwSpeed << "\n";
 
-    p.resetAll();
-    p.setVz(reqBwSpeed);
-    p.chained_sj45(t, o1.jumps + 1);
-    if(delayQ) p.s45(1);
-    slingSpeed = p.getVz();
+    if(-reqBwSpeed >= groundInertia){
+        p.resetAll();
+        p.setVz(reqBwSpeed);
+        p.chained_sj45(t, o1.jumps + 1);
+        if(delayQ) p.s45(1);
+        slingSpeed = p.getVz();
+    }else{
+        std::cout << "This backward speed hits inertia! Fixing... \n";
+        double extendedmm = mm + groundInertia;
+
+        auto getSample = [&](double m, bool falseZtrueVz){
+            p.resetAll();
+            p.sj45(m, 1);
+            p.sa45(t - 1);
+            p.chained_sj45(t, o1.jumps);
+            if(delayQ) p.s45(1);
+            return falseZtrueVz? p.getVz() : p.getZ();
+        };
+
+        // Lerp (0, z0), (1, z1) to find (moveVec, mm)
+        double z0 = getSample(0, false);
+        double z1 = getSample(1, false);
+        double moveVec = (extendedmm - z0)/(z1 - z0);
+
+        slingSpeed = getSample(moveVec, true);
+    }
 
     // Early Prune: reqBwSpeed could be reached
     if(o1.bwmmDis < mm){

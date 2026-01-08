@@ -30,6 +30,9 @@ public:
 
     static constexpr float PI = 3.14159265358979323846f;
 
+    static constexpr float GROUND_SLIP = 0.6f;
+    static constexpr double DEFAULT_INERTIA = 0.005;
+
     /* trig */
     static float SIN_TABLE[65536];
     static float sin45;
@@ -71,8 +74,6 @@ public:
     void resetAll();
 
 private:
-    static constexpr float GROUND_SLIP = 0.6f;
-    static constexpr double DEFAULT_INERTIA = 0.005;
 
     double z = 0.0;
     double vz = 0.0;

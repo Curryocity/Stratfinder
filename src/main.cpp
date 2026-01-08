@@ -6,7 +6,7 @@ int main() {
     // We don't have GUI yet
     ZSolver::init();
     ZSolver s;
-    double mm = 3;
+    double mm = 6.005362;
     int airtime = 12;
     ZSolver::fullStrat bs = s.optimalSolve(mm, airtime);
 

@@ -1,10 +1,11 @@
 # HI
 
-Inspired by Cantnavet's [BMSolver](https://github.com/cantnavet/BmSolver/tree/main)
+Inspired by Cantnavet's [BMSolver](https://github.com/cantnavet/BmSolver)
 
 Currently, the program inputs mm and mm airtime, output the velocity for optimal delayed and nondelayed strat (Imagine the inertia threshold = 0 )
 
 Example output:
+
 ```
 LOG ----------------------- 
 - Delayed section: 

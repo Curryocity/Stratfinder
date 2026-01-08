@@ -9,59 +9,103 @@ void ZS::init(){
     ZPlayer::init();
 }
 
+// finds the optimal speed for delayed and nondelayed strat
+ZS::fullStrat ZSolver::optimalSolve(double mm, int t)
+{
+    std::cout << "LOG ----------------------- \n";
+
+    std::cout << "- Delayed section: \n";
+    // Solve delayed version first to get maxBwSpeed
+    ZS::halfStrat delayedStrat = optimalDelayed(mm, t);
+    double maxBwSpeed = -delayedStrat.optimalSpeed;
+    int dT = delayedStrat.stratType;
+    double dS = delayedStrat.optimalSpeed;
+
+    ZPlayer p;
+    mm += 0.6f;
+
+    std::cout << "\n- Nondelayed section: \n";
+    std::cout << "Max BW speed: " << maxBwSpeed << "\n";
+    // Then solve nondelayed, given the knowledge of maxBwSpeed
+    ZS::CoreCtx c = solverCore(p, mm, t, false, maxBwSpeed);
+
+    ZS::halfStrat out;
+    if (earlyPrune(c, out)) return fullStrat{dT, dS, out.stratType, out.optimalSpeed};
+
+    // Given maxBwSpeed, fit the best fw air strat (angled jt sj45)
+    auto getSample = [&](double m, bool falseZtrueVz){
+        p.resetAll();
+        p.setVz(maxBwSpeed);
+        p.sj45(m, 1);
+        p.sa45(t - 1);
+        p.chained_sj45(t, c.o1.jumps);
+        return falseZtrueVz? p.getVz() : p.getZ();
+    };
+
+    // Lerp (0, z0), (1, z1) to find (moveVec, mm)
+    double z0 = getSample(0, false);
+    double z1 = getSample(1, false);
+    double moveVec = (mm - z0)/(z1 - z0);
+
+    //simulate it and get final speed
+    return fullStrat{dT, dS, ZS::PENDULUM, getSample(moveVec, true)};
+
+}
+
 // finds the optimal delayed speed: Given mm(no walls), mm-airtime
-ZS::mmStrat ZS::OptimalDelayed(double mm, int t)
+ZS::halfStrat ZS::optimalDelayed(double mm, int t)
 {
     ZPlayer p;
     mm += 0.6f;
 
-    ZS::CoreCtx c = runCore(p, mm, t, true, 0);
+    ZS::CoreCtx c = solverCore(p, mm, t, true, 0);
 
-    ZS::mmStrat out;
+    ZS::halfStrat out;
     if (earlyPrune(c, out)) return out;
 
     double maxBwSpeed = delayloopEquilibrium(p, mm, t, c.o1.jumps);
 
     if(-maxBwSpeed >= -c.o2.reqBwSpeed) 
-        return mmStrat{ZS::SLINGSHOT, c.o2.bwmmSpeed};
+        return halfStrat{ZS::SLINGSHOT, c.o2.slingSpeed};
 
-    if(-maxBwSpeed >= -c.o4.bwSpeedForBwhh) 
-        return mmStrat{ZS::BOOMERANG, c.o4.bwhhSpeed};
+    if(-maxBwSpeed >= -c.o4.bwSpeedBoom) 
+        return halfStrat{ZS::BOOMERANG, c.o4.boomSpeed};
 
-    return mmStrat{ZS::PENDULUM, -maxBwSpeed};
+    return halfStrat{ZS::PENDULUM, -maxBwSpeed};
 }
 
-// Runs: heuristics, bwmm, robo, bwhh (no equilibrium / no moveVec fit)
-ZS::CoreCtx ZS::runCore(ZPlayer& p, double mm, int t, bool delayQ, double knownBwCap){
+// Runs: heuristics, slingShot, robo, boomerang (no equilibrium / no moveVec fit)
+ZS::CoreCtx ZS::solverCore(ZPlayer& p, double mm, int t, bool delayQ, double knownBwCap){
     CoreCtx c;
     c.o1 = ZS::mmHeuristics(p, mm, t, delayQ, knownBwCap);
-    c.o2 = ZS::simpleBwmm(p, mm, t, delayQ, c.o1);
-    c.o3 = ZS::tryRobo(p, mm, t, delayQ, c.o1.jumps);
-    c.o4 = ZS::tryBwhh(p, mm, t, delayQ, c.o1);
+    c.o2 = ZS::slingShot(p, mm, t, delayQ, c.o1);
+    c.o3 = ZS::robo(p, mm, t, delayQ, c.o1.jumps);
+    c.o4 = ZS::boomerang(p, mm, t, delayQ, c.o1);
     return c;
 }
 
 // Applies the shared early-return rules (slingshot / true robo / robo vs boomerang).
 // Returns true if early prunable, and fills `out`.
-bool ZS::earlyPrune(const CoreCtx& c, ZS::mmStrat& out){
-    if (c.o2.possBwmm) {
-        out = { ZS::SLINGSHOT, c.o2.bwmmSpeed };
+bool ZS::earlyPrune(const CoreCtx& c, ZS::halfStrat& out){
+    if (c.o2.possSling) {
+        out = { ZS::SLINGSHOT, c.o2.slingSpeed };
         return true;
     }
-    if (c.o3.isTrueRobo) {
+    if (c.o3.trueRoboQ) {
         out = { ZS::TRUE_ROBO, c.o3.roboSpeed };
         return true;
     }
-    if (c.o4.possBwhh) {
-        if (c.o3.roboSpeed > c.o4.bwhhSpeed)
+    if (c.o4.possBoom) {
+        if (c.o3.roboSpeed > c.o4.boomSpeed)
             out = { ZS::ROBO, c.o3.roboSpeed };
         else
-            out = { ZS::BOOMERANG, c.o4.bwhhSpeed };
+            out = { ZS::BOOMERANG, c.o4.boomSpeed };
         return true;
     }
     return false;
 }
 
+// Finding the velocity convergence of chained loop by solving the equation of reqBwSpeed = finalSpeed
 double ZS::delayloopEquilibrium(ZPlayer& p, double mm, int t, int jumps){
 
     auto getSample = [&](double vi, double m, bool falseZtrueVz){
@@ -91,82 +135,7 @@ double ZS::delayloopEquilibrium(ZPlayer& p, double mm, int t, int jumps){
     return -v0/(v1-v0+1);
 }
 
-
-// finds the optimal non-delayed speed: Given mm(no walls), mm-airtime
-ZS::mmStrat ZS::OptimalNonDelayed(double mm, int t){
-
-    ZPlayer p;
-    mm += 0.6f;
-
-    ZS::CoreCtx c = runCore(p, mm, t, false, 0);
-
-    ZS::mmStrat out;
-    if (earlyPrune(c, out)) return out;
-
-    ZS::mmStrat delayedStrat = OptimalDelayed(mm - 0.6f, t);
-    double maxBwSpeed = -delayedStrat.optimalSpeed;
-
-    if(-maxBwSpeed >= -c.o2.reqBwSpeed)
-        return mmStrat{ZS::SLINGSHOT, c.o2.bwmmSpeed};
-
-    if(-maxBwSpeed >= -c.o4.bwSpeedForBwhh)
-        return mmStrat{ZS::BOOMERANG, c.o4.bwhhSpeed};
-
-    // fit the best fw air strat into maxBwSpeed
-    auto getSample = [&](double m, bool falseZtrueVz){
-        p.resetAll();
-        p.setVz(maxBwSpeed);
-        p.sj45(m, 1);
-        p.sa45(t - 1);
-        p.chained_sj45(t, c.o1.jumps);
-        return falseZtrueVz? p.getVz() : p.getZ();
-    };
-
-    // Lerp (0, z0), (1, z1) to find (moveVec, mm)
-    double z0 = getSample(0, false);
-    double z1 = getSample(1, false);
-    double moveVec = (mm - z0)/(z1 - z0);
-
-    //simulate it and get final speed
-    return mmStrat{ZS::PENDULUM, getSample(moveVec, true)};
-}
-
-ZS::mmStratBoth ZSolver::OptimalBoth(double mm, int t)
-{
-
-    ZS::mmStrat delayedStrat = OptimalDelayed(mm, t);
-    double maxBwSpeed = -delayedStrat.optimalSpeed;
-    int dT = delayedStrat.stratType;
-    double dS = delayedStrat.optimalSpeed;
-
-    ZPlayer p;
-    mm += 0.6f;
-
-    ZS::CoreCtx c = runCore(p, mm, t, false, maxBwSpeed);
-
-    ZS::mmStrat out;
-    if (earlyPrune(c, out)) return mmStratBoth{dT, dS, out.stratType, out.optimalSpeed};
-
-    // fit the best fw air strat into maxBwSpeed
-    auto getSample = [&](double m, bool falseZtrueVz){
-        p.resetAll();
-        p.setVz(maxBwSpeed);
-        p.sj45(m, 1);
-        p.sa45(t - 1);
-        p.chained_sj45(t, c.o1.jumps);
-        return falseZtrueVz? p.getVz() : p.getZ();
-    };
-
-    // Lerp (0, z0), (1, z1) to find (moveVec, mm)
-    double z0 = getSample(0, false);
-    double z1 = getSample(1, false);
-    double moveVec = (mm - z0)/(z1 - z0);
-
-    //simulate it and get final speed
-    return mmStratBoth{dT, dS, ZS::PENDULUM, getSample(moveVec, true)};
-
-}
-
+// Gather samples, preReq knowledges for later calculation. If there is no knownBwCap, it yolos a reasonable lowerbound.
 ZS::Output1 ZS::mmHeuristics(ZPlayer& p, double mm, int t, bool delayQ, double knownBwCap){
     
     // Amount of jumps an mm could fit without bw speed
@@ -213,6 +182,7 @@ ZS::Output1 ZS::mmHeuristics(ZPlayer& p, double mm, int t, bool delayQ, double k
         }
         p.s45(1);
         bestBwSpeed = -p.getVz();
+        std::cout << "Estimates BW speed lowerBound: " << bestBwSpeed << "\n";
     }else{
         bestBwSpeed = knownBwCap;
     }
@@ -228,31 +198,30 @@ ZS::Output1 ZS::mmHeuristics(ZPlayer& p, double mm, int t, bool delayQ, double k
     return Output1{jumps, overJamDis, jamDis, bestBwSpeed, bwmmDis};
 }
 
-ZS::Output2 ZS::simpleBwmm(ZPlayer& p, double mm, int t, bool delayQ, Output1& o1){
+ZS::Output2 ZS::slingShot(ZPlayer& p, double mm, int t, bool delayQ, Output1& o1){
 
-    double bwmmSpeed = 0;
+    double slingSpeed = 0;
     // Lerp (0, overJamDis), (bestBwSpeed, bwmmDis) to find (reqVz, mm)
     double reqBwSpeed = o1.bestBwSpeed * (o1.overJamDis - mm) / (o1.overJamDis - o1.bwmmDis);
-    bool possBwmm = false;
+    bool poss = false;
     std::cout << "Required BW speed: " << reqBwSpeed << "\n";
 
     p.resetAll();
     p.setVz(reqBwSpeed);
     p.chained_sj45(t, o1.jumps + 1);
     if(delayQ) p.s45(1);
-    bwmmSpeed = p.getVz();
+    slingSpeed = p.getVz();
 
-    // Early Prune: If possible to bwmm/loop with reqBwSpeed < bestBwSpeed
+    // Early Prune: reqBwSpeed could be reached
     if(o1.bwmmDis < mm){
-        std::cout << "Trivial slingshot.\n";
-        possBwmm = true;
+        poss = true;
     }
 
-    return Output2{reqBwSpeed, bwmmSpeed, possBwmm};
+    return Output2{reqBwSpeed, slingSpeed, poss};
 }
 
 
-ZS::Output3 ZS::tryRobo(ZPlayer& p, double mm, int t, bool delayQ, int jumps){
+ZS::Output3 ZS::robo(ZPlayer& p, double mm, int t, bool delayQ, int jumps){
 
     // robo doesn't make sense on jump = 0
     if(jumps == 0) return Output3{false, 0};
@@ -265,7 +234,7 @@ ZS::Output3 ZS::tryRobo(ZPlayer& p, double mm, int t, bool delayQ, int jumps){
 
     double hhDis = p.getZ();
 
-    // robo could beat bwhh only when it is bwmm into hh1t
+    // robo could beat boomerang only when it is bwmm into hh1t
     if(hhDis <= mm) return Output3{false, 0};
 
     double roboSpot1; 
@@ -282,9 +251,9 @@ ZS::Output3 ZS::tryRobo(ZPlayer& p, double mm, int t, bool delayQ, int jumps){
 
     double roboBwSpeed;
 
-    bool isTrueRobo = (borderDis >= mm);
+    bool trueRoboQ = (borderDis >= mm);
 
-    hhDis -= hhSpeed * isTrueRobo; // substract hh Speed from true robo (on jump tick, player is at the backedge of the mm)
+    hhDis -= hhSpeed * trueRoboQ; // substract hh Speed from true robo (on jump tick, player is at the backedge of the mm)
     roboBwSpeed = borderSpeed * (mm - hhDis) / (borderDis - hhDis);
 
     p.resetAll();
@@ -292,7 +261,7 @@ ZS::Output3 ZS::tryRobo(ZPlayer& p, double mm, int t, bool delayQ, int jumps){
 
     p.s45(1);
     p.sj45(1);
-    if(isTrueRobo) p.setZ(0);
+    if(trueRoboQ) p.setZ(0);
     p.sa45(t - 1);
     p.chained_sj45(t, jumps - 1);
     if(delayQ) p.s45(1);
@@ -300,16 +269,16 @@ ZS::Output3 ZS::tryRobo(ZPlayer& p, double mm, int t, bool delayQ, int jumps){
     double roboSpeed = p.getVz();
     p.resetAll();
 
-    return Output3{isTrueRobo, roboSpeed};
+    return Output3{trueRoboQ, roboSpeed};
 }
 
 
-ZS::Output4 ZS::tryBwhh(ZPlayer& p, double mm, int t, bool delayQ, Output1& o1){
+ZS::Output4 ZS::boomerang(ZPlayer& p, double mm, int t, bool delayQ, Output1& o1){
 
     // robo doesn't make sense on jump = 0
     if(o1.jumps == 0) return Output4{-INFINITY, 0, false};
 
-    bool possBwhh = false;
+    bool poss = false;
 
     // Fitting an initial air speed
     p.resetAll();
@@ -320,9 +289,9 @@ ZS::Output4 ZS::tryBwhh(ZPlayer& p, double mm, int t, bool delayQ, Output1& o1){
 
     // Lerp (0, jamDis), (z3, 1) to find (reqFwSpeed, mm)
     double reqFwSpeed = (mm - o1.jamDis) / (z3 - o1.jamDis);
-    std::cout << "Required boomerang speed: " << reqFwSpeed << "\n";
+    std::cout << "Required FW airspeed: " << reqFwSpeed << "\n";
 
-    // do borderline true bwhh
+    // do borderline boomerang
     auto getSample = [&](double vi, double m, bool falseZtrueVz){
         p.resetAll();
         p.setVz(vi);
@@ -341,27 +310,27 @@ ZS::Output4 ZS::tryBwhh(ZPlayer& p, double mm, int t, bool delayQ, Output1& o1){
     double z11 = getSample(1, 1, false);
     double m1 = (-z10)/(z11 - z10);
 
-    // Lerp (0, v0), (1, v1) to find (bwSpeedForBwhh, reqFwSpeed)
+    // Lerp (0, v0), (1, v1) to find (reqBwSpeed, reqFwSpeed)
     double v0 = getSample(0, m0, true);
     double v1 = getSample(1, m1, true);
-    double bwSpeedForBwhh = (reqFwSpeed - v0)/(v1 - v0);
+    double reqBwSpeed = (reqFwSpeed - v0)/(v1 - v0);
 
-    std::cout << "Required BW speed for boomerang: " << bwSpeedForBwhh << "\n";
+    std::cout << "Required BW speed for boomerang: " << reqBwSpeed << "\n";
 
-    //desire bwhh speed
+    // Simulate boomerang speed assuming it is possible
     p.resetAll();
     p.setVzAir(reqFwSpeed);
     p.chained_sj45(t, o1.jumps);
     if(delayQ) p.s45(1);
-    double bwhhSpeed = p.getVz();
+    double boomSpeed = p.getVz();
 
-    if(-bwSpeedForBwhh < -o1.bestBwSpeed)
-        possBwhh = true;
+    if(-reqBwSpeed < -o1.bestBwSpeed)
+        poss = true;
 
-    return Output4{bwSpeedForBwhh, bwhhSpeed, possBwhh};
+    return Output4{reqBwSpeed, boomSpeed, poss};
 }
 
-std::string ZS::stratString(int stratType) {
+std::string ZS::strat2string(int stratType) {
     switch (stratType) {
         case ZS::SLINGSHOT:
             return "Slingshot";

@@ -85,10 +85,3 @@ private:
 
     State savestate;
 };
-
-/* macro cleanup */
-#undef GEN_GAJ
-#undef GEN_J
-#undef GEN_GA
-#undef STRAFES
-#undef TYPES

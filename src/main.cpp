@@ -3,6 +3,7 @@
 
 int main() {
 
+    // We don't have GUI yet
     ZSolver::init();
     ZSolver s;
     double mm = 3;

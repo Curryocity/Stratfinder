@@ -9,7 +9,7 @@ void ZS::init(){
     ZPlayer::init();
 }
 
-// finds the optimal speed for delayed and nondelayed strat
+// finds the optimal speed for delayed and nondelayed strat: Given mm, mm-airtime
 ZS::fullStrat ZSolver::optimalSolve(double mm, int t)
 {
     std::cout << "LOG ----------------------- \n";
@@ -52,7 +52,7 @@ ZS::fullStrat ZSolver::optimalSolve(double mm, int t)
 
 }
 
-// finds the optimal delayed speed: Given mm(no walls), mm-airtime
+// finds the optimal delayed speed: Given mm, mm-airtime
 ZS::halfStrat ZS::optimalDelayed(double mm, int t)
 {
     ZPlayer p;

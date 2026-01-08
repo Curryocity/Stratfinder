@@ -67,9 +67,9 @@ class ZSolver{
     double delayloopEquilibrium(ZPlayer& p, double mm, int t, int jumps);
 
     Output1 mmHeuristics(ZPlayer& p, double mm, int t, bool delayQ, double knownBestBwSpeed);
-    Output2 slingShot(ZPlayer& p, double mm, int t, bool delayQ, Output1& o1);
-    Output3 robo(ZPlayer& p, double mm, int t, bool delayQ, int jumps);
-    Output4 boomerang(ZPlayer& p, double mm, int t, bool delayQ, Output1& o1);
+    Output2 slingShot   (ZPlayer& p, double mm, int t, bool delayQ, Output1& o1);
+    Output3 robo        (ZPlayer& p, double mm, int t, bool delayQ, int jumps);
+    Output4 boomerang   (ZPlayer& p, double mm, int t, bool delayQ, Output1& o1);
 
     static std::string strat2string(int stratType);
 

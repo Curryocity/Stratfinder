@@ -78,11 +78,11 @@ void ZPlayer::simpleMove(float moveVec, bool airborne, bool sprintJumpQ, int rep
     }
 }
 
-double ZPlayer::getZ(){
+double ZPlayer::Z(){
     return z;
 }
 
-double ZPlayer::getVz(){
+double ZPlayer::Vz(){
     return vz;
 }
 

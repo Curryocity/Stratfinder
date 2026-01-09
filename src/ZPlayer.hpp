@@ -56,8 +56,8 @@ public:
 
     void chained_sj45(int airtime, int repeat);
 
-    double getZ();
-    double getVz();
+    double Z();
+    double Vz();
 
     void setZ(double z);
     void setVz(double vz);

@@ -28,7 +28,8 @@ public:
     static constexpr int GROUND = 0;
     static constexpr int AIR = 1;
 
-    static constexpr float PI = 3.14159265358979323846f;
+    static constexpr float PIf = 3.14159265358979323846f;
+    static constexpr double PId = 3.14159265358979323846264338327950288;
 
     static constexpr float GROUND_SLIP = 0.6f;
     static constexpr double DEFAULT_INERTIA = 0.005;
@@ -68,10 +69,14 @@ public:
     void loadState();
     void loadState(const State& s);
 
-    void inertia(double inertia);
+    void toggleInertia(bool on);
+    void forceInertiaNext();
     void sprintDelay(bool delayQ);
 
     void resetAll();
+    void resetClock();
+    int lastInertia();
+    bool hitVelNeg();
 
 private:
 
@@ -81,8 +86,13 @@ private:
     float prev_slip = -1;
     bool prev_sprint = false;
 
-    double inertia_threshold = DEFAULT_INERTIA;
-    bool sprint_delay = true;
+    bool inertia_on = false; 
+    bool forceInertia = false; // If true, next vz update will apply inertia, then toggle off
+    bool sprint_delay = true; 
+
+    int clock = 0;  // increases every tick, used for inertia timing
+    int last_inertia = -1; // the clock value of last inertia trigger
+    bool hit_vel_neg = false; // in the last inertia hit, was vz < 0?
 
     State savestate;
 };

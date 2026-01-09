@@ -1,4 +1,5 @@
 #include <cmath>
+#include <iostream>
 #include "ZPlayer.hpp"
 
 /* static storage */
@@ -9,7 +10,7 @@ float ZPlayer::cos45 = 0.0f;
 /* Precompute sine table */
 void ZPlayer::init() {
     for (int i = 0; i < 65536; ++i) {
-        SIN_TABLE[i] = std::sin(i * M_PI * 2.0 / 65536.0);
+        SIN_TABLE[i] = std::sin(i * PId * 2.0 / 65536.0);
     }
 
     sin45 = sin(45.01f);
@@ -17,12 +18,12 @@ void ZPlayer::init() {
 }
 
 inline float ZPlayer::sin(float deg) {
-    float rad = deg * PI / 180.0f;
+    float rad = deg * PIf / 180.0f;
     return SIN_TABLE[(int)(rad * 10430.378f) & 65535];
 }
 
 inline float ZPlayer::cos(float deg) {
-    float rad = deg * PI / 180.0f;
+    float rad = deg * PIf / 180.0f;
     return SIN_TABLE[(int)(rad * 10430.378f + 16384.0f) & 65535];
 }
 
@@ -40,13 +41,17 @@ void ZPlayer::simpleMove(float moveVec, bool airborne, bool sprintJumpQ, int rep
 
         vz *= 0.91f * prev_slip;
 
-        // if (std::abs(vz) < inertia_threshold) vz = 0;
-        
-        // no acceleration
-        if(moveVec == 0){
-            prev_slip = slip;
-            continue;
-        } 
+        if (std::abs(vz) < DEFAULT_INERTIA && vz != 0) {
+            last_inertia = clock;
+            hit_vel_neg = (vz < 0);
+            if(inertia_on) vz = 0;
+        }
+
+        // artificial inertia application
+        if(forceInertia){
+            vz = 0;
+            forceInertia = false;
+        }
 
         /* base movement(force sprinted) */
         float accel = (airborne ? 0.02f : 0.1f) * 1.300000011920929f;
@@ -75,6 +80,7 @@ void ZPlayer::simpleMove(float moveVec, bool airborne, bool sprintJumpQ, int rep
         vz += moveVec * (sprintJumpQ ? mu : (mu * cos45 + mu * sin45));
 
         prev_slip = slip;
+        clock ++;
     }
 }
 
@@ -105,6 +111,21 @@ void ZPlayer::resetAll()
     vz = 0;
     prev_slip = -1;
     prev_sprint = false;
+    resetClock();
+}
+
+void ZPlayer::resetClock(){
+    clock = 0;
+    last_inertia = -1;
+    forceInertia = false;
+}
+
+int ZPlayer::lastInertia(){
+    return last_inertia;
+}
+
+bool ZPlayer::hitVelNeg(){
+    return hit_vel_neg;
 }
 
 void ZPlayer::saveState(){
@@ -125,8 +146,12 @@ void ZPlayer::loadState(const ZPlayer::State& s) {
     prev_sprint = s.prev_sprint;
 }
 
-void ZPlayer::inertia(double inertia){
-    inertia_threshold = inertia;
+void ZPlayer::toggleInertia(bool on){
+    inertia_on = on;
+}
+
+void ZPlayer::forceInertiaNext(){
+    forceInertia = true;
 }
 
 void ZPlayer::sprintDelay(bool delayQ){
@@ -145,25 +170,17 @@ void ZPlayer::sj45(float moveVec, int duration){
     simpleMove(moveVec, AIR, false, duration - 1);
 }
 
-void ZPlayer::sj45(int duration){
-    sj45(FORWARD, duration);
-}
-
 void ZPlayer::sa45(float moveVec, int duration){
     simpleMove(moveVec, AIR, false, duration);
-}
-
-void ZPlayer::sa45(int duration){
-    sa45(FORWARD, duration);
 }
 
 void ZPlayer::s45(float moveVec, int duration){
     simpleMove(moveVec, GROUND, false, duration);
 }
 
-void ZPlayer::s45(int duration){
-    s45(FORWARD, duration);
-}
+void ZPlayer::sj45(int duration){ sj45(FORWARD, duration);}
+void ZPlayer::sa45(int duration){ sa45(FORWARD, duration);}
+void ZPlayer::s45 (int duration){  s45(FORWARD, duration);}
 
 void ZPlayer::chained_sj45(int airtime, int repeat){
     while (repeat--) 

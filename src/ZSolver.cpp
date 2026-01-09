@@ -86,57 +86,6 @@ bool ZS::earlyPrune(const CoreCtx& c, ZS::halfStrat& out){
     return false;
 }
 
-// Finding the velocity convergence of chained loop by solving the equation of reqBwSpeed = finalSpeed
-double ZS::delayedPendulum(ZPlayer& p, double mm, int t, int jumps){
-
-    auto getSample = [&](double vi, double m, bool falseZtrueVz){
-        p.resetAll();
-        p.setVz(vi);
-        p.sj45(m, 1);
-        p.sa45(t - 1);
-        p.chained_sj45(t, jumps);
-        p.s45(1);
-        return falseZtrueVz? p.Vz() : p.Z();
-    };
-
-    // Lerp (0, z00) and (1, z01) to get (m0, mm)
-    double z00 = getSample(0, 0, false);
-    double z01 = getSample(0, 1, false);
-    double m0 = (mm - z00)/(z01 - z00);
-
-    // Lerp (0, z10) and (1, z11) to get (m1, mm)
-    double z10 = getSample(1, 0, false);
-    double z11 = getSample(1, 1, false);
-    double m1 = (mm - z10)/(z11 - z10);
-
-    // Simulate with (vi,m), solve the equation v_end = linear_func(vi) = -vi:
-    double v0 = getSample(0, m0, true);
-    double v1 = getSample(1, m1, true);
-
-    return v0/(v1-v0+1);
-}
-
-// Given maxBwSpeed, fit the best fw air strat (angled jt sj45)
-double ZS::nondelayedPendulum(ZPlayer& p, double mm, int t, int jumps, double maxBwSpeed){
-    
-    auto getSample = [&](double m, bool falseZtrueVz){
-        p.resetAll();
-        p.setVz(maxBwSpeed);
-        p.sj45(m, 1);
-        p.sa45(t - 1);
-        p.chained_sj45(t, jumps);
-        return falseZtrueVz? p.Vz() : p.Z();
-    };
-
-    // Lerp (0, z0), (1, z1) to find (moveVec, mm)
-    double z0 = getSample(0, false);
-    double z1 = getSample(1, false);
-    double moveVec = (mm - z0)/(z1 - z0);
-
-    //simulate it and get final speed
-    return getSample(moveVec, true);
-}
-
 // Gather samples, preReq knowledges for later calculation. If there is no knownBwCap, it yolos a reasonable lowerbound.
 ZS::Output1 ZS::mmHeuristics(ZPlayer& p, double mm, int t, bool delayQ, double knownBwCap){
     
@@ -233,6 +182,9 @@ ZS::Output2 ZS::slingShot(ZPlayer& p, double mm, int t, bool delayQ, Output1& o1
         double z1 = getSample(1, false);
         double moveVec = (extendedmm - z0)/(z1 - z0);
 
+        // Extending mm by ~0.0091575 is sometimes more than enough.
+        if(moveVec > 1) moveVec = 1;
+
         slingSpeed = getSample(moveVec, true);
     }
 
@@ -314,7 +266,7 @@ ZS::Output4 ZS::boomerang(ZPlayer& p, double mm, int t, bool delayQ, Output1& o1
     std::cout << "Required FW airspeed: " << reqFwSpeed << "\n";
 
     // do borderline boomerang
-    auto getSample = [&](double vi, double m, bool falseZtrueVz){
+    auto samp = [&](double vi, double m, bool falseZtrueVz){
         p.resetAll();
         p.setVz(vi);
         p.sj45(m, 1);
@@ -323,18 +275,18 @@ ZS::Output4 ZS::boomerang(ZPlayer& p, double mm, int t, bool delayQ, Output1& o1
     };
 
     // Lerp (0, z00), (1, z01) to find (m0, 0)
-    double z00 = getSample(0, 0, false);
-    double z01 = getSample(0, 1, false);
+    double z00 = samp(0, 0, false);
+    double z01 = samp(0, 1, false);
     double m0 = (-z00)/(z01 - z00);
 
     // Lerp (0, z10), (1, z11) to find (m1, 0)
-    double z10 = getSample(1, 0, false);
-    double z11 = getSample(1, 1, false);
+    double z10 = samp(1, 0, false);
+    double z11 = samp(1, 1, false);
     double m1 = (-z10)/(z11 - z10);
 
     // Lerp (0, v0), (1, v1) to find (reqBwSpeed, reqFwSpeed)
-    double v0 = getSample(0, m0, true);
-    double v1 = getSample(1, m1, true);
+    double v0 = samp(0, m0, true);
+    double v1 = samp(1, m1, true);
     double reqBwSpeed = (reqFwSpeed - v0)/(v1 - v0);
 
     std::cout << "Required BW speed for boomerang: " << reqBwSpeed << "\n";
@@ -351,6 +303,140 @@ ZS::Output4 ZS::boomerang(ZPlayer& p, double mm, int t, bool delayQ, Output1& o1
 
     return Output4{reqBwSpeed, boomSpeed, poss};
 }
+
+
+// Finding the velocity convergence of chained loop by solving the equation of reqBwSpeed = finalSpeed
+double ZS::delayedPendulum(ZPlayer& p, double mm, int t, int jumps){
+
+    auto samp = [&](double vi, double m, bool falseZtrueVz){
+        p.resetAll();
+        p.setVz(vi);
+        p.sj45(m, 1);
+        p.sa45(t - 1);
+        p.chained_sj45(t, jumps);
+        p.s45(1);
+        return falseZtrueVz? p.Vz() : p.Z();
+    };
+
+    // Lerp (0, z00) and (1, z01) to get (m0, mm)
+    double z00 = samp(0, 0, false);
+    double z01 = samp(0, 1, false);
+    double m0 = (mm - z00)/(z01 - z00);
+
+    // Lerp (0, z10) and (1, z11) to get (m1, mm)
+    double z10 = samp(1, 0, false);
+    double z11 = samp(1, 1, false);
+    double m1 = (mm - z10)/(z11 - z10);
+
+    // Simulate with (vi,m), solve the equation v_end = linear_func(vi) = -vi:
+    double v0 = samp(0, m0, true);
+    double v1 = samp(1, m1, true);
+
+    double pendulumSpeed = v0/(v1-v0+1);
+    // Lerp (0, z0) and (1, z1) to get (moveVec, mm)
+    double z0 = samp(-pendulumSpeed, 0, false);
+    double z1 = samp(-pendulumSpeed, 1, false);
+    double moveVec = (mm - z0)/(z1 - z0);
+
+    // Simulate it to check inertia shenanigans
+    samp(-pendulumSpeed, moveVec, true);
+    if(p.lastInertia() == -1) return pendulumSpeed;
+
+    // INERTIA SECTION
+    int inertiaTick = p.lastInertia();
+    bool hitVelNeg = p.hitVelNeg();
+
+    std::cout << "Inertia triggered at t = " << inertiaTick << " during delayed pendulum simulation.\n" << "Vz on inertia tick: " << (hitVelNeg ? "neg" : "pos") << "\n";
+
+    return pendulumSpeed;
+}
+
+// Given maxBwSpeed, fit the best fw air strat (angled jt sj45)
+double ZS::nondelayedPendulum(ZPlayer& p, double mm, int t, int jumps, double maxBwSpeed){
+    
+    auto samp = [&](double m, bool falseZtrueVz){
+        p.resetAll();
+        p.setVz(maxBwSpeed);
+        p.sj45(m, 1);
+        p.sa45(t - 1);
+        p.chained_sj45(t, jumps);
+        return falseZtrueVz? p.Vz() : p.Z();
+    };
+
+    // Lerp (0, z0), (1, z1) to find (moveVec, mm)
+    double z0 = samp(0, false);
+    double z1 = samp(1, false);
+    double moveVec = (mm - z0)/(z1 - z0);
+
+    // Simulate it
+    double pendulumSpeed = samp(moveVec, true);
+    if(p.lastInertia() == -1) return pendulumSpeed;
+
+    // INERTIA SECTION
+    int inertiaTick = p.lastInertia();
+    bool hitVelNeg = p.hitVelNeg();
+
+    std::cout << "Inertia triggered at t = " << inertiaTick << " during nondelayed pendulum simulation.\n" << "Vz on inertia tick: " << (hitVelNeg ? "neg" : "pos") << "\n";
+
+    // NOTE: It is proven that avoiding inertia below is never optimal, same as the ground case.
+
+    auto ISamp = [&](double m){
+        p.resetAll();
+        p.setVz(maxBwSpeed);
+        p.sj45(m, 1);
+        p.sa45(inertiaTick - 1);
+        return p.Vz();
+    };
+
+    auto fullISamp = [&](double ma, double mj, bool hitInertia, bool falseZtrueVz){
+        p.resetAll();
+        p.setVz(maxBwSpeed);
+        p.sj45(mj, 1);
+        p.sa45(inertiaTick - 1);
+        if(hitInertia) p.forceInertiaNext();
+        p.sa45(ma, 1);
+        p.sa45(t - inertiaTick - 1);
+        p.chained_sj45(t, jumps);
+        return falseZtrueVz? p.Vz() : p.Z();
+    };
+
+    // Lerp (0, v0), (1, v1) to find (moveVec, - airInertia) and (moveVec, airInertia)
+    double v0 = ISamp(0);
+    double v1 = ISamp(1);
+    double mInertiaLB = ( -airInertia - v0 ) / ( v1 - v0 );
+    double mInertiaUB = ( airInertia - v0 ) / ( v1 - v0 );
+
+    if(hitVelNeg){
+        // Hit inertia on lowerbound, and slow down afterward
+        double x0 = fullISamp(0, mInertiaLB, true, false);
+        double x1 = fullISamp(1, mInertiaLB, true, false);
+        double ma = (mm - x0)/(x1 - x0);
+
+        pendulumSpeed = fullISamp(ma, mInertiaLB, true, true);
+        std::cout << "Hit inertia on lowerbound, and slow down afterward \n";
+    }else{
+        // hit inertia on lowerbound, full speed
+        pendulumSpeed = fullISamp(1, mInertiaLB, true, true);
+
+        // avoid inertia above, and slow down afterward
+        double x0 = fullISamp(0, mInertiaUB, false, false);
+        double x1 = fullISamp(1, mInertiaUB, false, false);
+        double ma = (mm - x0)/(x1 - x0);
+
+        double tempV = fullISamp(ma, mInertiaUB, false, true);
+
+        if(tempV > pendulumSpeed){
+            pendulumSpeed = tempV;
+            std::cout << "Avoid inertia on upperbound, and slow down afterward \n";
+        }else {
+            std::cout << "Hit inertia on lowerbound, full speed \n";
+        }
+            
+    }
+    
+    return pendulumSpeed;
+}
+
 
 std::string ZS::strat2string(int stratType) {
     switch (stratType) {

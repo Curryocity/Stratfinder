@@ -318,25 +318,28 @@ double ZS::delayedPendulum(ZPlayer& p, double mm, int t, int jumps){
         return falseZtrueVz? p.Vz() : p.Z();
     };
 
-    // Lerp (0, z00) and (1, z01) to get (m0, mm)
-    double z00 = samp(0, 0, false);
-    double z01 = samp(0, 1, false);
-    double m0 = (mm - z00)/(z01 - z00);
+    double pendulumSpeed, moveVec;
+    {
+        // Lerp (0, z00) and (1, z01) to get (m0, mm)
+        double z00 = samp(0, 0, false);
+        double z01 = samp(0, 1, false);
+        double m0 = (mm - z00)/(z01 - z00);
 
-    // Lerp (0, z10) and (1, z11) to get (m1, mm)
-    double z10 = samp(1, 0, false);
-    double z11 = samp(1, 1, false);
-    double m1 = (mm - z10)/(z11 - z10);
+        // Lerp (0, z10) and (1, z11) to get (m1, mm)
+        double z10 = samp(1, 0, false);
+        double z11 = samp(1, 1, false);
+        double m1 = (mm - z10)/(z11 - z10);
 
-    // Simulate with (vi,m), solve the equation v_end = linear_func(vi) = -vi:
-    double v0 = samp(0, m0, true);
-    double v1 = samp(1, m1, true);
+        // Simulate with (vi,m), solve the equation v_end = linear_func(vi) = -vi:
+        double v0 = samp(0, m0, true);
+        double v1 = samp(1, m1, true);
 
-    double pendulumSpeed = v0/(v1-v0+1);
-    // Lerp (0, z0) and (1, z1) to get (moveVec, mm)
-    double z0 = samp(-pendulumSpeed, 0, false);
-    double z1 = samp(-pendulumSpeed, 1, false);
-    double moveVec = (mm - z0)/(z1 - z0);
+        pendulumSpeed = v0/(v1-v0+1);
+        // Lerp (0, z0) and (1, z1) to get (moveVec, mm)
+        double z0 = samp(-pendulumSpeed, 0, false);
+        double z1 = samp(-pendulumSpeed, 1, false);
+        moveVec = (mm - z0)/(z1 - z0);
+    }
 
     // Simulate it to check inertia shenanigans
     samp(-pendulumSpeed, moveVec, true);
@@ -347,6 +350,84 @@ double ZS::delayedPendulum(ZPlayer& p, double mm, int t, int jumps){
     bool hitVelNeg = p.hitVelNeg();
 
     std::cout << "Inertia triggered at t = " << inertiaTick << " during delayed pendulum simulation.\n" << "Vz on inertia tick: " << (hitVelNeg ? "neg" : "pos") << "\n";
+
+    auto ISamp = [&](double vi, double m){
+        p.resetAll();
+        p.setVz(vi);
+        p.sj45(m, 1);
+        p.sa45(inertiaTick - 1);
+        return p.Vz();
+    };
+
+    double inertia = (inertiaTick == 1)? groundInertia : airInertia;
+
+    double v00 = ISamp(0,0);
+    double v01 = ISamp(0,1);
+    double m0LB = ( -inertia - v00 ) / ( v01 - v00 );
+    double m0UB = ( inertia - v00 ) / ( v01 - v00 );
+
+    double v10 = ISamp(1,0);
+    double v11 = ISamp(1,1);
+    double m1LB = ( -inertia - v10 ) / ( v11 - v10 );
+    double m1UB = ( inertia - v10 ) / ( v11 - v10 );
+
+    auto fullISamp = [&](double vi, double ma, double mj, bool hitInertia, bool falseZtrueVz){
+        p.resetAll();
+        p.setVz(vi);
+        p.sj45(mj, 1);
+        p.sa45(inertiaTick - 1);
+        if(hitInertia) p.forceInertiaNext();
+        p.sa45(ma, 1);
+        p.sa45(t - inertiaTick - 1);
+        p.chained_sj45(t, jumps);
+        p.s45(1);
+        return falseZtrueVz? p.Vz() : p.Z();
+    };
+
+    if(hitVelNeg){
+        // Hit inertia on lowerbound, and slow down afterward
+        double z00LB = fullISamp(0, 0, m0LB, true, false);
+        double z01LB = fullISamp(0, 1, m0LB, true, false);
+        double ma0LB = (mm - z00LB)/(z01LB - z00LB);
+
+        double z10LB = fullISamp(1, 0, m1LB, true, false);
+        double z11LB = fullISamp(1, 1, m1LB, true, false);
+        double ma1LB = (mm - z10LB)/(z11LB - z10LB);
+
+        double v0LB = fullISamp(0, ma0LB, m0LB, true, true);
+        double v1LB = fullISamp(1, ma1LB, m1LB, true, true);
+    
+        pendulumSpeed = v0LB /(v1LB - v0LB + 1);
+
+        std::cout << "Hit inertia on lowerbound, and slow down afterward \n";
+    }else{
+        // hit inertia on lowerbound, full speed
+        double v0 = fullISamp(0, 1, m0LB, true, true);
+        double v1 = fullISamp(1, 1, m1LB, true, true);
+
+        pendulumSpeed = v0/(v1-v0+1);
+
+        // avoid inertia above, and slow down afterward
+        double z00UB = fullISamp(0, 0, m0UB, false, false);
+        double z01UB = fullISamp(0, 1, m0UB, false, false);
+        double ma0UB = (mm - z00UB)/(z01UB - z00UB);
+
+        double z10UB = fullISamp(1, 0, m1UB, false, false);
+        double z11UB = fullISamp(1, 1, m1UB, false, false);
+        double ma1UB = (mm - z10UB)/(z11UB - z10UB);
+
+        double v0UB = fullISamp(0, ma0UB, m0UB, false, true);
+        double v1UB = fullISamp(1, ma1UB, m1UB, false, true);
+
+        double tempV = v0UB/(v1UB-v0UB+1);
+        if(tempV > pendulumSpeed){
+            pendulumSpeed = tempV;
+            std::cout << "Avoid inertia on upperbound, and slow down afterward \n";
+        }else {
+            std::cout << "Hit inertia on lowerbound, full speed \n";
+        }
+    }
+        
 
     return pendulumSpeed;
 }
@@ -400,11 +481,12 @@ double ZS::nondelayedPendulum(ZPlayer& p, double mm, int t, int jumps, double ma
         return falseZtrueVz? p.Vz() : p.Z();
     };
 
-    // Lerp (0, v0), (1, v1) to find (moveVec, - airInertia) and (moveVec, airInertia)
+    double inertia = (inertiaTick == 1)? groundInertia : airInertia;
+
     double v0 = ISamp(0);
     double v1 = ISamp(1);
-    double mInertiaLB = ( -airInertia - v0 ) / ( v1 - v0 );
-    double mInertiaUB = ( airInertia - v0 ) / ( v1 - v0 );
+    double mInertiaLB = ( -inertia - v0 ) / ( v1 - v0 );
+    double mInertiaUB = ( inertia - v0 ) / ( v1 - v0 );
 
     if(hitVelNeg){
         // Hit inertia on lowerbound, and slow down afterward

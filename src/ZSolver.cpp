@@ -32,23 +32,8 @@ ZS::fullStrat ZSolver::optimalSolve(double mm, int t)
     ZS::halfStrat out;
     if (earlyPrune(c, out)) return fullStrat{dT, dS, out.stratType, out.optimalSpeed};
 
-    // Given maxBwSpeed, fit the best fw air strat (angled jt sj45)
-    auto getSample = [&](double m, bool falseZtrueVz){
-        p.resetAll();
-        p.setVz(maxBwSpeed);
-        p.sj45(m, 1);
-        p.sa45(t - 1);
-        p.chained_sj45(t, c.o1.jumps);
-        return falseZtrueVz? p.getVz() : p.getZ();
-    };
-
-    // Lerp (0, z0), (1, z1) to find (moveVec, mm)
-    double z0 = getSample(0, false);
-    double z1 = getSample(1, false);
-    double moveVec = (mm - z0)/(z1 - z0);
-
-    //simulate it and get final speed
-    return fullStrat{dT, dS, ZS::PENDULUM, getSample(moveVec, true)};
+    double pendulumSpeed = nondelayedPendulum(p, mm, t, c.o1.jumps, maxBwSpeed);
+    return fullStrat{dT, dS, ZS::PENDULUM, pendulumSpeed};
 
 }
 
@@ -63,15 +48,11 @@ ZS::halfStrat ZS::optimalDelayed(double mm, int t)
     ZS::halfStrat out;
     if (earlyPrune(c, out)) return out;
 
-    double maxBwSpeed = delayloopEquilibrium(p, mm, t, c.o1.jumps);
+    double pendulumSpeed = delayedPendulum(p, mm, t, c.o1.jumps);
+    if(pendulumSpeed >= -c.o2.reqBwSpeed) return halfStrat{ZS::SLINGSHOT, c.o2.slingSpeed};
+    if(pendulumSpeed >= -c.o4.bwSpeedBoom) return halfStrat{ZS::BOOMERANG, c.o4.boomSpeed};
 
-    if(-maxBwSpeed >= -c.o2.reqBwSpeed) 
-        return halfStrat{ZS::SLINGSHOT, c.o2.slingSpeed};
-
-    if(-maxBwSpeed >= -c.o4.bwSpeedBoom) 
-        return halfStrat{ZS::BOOMERANG, c.o4.boomSpeed};
-
-    return halfStrat{ZS::PENDULUM, -maxBwSpeed};
+    return halfStrat{ZS::PENDULUM, pendulumSpeed};
 }
 
 // Runs: heuristics, slingShot, robo, boomerang (no equilibrium / no moveVec fit)
@@ -106,7 +87,7 @@ bool ZS::earlyPrune(const CoreCtx& c, ZS::halfStrat& out){
 }
 
 // Finding the velocity convergence of chained loop by solving the equation of reqBwSpeed = finalSpeed
-double ZS::delayloopEquilibrium(ZPlayer& p, double mm, int t, int jumps){
+double ZS::delayedPendulum(ZPlayer& p, double mm, int t, int jumps){
 
     auto getSample = [&](double vi, double m, bool falseZtrueVz){
         p.resetAll();
@@ -132,7 +113,28 @@ double ZS::delayloopEquilibrium(ZPlayer& p, double mm, int t, int jumps){
     double v0 = getSample(0, m0, true);
     double v1 = getSample(1, m1, true);
 
-    return -v0/(v1-v0+1);
+    return v0/(v1-v0+1);
+}
+
+// Given maxBwSpeed, fit the best fw air strat (angled jt sj45)
+double ZS::nondelayedPendulum(ZPlayer& p, double mm, int t, int jumps, double maxBwSpeed){
+    
+    auto getSample = [&](double m, bool falseZtrueVz){
+        p.resetAll();
+        p.setVz(maxBwSpeed);
+        p.sj45(m, 1);
+        p.sa45(t - 1);
+        p.chained_sj45(t, jumps);
+        return falseZtrueVz? p.getVz() : p.getZ();
+    };
+
+    // Lerp (0, z0), (1, z1) to find (moveVec, mm)
+    double z0 = getSample(0, false);
+    double z1 = getSample(1, false);
+    double moveVec = (mm - z0)/(z1 - z0);
+
+    //simulate it and get final speed
+    return getSample(moveVec, true);
 }
 
 // Gather samples, preReq knowledges for later calculation. If there is no knownBwCap, it yolos a reasonable lowerbound.
@@ -213,6 +215,7 @@ ZS::Output2 ZS::slingShot(ZPlayer& p, double mm, int t, bool delayQ, Output1& o1
         if(delayQ) p.s45(1);
         slingSpeed = p.getVz();
     }else{
+        // If reqBwSpeed hits inertia, set bwSpeed to just hit inertia barely(has the effect to extend the mm by ~0.0091575), angled the first jump tick.
         std::cout << "This backward speed hits inertia! Fixing... \n";
         double extendedmm = mm + groundInertia;
 

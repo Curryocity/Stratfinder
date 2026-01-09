@@ -67,7 +67,8 @@ class ZSolver{
 
     CoreCtx solverCore(ZPlayer& p, double mm, int t, bool delayQ, double knownBwCap);
     bool earlyPrune(const CoreCtx& c, halfStrat& out);
-    double delayloopEquilibrium(ZPlayer& p, double mm, int t, int jumps);
+    double delayedPendulum(ZPlayer& p, double mm, int t, int jumps);
+    double nondelayedPendulum(ZPlayer& p, double mm, int t, int jumps, double maxBwSpeed);
 
     Output1 mmHeuristics(ZPlayer& p, double mm, int t, bool delayQ, double knownBestBwSpeed);
     Output2 slingShot   (ZPlayer& p, double mm, int t, bool delayQ, Output1& o1);

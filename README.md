@@ -68,4 +68,4 @@ t = 15: 5.375000 + 0.000034 b
 t = 19: 6.562500 + 0.000391 b
 ```
 
-### STATUS: STILL WORK IN PROCESS
+### TODO: Fully backwalled strats, potion effect support, (ice/slime support? might need to mark ice_start and ice_end)

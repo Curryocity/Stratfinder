@@ -12,9 +12,11 @@ void ZS::init(){
 // Finds the optimal speed for delayed and nondelayed strat: Given mm, mm-airtime
 ZS::fullStrat ZSolver::optimalSolve(double mm, int t)
 {
-    std::cout << "LOG ----------------------- \n";
+    log += "Optimal Solve ----------------------- \n";
+    log += "Target mm: " + std::to_string(mm) + ", airtime: " + std::to_string(t) + "\n";
 
-    std::cout << "- Delayed section: \n";
+    log += "- Delayed section: \n";
+
     // Solve delayed version first to get maxBwSpeed
     ZS::halfStrat delayedStrat = optimalDelayed(mm, t);
     int dT = delayedStrat.stratType;
@@ -24,8 +26,8 @@ ZS::fullStrat ZSolver::optimalSolve(double mm, int t)
     ZPlayer p;
     mm += 0.6f;
 
-    std::cout << "\n- Nondelayed section: \n";
-    std::cout << "Max BW speed: " << maxBwSpeed << "\n";
+    log += "\n- Nondelayed section: \n";
+    log += "Max BW speed: " + std::to_string(maxBwSpeed) + "\n";
     // Then solve nondelayed, given the knowledge of maxBwSpeed
     ZS::CoreCtx c = solverCore(p, mm, t, false, maxBwSpeed);
 
@@ -133,7 +135,7 @@ ZS::Output1 ZS::mmHeuristics(ZPlayer& p, double mm, int t, bool delayQ, double k
         }
         p.s45(1);
         bestBwSpeed = -p.Vz();
-        std::cout << "Estimates BW speed lowerBound: " << bestBwSpeed << "\n";
+        log += "Estimates BW speed lowerBound: " + std::to_string(bestBwSpeed) + "\n";
     }else{
         bestBwSpeed = knownBwCap;
     }
@@ -155,7 +157,7 @@ ZS::Output2 ZS::slingShot(ZPlayer& p, double mm, int t, bool delayQ, Output1& o1
     // Lerp (0, overJamDis), (bestBwSpeed, bwmmDis) to find (reqVz, mm)
     double reqBwSpeed = o1.bestBwSpeed * (o1.overJamDis - mm) / (o1.overJamDis - o1.bwmmDis);
     bool poss = false;
-    std::cout << "Required BW speed: " << reqBwSpeed << "\n";
+    log += "Required BW speed: " + std::to_string(reqBwSpeed) + "\n";
 
     if(-reqBwSpeed >= groundInertia){
         p.resetAll();
@@ -165,7 +167,7 @@ ZS::Output2 ZS::slingShot(ZPlayer& p, double mm, int t, bool delayQ, Output1& o1
         slingSpeed = p.Vz();
     }else{
         // If reqBwSpeed hits inertia, set bwSpeed to just hit inertia barely(has the effect to extend the mm by ~0.0091575), angled the first jump tick.
-        std::cout << "This backward speed hits inertia! Fixing... \n";
+        log += "This backward speed hits inertia! Fixing... \n";
         double extendedmm = mm + groundInertia;
 
         auto getSample = [&](double m, bool falseZtrueVz){
@@ -263,7 +265,7 @@ ZS::Output4 ZS::boomerang(ZPlayer& p, double mm, int t, bool delayQ, Output1& o1
 
     // Lerp (0, jamDis), (z3, 1) to find (reqFwSpeed, mm)
     double reqFwSpeed = (mm - o1.jamDis) / (z3 - o1.jamDis);
-    std::cout << "Required FW airspeed: " << reqFwSpeed << "\n";
+    log += "Required FW airspeed: " + std::to_string(reqFwSpeed) + "\n";
 
     // do borderline boomerang
     auto samp = [&](double vi, double m, bool falseZtrueVz){
@@ -289,7 +291,7 @@ ZS::Output4 ZS::boomerang(ZPlayer& p, double mm, int t, bool delayQ, Output1& o1
     double v1 = samp(1, m1, true);
     double reqBwSpeed = (reqFwSpeed - v0)/(v1 - v0);
 
-    std::cout << "Required BW speed for boomerang: " << reqBwSpeed << "\n";
+    log += "Required BW speed for boomerang: " + std::to_string(reqBwSpeed) + "\n";
 
     // Simulate boomerang speed assuming it is possible
     p.resetAll();
@@ -349,7 +351,7 @@ double ZS::delayedPendulum(ZPlayer& p, double mm, int t, int jumps){
     int inertiaTick = p.lastInertia();
     bool hitVelNeg = p.hitVelNeg();
 
-    std::cout << "Inertia triggered at t = " << inertiaTick << " during delayed pendulum simulation.\n" << "Vz on inertia tick: " << (hitVelNeg ? "neg" : "pos") << "\n";
+    log += "Inertia triggered at t = " + std::to_string(inertiaTick) + " during delayed pendulum simulation.\n" + "Vz on inertia tick: " + (hitVelNeg ? "neg" : "pos") + "\n";
 
     auto ISamp = [&](double vi, double m){
         p.resetAll();
@@ -399,7 +401,7 @@ double ZS::delayedPendulum(ZPlayer& p, double mm, int t, int jumps){
     
         pendulumSpeed = v0LB /(v1LB - v0LB + 1);
 
-        std::cout << "Hit inertia on lowerbound, and slow down afterward \n";
+        log += "Hit inertia on lowerbound, and slow down afterward \n";
     }else{
         // hit inertia on lowerbound, full speed
         double v0 = fullISamp(0, 1, m0LB, true, true);
@@ -422,9 +424,9 @@ double ZS::delayedPendulum(ZPlayer& p, double mm, int t, int jumps){
         double tempV = v0UB/(v1UB-v0UB+1);
         if(tempV > pendulumSpeed){
             pendulumSpeed = tempV;
-            std::cout << "Avoid inertia on upperbound, and slow down afterward \n";
+            log += "Avoid inertia on upperbound, and slow down afterward \n";
         }else {
-            std::cout << "Hit inertia on lowerbound, full speed \n";
+            log += "Hit inertia on lowerbound, full speed \n";
         }
     }
         
@@ -457,7 +459,7 @@ double ZS::nondelayedPendulum(ZPlayer& p, double mm, int t, int jumps, double ma
     int inertiaTick = p.lastInertia();
     bool hitVelNeg = p.hitVelNeg();
 
-    std::cout << "Inertia triggered at t = " << inertiaTick << " during nondelayed pendulum simulation.\n" << "Vz on inertia tick: " << (hitVelNeg ? "neg" : "pos") << "\n";
+    log += "Inertia triggered at t = " + std::to_string(inertiaTick) + " during nondelayed pendulum simulation.\n" + "Vz on inertia tick: " + (hitVelNeg ? "neg" : "pos") + "\n";
 
     // NOTE: It is proven that avoiding inertia below is never optimal, same as the ground case.
 
@@ -495,7 +497,7 @@ double ZS::nondelayedPendulum(ZPlayer& p, double mm, int t, int jumps, double ma
         double ma = (mm - x0)/(x1 - x0);
 
         pendulumSpeed = fullISamp(ma, mInertiaLB, true, true);
-        std::cout << "Hit inertia on lowerbound, and slow down afterward \n";
+        log += "Hit inertia on lowerbound, and slow down afterward \n";
     }else{
         // hit inertia on lowerbound, full speed
         pendulumSpeed = fullISamp(1, mInertiaLB, true, true);
@@ -509,9 +511,9 @@ double ZS::nondelayedPendulum(ZPlayer& p, double mm, int t, int jumps, double ma
 
         if(tempV > pendulumSpeed){
             pendulumSpeed = tempV;
-            std::cout << "Avoid inertia on upperbound, and slow down afterward \n";
+            log += "Avoid inertia on upperbound, and slow down afterward \n";
         }else {
-            std::cout << "Hit inertia on lowerbound, full speed \n";
+            log += "Hit inertia on lowerbound, full speed \n";
         }
             
     }
@@ -535,4 +537,61 @@ std::string ZS::strat2string(int stratType) {
         default:
             return "Unnamed";
     }
+}
+
+void ZS::printLog(){
+    std::cout << log;
+}
+
+void ZS::clearLog(){
+    log = "";
+}
+
+bool ZS::poss(double mm, int t, int jumpAirtime, double threshold, std::string& content){
+    content = "";
+    bool hasJump = false;
+    ZS::fullStrat bestStrat = optimalSolve(mm, t);
+    double dS = bestStrat.delaySpeed;
+    double ndS = bestStrat.nondelaySpeed;
+    ZPlayer dP;
+    dP.setVz(dS);
+    dP.sj45(1);
+    ZPlayer ndP;
+    ndP.setVzAir(ndS);
+    ndP.sj45(1);
+    content += "\n-------------------------------------------\n";
+    content += "For mm = " + std::to_string(mm) + ", mm airtime = " + std::to_string(t) + "\n";
+    content += "- NonDelayedSpeed: " + std::to_string(ndS) + ", Type: " + strat2string(bestStrat.nondelayStrat) + "\n";
+    content += "- DelayedSpeed: " + std::to_string(dS) + ", Type: " + strat2string(bestStrat.delayStrat) + "\n";
+    bool delayedBetter = true;
+    for(int i = 2; i <= jumpAirtime; i++){
+        dP.sa45(1);
+        ndP.sa45(1);
+        double zb;
+        if(delayedBetter){
+            zb = dP.Z();
+            double temp = ndP.Z();
+            if(temp > zb){
+                delayedBetter = false;
+                zb = temp;
+                content += "(Nondelayed is better than Delayed at t = " + std::to_string(i) + " )\n";
+            } 
+        }else{
+            zb = ndP.Z();
+        }
+        zb += 0.6f;
+        double offset = std::fmod(zb, 0.0625);
+        if(offset < threshold){
+            hasJump = true;
+            double jumpDis = zb - offset;
+            content += "t = " + std::to_string(i) + ": " + std::to_string(jumpDis) + " + " + std::to_string(offset) + " b\n";
+        }
+    }
+
+    if(!hasJump){
+        content += "No possible jump found.\n";
+    }
+
+    return hasJump;
+
 }

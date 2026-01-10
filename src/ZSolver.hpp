@@ -76,7 +76,10 @@ class ZSolver{
     Output4 boomerang   (ZPlayer& p, double mm, int t, bool delayQ, Output1& o1);
 
     static std::string strat2string(int stratType);
+    void printLog();
+    void clearLog();
+    bool poss(double mm, int t, int maxAirtime, double offset, std::string& content);
 
     private:
-    // no privacy for u
+    std::string log;
 };

@@ -547,10 +547,10 @@ void ZS::clearLog(){
     log = "";
 }
 
-bool ZS::poss(double mm, int t, int jumpAirtime, double threshold, std::string& content){
+bool ZS::poss(double mm, int t_mm, int max_t, double threshold, std::string& content){
     content = "";
     bool hasJump = false;
-    ZS::fullStrat bestStrat = optimalSolve(mm, t);
+    ZS::fullStrat bestStrat = optimalSolve(mm, t_mm);
     double dS = bestStrat.delaySpeed;
     double ndS = bestStrat.nondelaySpeed;
     ZPlayer dP;
@@ -560,11 +560,12 @@ bool ZS::poss(double mm, int t, int jumpAirtime, double threshold, std::string& 
     ndP.setVzAir(ndS);
     ndP.sj45(1);
     content += "\n-------------------------------------------\n";
-    content += "For mm = " + std::to_string(mm) + ", mm airtime = " + std::to_string(t) + "\n";
+    content += "For mm = " + std::to_string(mm) + " (airtime = " + std::to_string(t_mm)
+    + "), t <= " + std::to_string(max_t) + ", threshold = " + std::to_string(threshold) + "\n";
     content += "- NonDelayedSpeed: " + std::to_string(ndS) + ", Type: " + strat2string(bestStrat.nondelayStrat) + "\n";
     content += "- DelayedSpeed: " + std::to_string(dS) + ", Type: " + strat2string(bestStrat.delayStrat) + "\n";
     bool delayedBetter = true;
-    for(int i = 2; i <= jumpAirtime; i++){
+    for(int i = 2; i <= max_t; i++){
         dP.sa45(1);
         ndP.sa45(1);
         double zb;

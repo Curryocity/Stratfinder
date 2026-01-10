@@ -55,4 +55,17 @@ Optimal delayedSpeed: 0.385537
 Strat Type: Boomerang
 ```
 
+### poss(mm = 1.25, t_mm = 11, max_t = 25, threshold = 0.001)
+
+```
+-------------------------------------------
+For mm = 1.250000 (airtime = 11), t <= 25, threshold = 0.001000
+- NonDelayedSpeed: 0.232769, Type: Slingshot
+- DelayedSpeed: 0.334247, Type: Slingshot
+(Nondelayed is better than Delayed at t = 8 )
+t = 9: 3.562500 + 0.000980 b
+t = 15: 5.375000 + 0.000034 b
+t = 19: 6.562500 + 0.000391 b
+```
+
 ### STATUS: STILL WORK IN PROCESS

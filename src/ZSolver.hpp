@@ -78,7 +78,7 @@ class ZSolver{
     static std::string strat2string(int stratType);
     void printLog();
     void clearLog();
-    bool poss(double mm, int t, int maxAirtime, double offset, std::string& content);
+    bool poss(double mm, int t_mm, int maxt, double threshold, std::string& content);
 
     private:
     std::string log;

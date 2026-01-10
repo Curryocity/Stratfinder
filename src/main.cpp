@@ -23,10 +23,11 @@ int main() {
     */
 
 
+    // Need some e-4 double 45s? (some were triple 45s but who cares)
     std::string content;
-    for(double t = 10; t <= 12; t += 1){
+    for(double t_mm = 11; t_mm <= 12; t_mm += 1){
         for(double x = 0.875; x <= 3; x += 0.0625){
-            bool hasJump = s.poss(x, t, 25, 0.0009, content);
+            bool hasJump = s.poss(x, t_mm, 25, 0.001, content);
             if(hasJump) std::cout << content;
         }
     }

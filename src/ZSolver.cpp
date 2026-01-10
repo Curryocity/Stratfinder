@@ -12,10 +12,10 @@ void ZS::init(){
 // Finds the optimal speed for delayed and nondelayed strat: Given mm, mm-airtime
 ZS::fullStrat ZSolver::optimalSolver(double mm, int t)
 {
-    log += "Optimal Solve ----------------------- \n";
+    log += "\nOptimal Solver ----------------------- \n";
     log += "Target mm: " + std::to_string(mm) + ", airtime: " + std::to_string(t) + "\n";
 
-    log += "- Delayed section: \n";
+    log += "\n- Delayed section: \n";
 
     // Solve delayed version first to get maxBwSpeed
     ZS::halfStrat delayedStrat = optimalDelayed(mm, t);
@@ -762,7 +762,7 @@ std::string ZS::strat2string(int stratType) {
 }
 
 void ZS::printLog(){
-    std::cout << "----- Log-----\n";
+    std::cout << "LOG ----------------------- \n";
     std::cout << log;
 }
 
@@ -798,7 +798,7 @@ bool ZS::poss(double mm, int t_mm, int max_t, double threshold, bool backwallQ, 
             if(temp > zb){
                 delayedBetter = false;
                 zb = temp;
-                content += "(Nondelayed is better than Delayed at t = " + std::to_string(i) + " )\n";
+                content += "(Nondelayed is better than Delayed at t = " + std::to_string(i) + ")\n";
             } 
         }else{
             zb = ndP.Z();

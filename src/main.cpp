@@ -19,11 +19,11 @@ int main() {
     }
     */
 
-    double mm = 0.375;
+    double mm = 0.1875;
     int airtime = 12;
 
     std::string content;
-    bool hasJump = s.poss(mm, airtime, 25, 0.01, true, content);
+    bool hasJump = s.poss(mm, airtime, 25, 0.01, false, content);
     s.printLog();
     std::cout << content;
 

@@ -68,7 +68,7 @@ class ZSolver{
 
     static void init();
 
-    fullStrat optimalSolve(double mm, int t);
+    fullStrat optimalSolver(double mm, int t);
     halfStrat optimalDelayed(double mm, int t);
 
     CoreCtx solverCore(ZPlayer& p, double mm, int t, bool delayQ, double knownBwCap);
@@ -81,13 +81,13 @@ class ZSolver{
     Output3 robo        (ZPlayer& p, double mm, int t, bool delayQ, int jumps);
     Output4 boomerang   (ZPlayer& p, double mm, int t, bool delayQ, Output1& o1);
 
-    fullStrat backwallSolve(double mm, int t);
+    fullStrat backwallSolver(double mm, int t);
     halfStrat backwallSolve(double mm, int t, bool delayQ);
 
     static std::string strat2string(int stratType);
     void printLog();
     void clearLog();
-    bool poss(double mm, int t_mm, int maxt, double threshold, std::string& content);
+    bool poss(double mm, int t_mm, int maxt, double threshold, bool backwallQ, std::string& content);
 
     private:
     std::string log;

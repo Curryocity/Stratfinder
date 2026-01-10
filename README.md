@@ -58,7 +58,7 @@ Optimal delayedSpeed: 0.385537
 Strat Type: Boomerang
 ```
 
-### poss(mm = 1.25, t_mm = 11, max_t = 25, threshold = 0.001)
+### poss(mm = 1.25, t_mm = 11, max_t = 25, backwallQ = false, threshold = 0.001)
 
 ```
 -------------------------------------------
@@ -69,6 +69,31 @@ For mm = 1.250000 (airtime = 11), t <= 25, threshold = 0.001000
 t = 9: 3.562500 + 0.000980 b
 t = 15: 5.375000 + 0.000034 b
 t = 19: 6.562500 + 0.000391 b
+```
+
+### poss(mm = 0.375, t_mm = 12, max_t = 25, backwallQ = true, threshold = 0.01)
+
+```
+----- Log-----
+
+Optimal Backwalled Solver ----------------------- 
+Target mm: 0.375000, airtime: 12
+
+- Delayed section: 
+pessi speed: 0.232238
+a7run speed: 0.244697
+run speed: 0.243620
+
+- Nondelayed section: 
+pessi speed: 0.128238
+
+-------------------------------------------
+For backwalled mm = 0.375000 (airtime = 12), t <= 25, threshold = 0.010000
+- NonDelayedSpeed: 0.128238, Type: Pessi
+- DelayedSpeed: 0.244697, Type: A7Run
+t = 14: 4.687500 + 0.000701 b
+t = 16: 5.250000 + 0.009093 b
+t = 21: 6.687500 + 0.003565 b
 ```
 
 ### TODO: Potion effect support, (ice/slime support? might need to mark ice_start and ice_end)

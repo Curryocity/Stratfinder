@@ -10,7 +10,7 @@ void ZS::init(){
 }
 
 // Finds the optimal speed for delayed and nondelayed strat: Given mm, mm-airtime
-ZS::fullStrat ZSolver::optimalSolve(double mm, int t)
+ZS::fullStrat ZSolver::optimalSolver(double mm, int t)
 {
     log += "Optimal Solve ----------------------- \n";
     log += "Target mm: " + std::to_string(mm) + ", airtime: " + std::to_string(t) + "\n";
@@ -521,6 +521,8 @@ double ZS::nondelayedPendulum(ZPlayer& p, double mm, int t, int jumps, double ma
     return pendulumSpeed;
 }
 
+// ----------------- Backwall Solver ----------------
+
 ZS::halfStrat ZS::backwallSolve(double mm, int t, bool delayQ){
     ZPlayer p;
     double bestSpeed = 0;
@@ -594,14 +596,14 @@ ZS::halfStrat ZS::backwallSolve(double mm, int t, bool delayQ){
         double speed = sampler(moveVec, getVz, notInertia);
 
         if (checkInertia && p.lastInertia() != -1) {
-            std::cout << "Inertia triggered during " << name << " backwall solve.\n";
+            log += "Inertia triggered during " + name + " backwall solve.\n";
             double zi0 = sampler(0, getZ, YesInertia);
             double zi1 = sampler(1, getZ, YesInertia);
             double mInertia = (mm - zi0) / (zi1 - zi0);
             double tempV = sampler(mInertia, getVz, YesInertia);
             speed = tempV > baseSpeed ? tempV : baseSpeed;
         }
-        std::cout << name << " Speed: " << speed << "\n";
+        log += name + " speed: " + std::to_string(speed) + "\n";
         return speed;
     };
 
@@ -722,11 +724,17 @@ ZS::halfStrat ZS::backwallSolve(double mm, int t, bool delayQ){
     return ZS::halfStrat{stratType, bestSpeed};
 }
 
-ZS::fullStrat ZS::backwallSolve(double mm, int t){
+ZS::fullStrat ZS::backwallSolver(double mm, int t){
+    log += "\nOptimal Backwalled Solver ----------------------- \n";
+    log += "Target mm: " + std::to_string(mm) + ", airtime: " + std::to_string(t) + "\n";
+    log += "\n- Delayed section: \n";
     ZS::halfStrat delayed = backwallSolve(mm, t, true);
+    log += "\n- Nondelayed section: \n";
     ZS::halfStrat nondelayed = backwallSolve(mm, t, false);
     return ZS::fullStrat{delayed.stratType, delayed.optimalSpeed, nondelayed.stratType, nondelayed.optimalSpeed};
 }
+
+// ----------------- Utility Functions ----------------
 
 std::string ZS::strat2string(int stratType) {
     switch (stratType) {
@@ -754,6 +762,7 @@ std::string ZS::strat2string(int stratType) {
 }
 
 void ZS::printLog(){
+    std::cout << "----- Log-----\n";
     std::cout << log;
 }
 
@@ -761,10 +770,10 @@ void ZS::clearLog(){
     log = "";
 }
 
-bool ZS::poss(double mm, int t_mm, int max_t, double threshold, std::string& content){
+bool ZS::poss(double mm, int t_mm, int max_t, double threshold, bool backwallQ, std::string& content){
     content = "";
     bool hasJump = false;
-    ZS::fullStrat bestStrat = optimalSolve(mm, t_mm);
+    ZS::fullStrat bestStrat = backwallQ ? backwallSolver(mm, t_mm) : optimalSolver(mm, t_mm);
     double dS = bestStrat.delaySpeed;
     double ndS = bestStrat.nondelaySpeed;
     ZPlayer dP;
@@ -774,7 +783,7 @@ bool ZS::poss(double mm, int t_mm, int max_t, double threshold, std::string& con
     ndP.setVzAir(ndS);
     ndP.sj45(1);
     content += "\n-------------------------------------------\n";
-    content += "For mm = " + std::to_string(mm) + " (airtime = " + std::to_string(t_mm)
+    content += std::string("For") + (backwallQ ? " backwalled " : " ") + "mm = " + std::to_string(mm) + " (airtime = " + std::to_string(t_mm)
     + "), t <= " + std::to_string(max_t) + ", threshold = " + std::to_string(threshold) + "\n";
     content += "- NonDelayedSpeed: " + std::to_string(ndS) + ", Type: " + strat2string(bestStrat.nondelayStrat) + "\n";
     content += "- DelayedSpeed: " + std::to_string(dS) + ", Type: " + strat2string(bestStrat.delayStrat) + "\n";

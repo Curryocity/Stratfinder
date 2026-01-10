@@ -34,15 +34,15 @@ int main() {
     }
     */
 
-    double mm = 9.875;
-    int airtime = 7;
+    double mm = 1;
+    int airtime = 3;
 
     ZSolver::fullStrat backwallStrats = s.backwallSolve(mm, airtime);
 
     s.printLog();
 
     std::cout << "\n-------------------------------------------\n";
-    std::cout << "For backwall mm = " << mm << ", airtime = " << airtime << "\n";
+    std::cout << "For Backwalled mm = " << mm << ", airtime = " << airtime << "\n";
     std::cout << "Optimal nonDelayedSpeed: " << backwallStrats.nondelaySpeed << "\n";
     std::cout << "Strat Type: " << ZSolver::strat2string(backwallStrats.nondelayStrat) << "\n";
     std::cout << "Optimal delayedSpeed: " << backwallStrats.delaySpeed << "\n";

@@ -34,8 +34,8 @@ int main() {
     }
     */
 
-    double mm = 1.3125;
-    int airtime = 12;
+    double mm = 1;
+    int airtime = 3;
 
     ZSolver::fullStrat backwallStrats = s.backwallSolve(mm, airtime);
 

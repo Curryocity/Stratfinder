@@ -578,19 +578,22 @@ ZS::halfStrat ZS::backwallSolve(double mm, int t, bool delayQ){
     double zRun0 = p.Z() + (z1ground - z0) * p.Vz() + z0;
     double runBaseSpeed = p.Vz();
 
+    const bool notInertia = false, YesInertia = true;
+    const bool getZ = false, getVz = true;
+
     // Lambda: Evaluate strategy with linear interpolation
-    auto calcSpeed = [&](auto& sampler, auto* inertiasampler, double baseSpeed, const std::string& name) {
-        double z_0 = sampler(0, false);
-        double z_1 = sampler(1, false);
+    auto calcSpeed = [&](auto& sampler, double baseSpeed, const std::string& name, bool checkInertia = true) {
+        double z_0 = sampler(0, getZ, notInertia);
+        double z_1 = sampler(1, getZ, notInertia);
         double moveVec = (mm - z_0) / (z_1 - z_0);
-        double speed = sampler(moveVec, true);
-        
-        if (inertiasampler && p.lastInertia() != -1) {
+        double speed = sampler(moveVec, getVz, notInertia);
+
+        if (checkInertia && p.lastInertia() != -1) {
             std::cout << "Inertia triggered during " << name << " backwall solve.\n";
-            double zi0 = (*inertiasampler)(0, false);
-            double zi1 = (*inertiasampler)(1, false);
+            double zi0 = sampler(0, getZ, YesInertia);
+            double zi1 = sampler(1, getZ, YesInertia);
             double mInertia = (mm - zi0) / (zi1 - zi0);
-            double tempV = (*inertiasampler)(mInertia, true);
+            double tempV = sampler(mInertia, getVz, YesInertia);
             speed = tempV > baseSpeed ? tempV : baseSpeed;
         }
         std::cout << name << " Speed: " << speed << "\n";
@@ -609,26 +612,20 @@ ZS::halfStrat ZS::backwallSolve(double mm, int t, bool delayQ){
     bool needSj = (p.Z() < mm);
 
     if (needSj) {
-        auto samp = [&](double m, bool falseZtrueVz){
+
+        auto samp = [&](double m, bool falseZtrueVz, bool inertiaQ = false){
             p.resetAll();
-            p.sj45(m, 1);
-            p.sa45(t - 1);
+            if(inertiaQ){
+                p.setVz(groundInertia);
+                p.sa45(m , 1);
+            } else p.sj45(m, 1);
+            p.sa45(inertiaQ ? t - 2 : t - 1);
             p.chained_sj45(t, jumps);
             if(delayQ) p.s45(1);
             return falseZtrueVz? p.Vz() : p.Z();
         };
 
-        auto ISamp = [&](double m, bool falseZtrueVz){
-            p.resetAll();
-            p.setVz(groundInertia);
-            p.sa45(m, 1);
-            p.sa45(t - 2);
-            p.chained_sj45(t, jumps);
-            if(delayQ) p.s45(1);
-            return falseZtrueVz? p.Vz() : p.Z();
-        };
-
-        bestSpeed = calcSpeed(samp, &ISamp, maxPessiSpeed, "angled_jt");
+        bestSpeed = calcSpeed(samp, maxPessiSpeed, "angled_jt");
         stratType = ZS::ANGLED_JT;
 
     } else {
@@ -656,26 +653,17 @@ ZS::halfStrat ZS::backwallSolve(double mm, int t, bool delayQ){
         }
         double pessiSpeed = p.Vz();
 
-        auto samp = [&](double ma, bool falseZtrueVz){
+        auto samp = [&](double ma, bool falseZtrueVz, bool inertiaQ = false){
             p.resetAll();
+            if(inertiaQ) p.setVzAir(airInertia);
             p.sa45(ma, 1);
-            p.sa45(y);
+            p.sa45(inertiaQ ? y - 1 : y);
             p.chained_sj45(t, jumps);
             if(delayQ) p.s45(1);
             return falseZtrueVz? p.Vz() : p.Z();
         };
 
-        auto ISamp = [&](double ma, bool falseZtrueVz){
-            p.resetAll();
-            p.setVzAir(airInertia);
-            p.sa45(ma, 1);
-            p.sa45(y - 1);
-            p.chained_sj45(t, jumps);
-            if(delayQ) p.s45(1);
-            return falseZtrueVz? p.Vz() : p.Z();
-        };
-
-        bestSpeed = calcSpeed(samp, &ISamp, pessiSpeed, "pessi");
+        bestSpeed = calcSpeed(samp, pessiSpeed, "pessi");
         stratType = ZS::PESSI;
     }
 
@@ -713,28 +701,18 @@ ZS::halfStrat ZS::backwallSolve(double mm, int t, bool delayQ){
         }
         double a7runBaseSpeed = p.Vz();
 
-        auto sampA7 = [&](double ma, bool falseZtrueVz){
+        auto samp = [&](double ma, bool falseZtrueVz, bool inertiaQ = false){
             p.resetAll();
+            if(inertiaQ) p.setVzAir(airInertia);
             p.sa45(ma, 1);
-            p.sa45(y);
+            p.sa45(inertiaQ ? y - 1 : y);
             p.s45(x);
             p.chained_sj45(t, jumps);
             if(delayQ) p.s45(1);
             return falseZtrueVz? p.Vz() : p.Z();
         };
 
-        auto ISampA7 = [&](double ma, bool falseZtrueVz){
-            p.resetAll();
-            p.setVzAir(airInertia);
-            p.sa45(ma, 1);
-            p.sa45(y - 1);
-            p.s45(x);
-            p.chained_sj45(t, jumps);
-            if(delayQ) p.s45(1);
-            return falseZtrueVz? p.Vz() : p.Z();
-        };
-
-        double a7runSpeed = calcSpeed(sampA7, &ISampA7, a7runBaseSpeed, "a7run");
+        double a7runSpeed = calcSpeed(samp, a7runBaseSpeed, "a7run");
         if(a7runSpeed > bestSpeed){
             bestSpeed = a7runSpeed;
             stratType = ZS::A7RUN;
@@ -743,29 +721,22 @@ ZS::halfStrat ZS::backwallSolve(double mm, int t, bool delayQ){
 
     // 3. ground speed + s45(x)
 
-    auto sampRun = [&](double m, bool falseZtrueVz){
-        p.resetAll();
-        p.s45(m, 1);
-        p.s45(x);
-        p.chained_sj45(t, jumps);
-        if(delayQ) p.s45(1);
-        return falseZtrueVz? p.Vz() : p.Z();
-    };
+    {
+        auto samp = [&](double m, bool falseZtrueVz, bool inertiaQ = false){
+            p.resetAll();
+            if(inertiaQ) p.setVz(groundInertia);
+            p.s45(m, 1);
+            p.s45(inertiaQ ? x - 1 : x);
+            p.chained_sj45(t, jumps);
+            if(delayQ) p.s45(1);
+            return falseZtrueVz? p.Vz() : p.Z();
+        };
 
-    auto ISampRun = [&](double m, bool falseZtrueVz){
-        p.resetAll();
-        p.setVz(groundInertia);
-        p.s45(m, 1);
-        p.s45(x - 1);
-        p.chained_sj45(t, jumps);
-        if(delayQ) p.s45(1);
-        return falseZtrueVz? p.Vz() : p.Z();
-    };
-
-    double runSpeed = calcSpeed(sampRun, (p.lastInertia() != -1 && x > 0) ? &ISampRun : nullptr, runBaseSpeed, "run");
-    if(runSpeed > bestSpeed){
-        bestSpeed = runSpeed;
-        stratType = ZS::RUN;
+        double runSpeed = calcSpeed(samp, runBaseSpeed, "run", p.lastInertia() != -1 && x > 0);
+        if(runSpeed > bestSpeed){
+            bestSpeed = runSpeed;
+            stratType = ZS::RUN;
+        }
     }
 
     return ZS::halfStrat{stratType, bestSpeed};

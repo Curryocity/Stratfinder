@@ -1,8 +1,11 @@
 # HI
 
-Inspired by Cantnavet's [BMSolver](https://github.com/cantnavet/BmSolver)
+This project is inspired by Cantnavet's [BMSolver](https://github.com/cantnavet/BmSolver) an year ago.
 
-The program inputs mm and mm airtime, output the velocity for optimal delayed and nondelayed strat.
+The program inputs mm(also supports backwalled mm) and mm airtime.
+
+1. outputs the velocity and strategy type for optimal delayed and nondelayed strat.
+2. find jumps within offset threshold (picking the best out of delayed and nondelayed strat).
 
 **(Considers inertia)**
 
@@ -68,4 +71,4 @@ t = 15: 5.375000 + 0.000034 b
 t = 19: 6.562500 + 0.000391 b
 ```
 
-### TODO: Fully backwalled strats, potion effect support, (ice/slime support? might need to mark ice_start and ice_end)
+### TODO: Potion effect support, (ice/slime support? might need to mark ice_start and ice_end)

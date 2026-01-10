@@ -528,15 +528,13 @@ ZS::halfStrat ZS::backwallSolve(double mm, int t, bool delayQ){
 
     // Amount of sj45(t)'s the mm could fit
     int jumps = 0;
-    double z0;
-    double zOverJump;
+    double z0, zOverJump, z1ground, z1air;
 
     ZPlayer::State prevJump;
 
     while (true){
         prevJump = p.getState();
-        if(delayQ && jumps != 0)
-            p.loadState(); // Undo run 1t
+        if(delayQ && jumps != 0) p.loadState(); // Undo run 1t
         p.sj45(t);
         
         if(delayQ){
@@ -557,24 +555,31 @@ ZS::halfStrat ZS::backwallSolve(double mm, int t, bool delayQ){
     p.setVz(1);
     p.chained_sj45(t, jumps);
     if(delayQ) p.s45(1);
-    double z1ground = p.Z();
+    z1ground = p.Z();
+
+    auto fitMax = [&](bool isGround, double z_start, double z_end){
+        int count = 0;
+        double usedmm = 0;
+
+        p.resetAll();
+        while(usedmm <= mm){
+            p.saveState();
+            if(isGround) p.s45(1);
+            else p.sa45(1);
+            count ++;
+            usedmm = p.Z() + (z_end - z_start) * p.Vz() + z_start;
+        }
+        p.loadState(); // Undo last sa45
+        count --;
+        
+        return count;
+    };
 
     // deltaZ =  (z1ground - z0) * ground_vi + z0
     // Find maximum x such that s45(x) chained_sj45(t, jumps) <= mm
 
-    p.resetAll();
-    int x = 0;
-    {
-        double usedmm = 0;
-        while(usedmm <= mm){
-            p.saveState();
-            p.s45(1);
-            x ++;
-            usedmm = p.Z() + (z1ground - z0) * p.Vz() + z0;
-        }
-        x --;
-    }   
-    p.loadState(); // Undo last s45
+    int x = fitMax(true, z0, z1ground);
+
     double zRun0 = p.Z() + (z1ground - z0) * p.Vz() + z0;
     double runBaseSpeed = p.Vz();
 
@@ -608,7 +613,6 @@ ZS::halfStrat ZS::backwallSolve(double mm, int t, bool delayQ){
     p.chained_sj45(t, jumps);
     if(delayQ) p.s45(1);
     double maxPessiSpeed = p.Vz();
-    
     bool needSj = (p.Z() < mm);
 
     if (needSj) {
@@ -633,24 +637,12 @@ ZS::halfStrat ZS::backwallSolve(double mm, int t, bool delayQ){
         p.setVzAir(1);
         p.chained_sj45(t, jumps);
         if(delayQ) p.s45(1);
-        double z1air = p.Z();
+        z1air = p.Z();
 
         // deltaZ =  (z1air - z0) * air_vi + z0
         // Find maximum y such that sa45(y) chained_sj45(t, jumps) <= mm
 
-        p.resetAll();
-        int y = 0;
-        {
-            double usedmm = 0;
-            while(usedmm <= mm){
-                p.saveState();
-                p.sa45(1);
-                y ++;
-                usedmm = p.Z() + (z1air - z0) * p.Vz() + z0;
-            }
-            p.loadState(); // Undo last sa45
-            y --;
-        }
+        int y = fitMax(false, z0, z1air);
         double pessiSpeed = p.Vz();
 
         auto samp = [&](double ma, bool falseZtrueVz, bool inertiaQ = false){
@@ -686,19 +678,7 @@ ZS::halfStrat ZS::backwallSolve(double mm, int t, bool delayQ){
         // deltaZ =  (zRun1 - zRun0) * air_vi + zRun0
         // Find maximum y such that sa45(y) s45(x) chained_sj45(t, jumps) <= mm
 
-        p.resetAll();
-        int y = 0;
-        {
-            double usedmm = 0;
-            while(usedmm <= mm){
-                p.saveState();
-                p.sa45(1);
-                y ++;
-                usedmm = p.Z() + (zRun1 - zRun0) * p.Vz() + zRun0;
-            }
-            y --;
-            p.loadState(); // Undo last sa45
-        }
+        int y = fitMax(false, zRun0, zRun1);
         double a7runBaseSpeed = p.Vz();
 
         auto samp = [&](double ma, bool falseZtrueVz, bool inertiaQ = false){

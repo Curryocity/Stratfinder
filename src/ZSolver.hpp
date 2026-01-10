@@ -10,6 +10,12 @@ class ZSolver{
     static constexpr int ROBO = 2;
     static constexpr int BOOMERANG = 3; // Fw airspeed into sj45
     static constexpr int PENDULUM = 4; // Chained loops
+    // backwall strat types
+    static constexpr int ANGLED_JT = 5;
+    static constexpr int PESSI = 6;
+    static constexpr int A7RUN = 7;
+    static constexpr int RUN = 8;
+
 
     static constexpr double groundInertia = 0.005/0.6/0.91;
     static constexpr double airInertia = 0.005/0.91;
@@ -74,6 +80,9 @@ class ZSolver{
     Output2 slingShot   (ZPlayer& p, double mm, int t, bool delayQ, Output1& o1);
     Output3 robo        (ZPlayer& p, double mm, int t, bool delayQ, int jumps);
     Output4 boomerang   (ZPlayer& p, double mm, int t, bool delayQ, Output1& o1);
+
+    fullStrat backwallSolve(double mm, int t);
+    halfStrat backwallSolve(double mm, int t, bool delayQ);
 
     static std::string strat2string(int stratType);
     void printLog();

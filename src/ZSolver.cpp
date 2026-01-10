@@ -521,6 +521,220 @@ double ZS::nondelayedPendulum(ZPlayer& p, double mm, int t, int jumps, double ma
     return pendulumSpeed;
 }
 
+ZS::halfStrat ZS::backwallSolve(double mm, int t, bool delayQ){
+    ZPlayer p;
+    double bestSpeed = 0;
+    int stratType = -1;
+
+    // Amount of sj45(t)'s the mm could fit
+    int jumps = 0;
+    double z0;
+
+    ZPlayer::State prevJump;
+
+    while (true){
+        prevJump = p.getState();
+        if(delayQ && jumps != 0)
+            p.loadState(); // Undo run 1t
+        p.sj45(t);
+        
+        if(delayQ){
+            p.saveState();
+            p.s45(1);
+        } 
+
+        if(p.Z() > mm){
+            p.loadState(prevJump); // Undo a jump
+            z0 = p.Z();
+            break;
+        }
+        jumps ++;
+    }
+
+    p.resetAll();
+    p.setVz(1);
+    p.chained_sj45(t, jumps);
+    if(delayQ) p.s45(1);
+    double z1ground = p.Z();
+
+    // deltaZ =  (z1ground - z0) * ground_vi + z0
+    // Find maximum x such that s45(x) chained_sj45(t, jumps) <= mm
+
+    p.resetAll();
+    int x = 0;
+    {
+        double usedmm = 0;
+        while(usedmm <= mm){
+            p.saveState();
+            p.s45(1);
+            x ++;
+            usedmm = p.Z() + (z1ground - z0) * p.Vz() + z0;
+        }
+        x --;
+    }   
+    p.loadState(); // Undo last s45
+    double zRun0 = p.Z() + (z1ground - z0) * p.Vz() + z0;
+
+    std::cout << "x = " << x << "\n";
+
+    // 1. only airstrat
+
+    // test maxPessi sa45(t-1)
+    p.resetAll();
+    p.sa45(t - 1);
+    p.chained_sj45(t, jumps);
+    if(delayQ) p.s45(1);
+    
+
+    bool needSj = (p.Z() < mm);
+
+    if (needSj) {
+
+        auto samp = [&](double m, bool falseZtrueVz){
+            p.resetAll();
+            p.sj45(m, 1);
+            p.sa45(t - 1);
+            p.chained_sj45(t, jumps);
+            if(delayQ) p.s45(1);
+            return falseZtrueVz? p.Vz() : p.Z();
+        };
+
+        
+        double zPessi = samp(0, false);
+        // z0 == samp(1, false)
+        double moveVec = (mm - zPessi)/(z0 - zPessi);
+        double bestSpeed = samp(moveVec, true);
+        stratType = ZS::ANGLED_JT;
+
+        std::cout << "angled_jt Speed: " << bestSpeed << "\n";
+
+    }else{
+        p.resetAll();
+        p.setVzAir(1);
+        p.chained_sj45(t, jumps);
+        if(delayQ) p.s45(1);
+        double z1air = p.Z();
+
+        // deltaZ =  (z1air - z0) * air_vi + z0
+        // Find maximum y such that sa45(y) chained_sj45(t, jumps) <= mm
+
+        p.resetAll();
+        int y = 0;
+        {
+            double usedmm = 0;
+            while(usedmm <= mm){
+                p.sa45(1);
+                y ++;
+                usedmm = p.Z() + (z1air - z0) * p.Vz() + z0;
+            }
+        }
+        y --;
+
+        std::cout << "pessi y = " << y << "\n";
+
+        auto samp = [&](double ma, bool falseZtrueVz){
+            p.resetAll();
+            p.sa45(ma, 1);
+            p.sa45(y);
+            p.chained_sj45(t, jumps);
+            if(delayQ) p.s45(1);
+            return falseZtrueVz? p.Vz() : p.Z();
+        };
+
+        double zPessi0 = samp(0, false);
+        double zPessi1 = samp(1, false);
+        double ma = (mm - zPessi0)/(zPessi1 - zPessi0);
+        bestSpeed = samp(ma, true);
+        stratType = ZS::PESSI;
+
+        std::cout << "pessi Speed: " << bestSpeed << "\n";
+
+    }
+
+    if(!delayQ && jumps == 0){
+        // Rest of the strategies doesn't make sense for them.
+        return ZS::halfStrat{stratType, bestSpeed};
+    }
+
+    // 2. airstrat + s45(x)
+
+    p.resetAll();
+    p.setVzAir(1);
+    p.s45(x);
+    p.chained_sj45(t, jumps);
+    if(delayQ) p.s45(1);
+    double zRun1 = p.Z();
+
+    // deltaZ =  (zRun1 - zRun0) * air_vi + zRun0
+    // Find maximum y such that sa45(y) s45(x) chained_sj45(t, jumps) <= mm
+
+    p.resetAll();
+    int y = 0;
+    {
+        double usedmm = 0;
+        while(usedmm <= mm){
+            p.sa45(1);
+            y ++;
+            usedmm = p.Z() + (zRun1 - zRun0) * p.Vz() + zRun0;
+        }
+        y --;
+    }
+    
+
+    std::cout << "a7run y = " << y << "\n";
+
+    auto sampA7 = [&](double ma, bool falseZtrueVz){
+        p.resetAll();
+        p.sa45(ma, 1);
+        p.sa45(y);
+        p.s45(x);
+        p.chained_sj45(t, jumps);
+        if(delayQ) p.s45(1);
+        return falseZtrueVz? p.Vz() : p.Z();
+    };
+
+    double zA7_0 = sampA7(0, false);
+    double zA7_1 = sampA7(1, false);
+    double ma = (mm - zA7_0)/(zA7_1 - zA7_0);
+    double a7runSpeed = sampA7(ma, true);
+
+    std::cout << "a7run Speed: " << a7runSpeed << "\n";
+
+    if(a7runSpeed > bestSpeed){
+        bestSpeed = a7runSpeed;
+        stratType = ZS::A7RUN;
+    }
+
+    // 3. ground speed + s45(x)
+
+    auto sampRun = [&](double m, bool falseZtrueVz){
+        p.resetAll();
+        p.s45(m, 1);
+        p.s45(x);
+        p.chained_sj45(t, jumps);
+        if(delayQ) p.s45(1);
+        return falseZtrueVz? p.Vz() : p.Z();
+    };
+
+    double zGround0 = sampRun(0, false);
+    double zGround1 = sampRun(1, false);
+    double moveVecRun = (mm - zGround0)/(zGround1 - zGround0);
+    double runSpeed = sampRun(moveVecRun, true);
+    std::cout << "run Speed: " << runSpeed << "\n";
+
+    if(runSpeed > bestSpeed){
+        bestSpeed = runSpeed;
+        stratType = ZS::RUN;
+    }
+
+    return ZS::halfStrat{stratType,bestSpeed};
+}
+
+ZS::fullStrat ZS::backwallSolve(double mm, int t){
+    ZS::halfStrat delayed = backwallSolve(mm, t, true);
+    ZS::halfStrat nondelayed = backwallSolve(mm, t, false);
+    return ZS::fullStrat{delayed.stratType, delayed.optimalSpeed, nondelayed.stratType, nondelayed.optimalSpeed};
+}
 
 std::string ZS::strat2string(int stratType) {
     switch (stratType) {
@@ -534,6 +748,14 @@ std::string ZS::strat2string(int stratType) {
             return "Boomerang";
         case ZS::PENDULUM:
             return "Pendulum";
+        case ZS::ANGLED_JT:
+            return "Angled_JT";
+        case ZS::PESSI:
+            return "Pessi";
+        case ZS::A7RUN:
+            return "A7Run";
+        case ZS::RUN:
+            return "Run";
         default:
             return "Unnamed";
     }

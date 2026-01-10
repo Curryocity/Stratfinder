@@ -1,5 +1,4 @@
 #include <cmath>
-#include <iostream>
 #include "ZPlayer.hpp"
 
 /* static storage */

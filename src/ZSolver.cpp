@@ -386,20 +386,25 @@ double ZS::delayedPendulum(ZPlayer& p, double mm, int t, int jumps){
         return falseZtrueVz? p.Vz() : p.Z();
     };
 
+    auto convergenceVzOnInertia = [&](double m0, double m1, bool hitInertia){
+
+        double z00 = fullISamp(0, 0, m0, hitInertia, false);
+        double z01 = fullISamp(0, 1, m0, hitInertia, false);
+        double ma0 = (mm - z00)/(z01 - z00);
+
+        double z10 = fullISamp(1, 0, m1, hitInertia, false);
+        double z11 = fullISamp(1, 1, m1, hitInertia, false);
+        double ma1 = (mm - z10)/(z11 - z10);
+
+        double v0 = fullISamp(0, ma0, m0, hitInertia, true);
+        double v1 = fullISamp(1, ma1, m1, hitInertia, true);
+
+        return v0/(v1-v0+1);
+    };
+
     if(hitVelNeg){
         // Hit inertia on lowerbound, and slow down afterward
-        double z00LB = fullISamp(0, 0, m0LB, true, false);
-        double z01LB = fullISamp(0, 1, m0LB, true, false);
-        double ma0LB = (mm - z00LB)/(z01LB - z00LB);
-
-        double z10LB = fullISamp(1, 0, m1LB, true, false);
-        double z11LB = fullISamp(1, 1, m1LB, true, false);
-        double ma1LB = (mm - z10LB)/(z11LB - z10LB);
-
-        double v0LB = fullISamp(0, ma0LB, m0LB, true, true);
-        double v1LB = fullISamp(1, ma1LB, m1LB, true, true);
-    
-        pendulumSpeed = v0LB /(v1LB - v0LB + 1);
+        pendulumSpeed = convergenceVzOnInertia(m0LB, m1LB, true);
 
         log += "Hit inertia on lowerbound, and slow down afterward \n";
     }else{
@@ -410,18 +415,8 @@ double ZS::delayedPendulum(ZPlayer& p, double mm, int t, int jumps){
         pendulumSpeed = v0/(v1-v0+1);
 
         // avoid inertia above, and slow down afterward
-        double z00UB = fullISamp(0, 0, m0UB, false, false);
-        double z01UB = fullISamp(0, 1, m0UB, false, false);
-        double ma0UB = (mm - z00UB)/(z01UB - z00UB);
+        double tempV = convergenceVzOnInertia(m0UB, m1UB, false);
 
-        double z10UB = fullISamp(1, 0, m1UB, false, false);
-        double z11UB = fullISamp(1, 1, m1UB, false, false);
-        double ma1UB = (mm - z10UB)/(z11UB - z10UB);
-
-        double v0UB = fullISamp(0, ma0UB, m0UB, false, true);
-        double v1UB = fullISamp(1, ma1UB, m1UB, false, true);
-
-        double tempV = v0UB/(v1UB-v0UB+1);
         if(tempV > pendulumSpeed){
             pendulumSpeed = tempV;
             log += "Avoid inertia on upperbound, and slow down afterward \n";
@@ -429,7 +424,6 @@ double ZS::delayedPendulum(ZPlayer& p, double mm, int t, int jumps){
             log += "Hit inertia on lowerbound, full speed \n";
         }
     }
-        
 
     return pendulumSpeed;
 }

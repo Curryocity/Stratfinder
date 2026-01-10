@@ -1,6 +1,6 @@
 # HI
 
-This project is inspired by Cantnavet's [BMSolver](https://github.com/cantnavet/BmSolver) an year ago.
+This project is inspired by Cantnavet's [BMSolver](https://github.com/cantnavet/BmSolver).
 
 The program inputs mm(also supports backwalled mm) and mm airtime.
 
@@ -84,6 +84,6 @@ t = 17: 6.625000 + 0.000720 b
 t = 24: 8.750000 + 0.008839 b
 ```
 
-### TODO: Potion effect support, ice/slime support, slime bounce jump finding?
+### TODO: GUI, Potion effect support, ice/slime support, slime bounce jump finding?
 
 ### Future Plan: 45bwmm finder, noturn (on mm) finder ... 

@@ -19,7 +19,7 @@ int main() {
     }
     */
 
-    double mm = 0.7638;
+    double mm = 0.73;
     int airtime = 12;
 
     std::string content;

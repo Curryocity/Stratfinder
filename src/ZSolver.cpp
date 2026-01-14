@@ -641,6 +641,7 @@ ZS::halfStrat ZS::backwallSolve(double mm, int t, bool delayQ){
         // Find maximum y such that sa45(y) chained_sj45(t, jumps) <= mm
 
         int y = fitMax(false, z0, z1air);
+        p.chained_sj45(t, jumps);
         if(delayQ) p.s45(1);
         double pessiSpeed = p.Vz();
 
@@ -678,6 +679,9 @@ ZS::halfStrat ZS::backwallSolve(double mm, int t, bool delayQ){
         // Find maximum y such that sa45(y) s45(x) chained_sj45(t, jumps) <= mm
 
         int y = fitMax(false, zRun0, zRun1);
+        p.s45(x);
+        p.chained_sj45(t, jumps);
+        if(delayQ) p.s45(1);
         double a7runBaseSpeed = p.Vz();
 
         auto samp = [&](double ma, bool falseZtrueVz, bool inertiaQ = false){

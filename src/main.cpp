@@ -19,13 +19,13 @@ int main() {
     }
     */
 
-    double mm = 0.73;
-    int airtime = 12;
-
     std::string content;
-    bool hasJump = s.poss(mm, airtime, 25, 0.01, true, content);
-    s.printLog();
-    std::cout << content;
+    for(double t_mm = 2; t_mm <= 14; t_mm += 1){
+        for(double x = 0.0625; x <= 40; x += 0.0625){
+            bool hasJump = s.poss(x, t_mm, 116, 0.0000001, true, content, ZSolver::blockage);
+            if(hasJump) std::cout << content;
+        }
+    }
 
     
     return 0;

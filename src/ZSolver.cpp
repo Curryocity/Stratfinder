@@ -1,5 +1,8 @@
 #include <iostream>
 #include <cmath>
+#include <ostream>
+#include <iomanip>
+#include <sstream>
 #include "ZPlayer.hpp"
 #include "ZSolver.hpp"
 
@@ -596,6 +599,7 @@ ZS::halfStrat ZS::backwallSolve(double mm, int t, bool delayQ){
             double zi0 = sampler(0, getZ, YesInertia);
             double zi1 = sampler(1, getZ, YesInertia);
             double mInertia = (mm - zi0) / (zi1 - zi0);
+
             double tempV = sampler(mInertia, getVz, YesInertia);
             speed = tempV > baseSpeed ? tempV : baseSpeed;
         }
@@ -648,9 +652,15 @@ ZS::halfStrat ZS::backwallSolve(double mm, int t, bool delayQ){
         auto samp = [&](double ma, bool falseZtrueVz, bool inertiaQ = false){
             p.resetAll();
             if(inertiaQ) p.setVzAir(airInertia);
-            p.sa45(ma, 1);
-            p.sa45(inertiaQ ? y - 1 : y);
-            p.chained_sj45(t, jumps);
+            if(y > 0 || !inertiaQ){
+                p.sa45(ma, 1);
+                p.sa45(inertiaQ ? y - 1 : y);
+                p.chained_sj45(t, jumps);
+            }else{
+                p.sj45(ma, 1);
+                p.sa45(t - 1);
+                p.chained_sj45(t, jumps - 1);
+            }
             if(delayQ) p.s45(1);
             return falseZtrueVz? p.Vz() : p.Z();
         };
@@ -687,20 +697,30 @@ ZS::halfStrat ZS::backwallSolve(double mm, int t, bool delayQ){
         auto samp = [&](double ma, bool falseZtrueVz, bool inertiaQ = false){
             p.resetAll();
             if(inertiaQ) p.setVzAir(airInertia);
-            p.sa45(ma, 1);
-            p.sa45(inertiaQ ? y - 1 : y);
-            p.s45(x);
+            if(y > 0 || !inertiaQ){
+                p.sa45(ma, 1);
+                p.sa45(inertiaQ ? y - 1 : y);
+                p.s45(x);
+            }else {
+                // I caught this bug on 2.25bm backwalled
+                p.s45(ma, 1);
+                p.s45(x - 1);
+            }
             p.chained_sj45(t, jumps);
             if(delayQ) p.s45(1);
             return falseZtrueVz? p.Vz() : p.Z();
         };
 
         double a7runSpeed = calcSpeed(samp, a7runBaseSpeed, "a7run");
+
         if(a7runSpeed > bestSpeed){
             bestSpeed = a7runSpeed;
             stratType = ZS::A7RUN;
         }
+
     }
+
+    
 
     // 3. ground speed + s45(x)
 
@@ -771,7 +791,7 @@ void ZS::clearLog(){
     log = "";
 }
 
-bool ZS::poss(double mm, int t_mm, int max_t, double threshold, bool backwallQ, std::string& content){
+bool ZS::poss(double mm, int t_mm, int max_t, double threshold, bool backwallQ, std::string& content, double shift){
     content = "";
     bool hasJump = false;
     ZS::fullStrat bestStrat = backwallQ ? backwallSolver(mm, t_mm) : optimalSolver(mm, t_mm);
@@ -784,10 +804,10 @@ bool ZS::poss(double mm, int t_mm, int max_t, double threshold, bool backwallQ, 
     ndP.setVzAir(ndS);
     ndP.sj45(1);
     content += "\n-------------------------------------------\n";
-    content += std::string("For") + (backwallQ ? " backwalled " : " ") + "mm = " + std::to_string(mm) + " (airtime = " + std::to_string(t_mm)
-    + "), t <= " + std::to_string(max_t) + ", threshold = " + std::to_string(threshold) + "\n";
-    content += "- NonDelayedSpeed: " + std::to_string(ndS) + ", Type: " + strat2string(bestStrat.nondelayStrat) + "\n";
-    content += "- DelayedSpeed: " + std::to_string(dS) + ", Type: " + strat2string(bestStrat.delayStrat) + "\n";
+    content += std::string("For") + (backwallQ ? " backwalled " : " ") + "mm = " + fmt(mm) + " (airtime = " + fmt(t_mm)
+    + "), t <= " + std::to_string(max_t) + ", threshold = " + fmt(threshold) + ", offset:" + fmt(shift) + "\n";
+    content += "- NonDelayedSpeed: " + fmt(ndS) + ", Type: " + strat2string(bestStrat.nondelayStrat) + "\n";
+    content += "- DelayedSpeed: " + fmt(dS) + ", Type: " + strat2string(bestStrat.delayStrat) + "\n";
     bool delayedBetter = true;
     for(int i = 2; i <= max_t; i++){
         dP.sa45(1);
@@ -804,12 +824,15 @@ bool ZS::poss(double mm, int t_mm, int max_t, double threshold, bool backwallQ, 
         }else{
             zb = ndP.Z();
         }
-        zb += 0.6f;
+        zb += shift;
         double offset = std::fmod(zb, 0.0625);
-        if(offset < threshold){
+
+        if (offset < threshold) {
             hasJump = true;
             double jumpDis = zb - offset;
-            content += "t = " + std::to_string(i) + ": " + std::to_string(jumpDis) + " + " + std::to_string(offset) + " b\n";
+
+            content += "t = " + std::to_string(i) + ": "
+            + fmt(jumpDis) + " + " + fmt(offset) + " b\n";
         }
     }
 
@@ -820,3 +843,32 @@ bool ZS::poss(double mm, int t_mm, int max_t, double threshold, bool backwallQ, 
     return hasJump;
 
 }
+
+std::string ZSolver::fmt(double x) {
+    std::ostringstream oss;
+    if (std::abs(x) < 1e-8)
+        oss << std::scientific << std::setprecision(16);
+    else if (std::abs(x) < 1e-5)
+        oss << std::fixed << std::setprecision(9);
+    else
+        oss << std::fixed << std::setprecision(6);
+    oss << x;
+    std::string s = oss.str();
+
+    // Trim trailing zeros
+    if (auto pos = s.find('e'); pos != std::string::npos) {
+        // scientific notation
+        auto end = s.find_last_not_of('0', pos - 1);
+        if (s[end] == '.') --end;
+        s.erase(end + 1, pos - end - 1);
+    } else {
+        // fixed notation
+        auto end = s.find_last_not_of('0');
+        if (end != std::string::npos && s[end] == '.')
+            --end;
+        s.erase(end + 1);
+    }
+
+    return s;
+}
+

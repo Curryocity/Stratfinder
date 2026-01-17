@@ -12,7 +12,7 @@ The program inputs mm(also supports backwalled mm) and mm airtime.
 
 ## Examples
 
-### 0.1875bm loop (Benja's optimal loop video strat debunked)
+### 0.1875bm loop (beats Benja's "optimal loop")
 
 ```
 Optimal Solver ----------------------- 
@@ -55,7 +55,7 @@ t = 15: 5.375000 + 0.000034 b
 t = 19: 6.562500 + 0.000391 b
 ```
 
-### A weird true penta(6-2) featured in my unlisted video
+### A weird true penta(6-2) featured in my [unlisted video](https://youtu.be/uTz3sbWMWuI)
 
 ```
 Optimal Backwalled Solver ----------------------- 

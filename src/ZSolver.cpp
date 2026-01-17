@@ -846,7 +846,7 @@ bool ZS::poss(double mm, int t_mm, int max_t, double threshold, bool backwallQ, 
 
 std::string ZSolver::fmt(double x) {
     std::ostringstream oss;
-    if (std::abs(x) < 1e-8)
+    if (std::abs(x) < 1e-8 && x != 0)
         oss << std::scientific << std::setprecision(16);
     else if (std::abs(x) < 1e-5)
         oss << std::fixed << std::setprecision(9);

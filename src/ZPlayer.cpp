@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cmath>
 #include "ZPlayer.hpp"
 
@@ -26,6 +27,8 @@ inline float ZPlayer::cos(float deg) {
     return SIN_TABLE[(int)(rad * 10430.378f + 16384.0f) & 65535];
 }
 
+ZPlayer::ZPlayer(int speed, int slowness) : speed(speed), slowness(slowness){}
+
 /*
  * Used for zSolver, sprinted 45 zAxis movement only
  */
@@ -53,7 +56,17 @@ void ZPlayer::simpleMove(float moveVec, bool airborne, bool sprintJumpQ, int rep
         }
 
         /* base movement(force sprinted) */
-        float accel = (airborne ? 0.02f : 0.1f) * 1.300000011920929f;
+        float accel;
+        if(airborne){
+            accel = 0.02f;
+        } else{
+            accel = 0.1f;
+            if (speed > 0)    accel *= 1 + 0.2f * speed;
+            if (slowness > 0) accel *= 1 + (-0.15f) * slowness;
+            if (accel < 0) accel = 0;
+        }
+        
+        accel *= 1.0 + 0.3f;  // sprinting multiplier
 
         /* ground drag */
         if (!airborne) {
@@ -155,6 +168,16 @@ void ZPlayer::forceInertiaNext(){
 
 void ZPlayer::sprintDelay(bool delayQ){
     sprint_delay = delayQ;
+}
+
+void ZPlayer::setEffect(int speed, int slowness){
+    this->speed = speed;
+    this->slowness = slowness;
+}
+
+void ZPlayer::clearEffects(){
+    speed = 0;
+    slowness = 0;
 }
 
 void ZPlayer::loadState(){

@@ -12,18 +12,9 @@ public:
         bool prev_sprint = false;
     };
     
-
-    /* movement orientations */
     static constexpr float FORWARD  =  1.0f;
     static constexpr float BACKWARD = -1.0f;
     static constexpr float STOP     =  0.0f;
-
-    /* movement types */
-    static constexpr int NONE = -1;
-    static constexpr int WALK = 0;
-    static constexpr int SNEAK = 1;
-    static constexpr int SPRINT = 2;
-    static constexpr int SPRINTJUMP = 3;
 
     static constexpr int GROUND = 0;
     static constexpr int AIR = 1;
@@ -44,6 +35,8 @@ public:
 
     static inline float sin(float deg);
     static inline float cos(float deg);
+
+    ZPlayer(int speed = 0, int slowness = 0);
 
     void simpleMove(float moveVec, bool airborne, bool sprintJumpQ,  int repeat);
 
@@ -72,6 +65,8 @@ public:
     void toggleInertia(bool on);
     void forceInertiaNext();
     void sprintDelay(bool delayQ);
+    void setEffect(int speed, int slowness);
+    void clearEffects();
 
     void resetAll();
     void resetClock();
@@ -93,6 +88,9 @@ private:
     int clock = 0;  // increases every tick, used for inertia timing
     int last_inertia = -1; // the clock value of last inertia trigger
     bool hit_vel_neg = false; // in the last inertia hit, was vz < 0?
+
+    int speed = 0;
+    int slowness = 0;
 
     State savestate;
 };

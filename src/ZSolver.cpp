@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <iostream>
 #include <cmath>
 #include <ostream>
@@ -16,63 +17,94 @@ void ZS::init(){
 ZS::fullStrat ZSolver::optimalSolver(double mm, int t)
 {
     log += "\nOptimal Solver ----------------------- \n";
-    log += "Target mm: " + std::to_string(mm) + ", airtime: " + std::to_string(t) + "\n";
+    log += "Target mm: " + fmt(mm) + ", airtime: " + std::to_string(t) + "\n";
 
     log += "\n- Delayed section: \n";
 
     // Solve delayed version first to get maxBwSpeed
-    ZS::halfStrat delayedStrat = optimalDelayed(mm, t);
+    int bestDelayTick = 1;
+    int delayTick = 1;
+    ZS::strat delayedStrat = optimalDelayed(mm, t);
     int dT = delayedStrat.stratType;
     double dS = delayedStrat.optimalSpeed;
+
+    ZPlayer p(speed, slowness);
+    p.s45(1);
+    double sprint45Vz = p.Vz();
+    double terminalSpeed = sprint45Vz/ 0.454;
+    // only low speed could delayTick > 1 benifit
+    if(dS < terminalSpeed){
+
+        log += "Best vz = " +  std::to_string(dS) + "\n\n";
+        int maxDelayTick = -1;
+        p.resetAll();
+        for(; p.Z() < mm + 0.6f; maxDelayTick ++)
+            p.s45(1);
+
+        log += "maxDelayTick = " + std::to_string(maxDelayTick) + "\n";
+        
+        for(delayTick = std::max(2, maxDelayTick - 1); delayTick <= maxDelayTick; delayTick ++){
+            ZS::strat newDelayedStrat = optimalDelayed(mm, t, delayTick);
+            log += "Best vz = " +  std::to_string(newDelayedStrat.optimalSpeed) + "\n\n";
+            if(newDelayedStrat.optimalSpeed > dS){
+                dS = newDelayedStrat.optimalSpeed;
+                dT = newDelayedStrat.stratType;
+
+                bestDelayTick = delayTick;
+            }
+        }
+    }
+    p.resetAll();
+    
     double maxBwSpeed = -dS;
 
-    ZPlayer p;
     mm += 0.6f;
 
     log += "\n- Nondelayed section: \n";
     log += "Max BW speed: " + std::to_string(maxBwSpeed) + "\n";
     // Then solve nondelayed, given the knowledge of maxBwSpeed
-    ZS::CoreCtx c = solverCore(p, mm, t, false, maxBwSpeed);
+    ZS::CoreCtx c = solverCore(p, mm, t, NONDELAYED, maxBwSpeed);
 
-    ZS::halfStrat out;
-    if (earlyPrune(c, out)) return fullStrat{dT, dS, out.stratType, out.optimalSpeed};
+    ZS::strat out;
+    if (earlyPrune(c, out)) return fullStrat{dT, dS, out.stratType, out.optimalSpeed, bestDelayTick};
 
     double pendulumSpeed = nondelayedPendulum(p, mm, t, c.o1.jumps, maxBwSpeed);
-    return fullStrat{dT, dS, ZS::PENDULUM, pendulumSpeed};
+    return fullStrat{dT, dS, ZS::PENDULUM, pendulumSpeed, bestDelayTick};
 
 }
 
 // Finds the optimal delayed speed: Given mm, mm-airtime
-ZS::halfStrat ZS::optimalDelayed(double mm, int t)
+ZS::strat ZS::optimalDelayed(double mm, int t, int delayTick)
 {
-    ZPlayer p;
+    log += "delayTick = " + std::to_string(delayTick) + "\n";
+    ZPlayer p(speed, slowness);
     mm += 0.6f;
 
-    ZS::CoreCtx c = solverCore(p, mm, t, true, 0);
+    ZS::CoreCtx c = solverCore(p, mm, t, delayTick, 0);
 
-    ZS::halfStrat out;
+    ZS::strat out;
     if (earlyPrune(c, out)) return out;
 
-    double pendulumSpeed = delayedPendulum(p, mm, t, c.o1.jumps);
-    if(pendulumSpeed >= -c.o2.reqBwSpeed) return halfStrat{ZS::SLINGSHOT, c.o2.slingSpeed};
-    if(pendulumSpeed >= -c.o4.bwSpeedBoom) return halfStrat{ZS::BOOMERANG, c.o4.boomSpeed};
+    double pendulumSpeed = delayedPendulum(p, mm, t, c.o1.jumps, delayTick);
+    if(pendulumSpeed >= -c.o2.reqBwSpeed) return strat{ZS::SLINGSHOT, c.o2.slingSpeed};
+    if(pendulumSpeed >= -c.o4.bwSpeedBoom) return strat{ZS::BOOMERANG, c.o4.boomSpeed};
 
-    return halfStrat{ZS::PENDULUM, pendulumSpeed};
+    return strat{ZS::PENDULUM, pendulumSpeed};
 }
 
 // Runs: heuristics, slingShot, robo, boomerang (no equilibrium / no moveVec fit)
-ZS::CoreCtx ZS::solverCore(ZPlayer& p, double mm, int t, bool delayQ, double knownBwCap){
+ZS::CoreCtx ZS::solverCore(ZPlayer& p, double mm, int t, int delayTick, double knownBwCap){
     CoreCtx c;
-    c.o1 = ZS::mmHeuristics(p, mm, t, delayQ, knownBwCap);
-    c.o2 = ZS::slingShot(p, mm, t, delayQ, c.o1);
-    c.o3 = ZS::robo(p, mm, t, delayQ, c.o1.jumps);
-    c.o4 = ZS::boomerang(p, mm, t, delayQ, c.o1);
+    c.o1 = ZS::mmHeuristics(p, mm, t, delayTick, knownBwCap);
+    c.o2 = ZS::slingShot(p, mm, t, delayTick, c.o1);
+    c.o3 = ZS::robo(p, mm, t, delayTick, c.o1.jumps);
+    c.o4 = ZS::boomerang(p, mm, t, delayTick, c.o1);
     return c;
 }
 
 // Applies the shared early-return rules (slingshot / true robo / robo vs boomerang).
 // Returns true if early prunable, and fills `out`.
-bool ZS::earlyPrune(const CoreCtx& c, ZS::halfStrat& out){
+bool ZS::earlyPrune(const CoreCtx& c, ZS::strat& out){
     if (c.o2.possSling) {
         out = { ZS::SLINGSHOT, c.o2.slingSpeed };
         return true;
@@ -92,7 +124,7 @@ bool ZS::earlyPrune(const CoreCtx& c, ZS::halfStrat& out){
 }
 
 // Gather samples, preReq knowledges for later calculation. If there is no knownBwCap, it yolos a reasonable lowerbound.
-ZS::Output1 ZS::mmHeuristics(ZPlayer& p, double mm, int t, bool delayQ, double knownBwCap){
+ZS::Output1 ZS::mmHeuristics(ZPlayer& p, double mm, int t, int delayTick, double knownBwCap){
     
     // Amount of sj45(t)'s an mm could fit, without bwSpeed
     int jumps = 0;
@@ -101,15 +133,21 @@ ZS::Output1 ZS::mmHeuristics(ZPlayer& p, double mm, int t, bool delayQ, double k
 
     ZPlayer::State prevJump;
 
+    
+    if(delayTick > 0){
+        p.saveState();
+        p.s45(delayTick);
+    } 
+
     while (true){
         prevJump = p.getState();
-        if(delayQ && jumps != 0)
-            p.loadState(); // Undo run 1t
+        if(delayTick > 0)
+            p.loadState(); // Undo run
         p.sj45(t);
         
-        if(delayQ){
+        if(delayTick > 0){
             p.saveState();
-            p.s45(1);
+            p.s45(delayTick);
         } 
 
         if(p.Z() > mm){
@@ -121,11 +159,14 @@ ZS::Output1 ZS::mmHeuristics(ZPlayer& p, double mm, int t, bool delayQ, double k
         jumps ++;
     }
 
+
     double bestBwSpeed;
     if(knownBwCap == 0){
         // [Note] Current state: prevJump
         // A lowerbound on maxBwSpeed(bestBwSpeed) is used for early pruning in stratfind
         // Get bestBwSpeed by doing full jumps on mm (filled mm with sa45 if jump == 0), then run 1t 
+        p.resetAll();
+        p.chained_sj45(t, jumps);
 
         if(jumps == 0){
             int pessiTicks = 0;
@@ -138,23 +179,27 @@ ZS::Output1 ZS::mmHeuristics(ZPlayer& p, double mm, int t, bool delayQ, double k
         }
         p.s45(1);
         bestBwSpeed = -p.Vz();
-        log += "Estimates BW speed lowerBound: " + std::to_string(bestBwSpeed) + "\n";
+        log += "BW speed lowerBound: " + std::to_string(bestBwSpeed) + "\n";
+
+        
     }else{
         bestBwSpeed = knownBwCap;
     }
 
+    
     p.resetAll();
     p.setVz(bestBwSpeed);
     p.chained_sj45(t, jumps + 1);
-    if(delayQ) p.s45(1);
+    p.s45(delayTick);
     double bwmmDis = p.Z();
 
     p.resetAll();
 
+
     return Output1{jumps, overJamDis, jamDis, bestBwSpeed, bwmmDis};
 }
 
-ZS::Output2 ZS::slingShot(ZPlayer& p, double mm, int t, bool delayQ, Output1& o1){
+ZS::Output2 ZS::slingShot(ZPlayer& p, double mm, int t, int delayTick, Output1& o1){
 
     double slingSpeed = 0;
     // Lerp (0, overJamDis), (bestBwSpeed, bwmmDis) to find (reqVz, mm)
@@ -166,7 +211,7 @@ ZS::Output2 ZS::slingShot(ZPlayer& p, double mm, int t, bool delayQ, Output1& o1
         p.resetAll();
         p.setVz(reqBwSpeed);
         p.chained_sj45(t, o1.jumps + 1);
-        if(delayQ) p.s45(1);
+        p.s45(delayTick);
         slingSpeed = p.Vz();
     }else{
         // If reqBwSpeed hits inertia, set bwSpeed to just hit inertia barely(has the effect to extend the mm by ~0.0091575), angled the first jump tick.
@@ -178,7 +223,7 @@ ZS::Output2 ZS::slingShot(ZPlayer& p, double mm, int t, bool delayQ, Output1& o1
             p.sj45(m, 1);
             p.sa45(t - 1);
             p.chained_sj45(t, o1.jumps);
-            if(delayQ) p.s45(1);
+            p.s45(delayTick);
             return falseZtrueVz? p.Vz() : p.Z();
         };
 
@@ -191,6 +236,7 @@ ZS::Output2 ZS::slingShot(ZPlayer& p, double mm, int t, bool delayQ, Output1& o1
         if(moveVec > 1) moveVec = 1;
 
         slingSpeed = getSample(moveVec, true);
+
     }
 
     // ReqBwSpeed could be reached
@@ -200,7 +246,7 @@ ZS::Output2 ZS::slingShot(ZPlayer& p, double mm, int t, bool delayQ, Output1& o1
 }
 
 
-ZS::Output3 ZS::robo(ZPlayer& p, double mm, int t, bool delayQ, int jumps){
+ZS::Output3 ZS::robo(ZPlayer& p, double mm, int t, int delayTick, int jumps){
 
     // Robo doesn't make sense when jumps == 0
     if(jumps == 0) return Output3{false, 0};
@@ -209,7 +255,7 @@ ZS::Output3 ZS::robo(ZPlayer& p, double mm, int t, bool delayQ, int jumps){
     p.s45(1);
     double hhSpeed = p.Vz(); 
     p.chained_sj45(t, jumps);
-    if(delayQ) p.s45(1);
+    p.s45(delayTick);
 
     double hhDis = p.Z();
 
@@ -220,12 +266,12 @@ ZS::Output3 ZS::robo(ZPlayer& p, double mm, int t, bool delayQ, int jumps){
     p.resetAll();
 
     // The border of robo and true robo
-    // The formula is v_0 = -0.13*(0.6/slip)^3/(1+0.91*slip), derived from v_0 + v_1 = 0
-    double borderSpeed = -0.13/1.546;
+    // The formula is v_0 = -hhSpeed*(0.6/slip)^3/(1+0.91*slip), derived from v_0 + v_1 = 0
+    double borderSpeed = -hhSpeed/1.546;
     p.setVz(borderSpeed);
     p.s45(1);
     p.chained_sj45(t, jumps);
-    if(delayQ) p.s45(1);
+    p.s45(delayTick);
     double borderDis = p.Z();
 
     double roboBwSpeed;
@@ -243,7 +289,7 @@ ZS::Output3 ZS::robo(ZPlayer& p, double mm, int t, bool delayQ, int jumps){
     if(trueRoboQ) p.setZ(0);
     p.sa45(t - 1);
     p.chained_sj45(t, jumps - 1);
-    if(delayQ) p.s45(1);
+    p.s45(delayTick);
 
     double roboSpeed = p.Vz();
     p.resetAll();
@@ -252,10 +298,10 @@ ZS::Output3 ZS::robo(ZPlayer& p, double mm, int t, bool delayQ, int jumps){
 }
 
 
-ZS::Output4 ZS::boomerang(ZPlayer& p, double mm, int t, bool delayQ, Output1& o1){
+ZS::Output4 ZS::boomerang(ZPlayer& p, double mm, int t, int delayTick, Output1& o1){
 
-    // Bommerang doesn't make sense when jumps == 0
-    if(o1.jumps == 0) return Output4{-INFINITY, 0, false};
+    // Bommerang doesn't make sense when that
+    if(o1.jumps == 0 && delayTick <= 1) return Output4{-INFINITY, 0, false};
 
     bool poss = false;
 
@@ -263,12 +309,12 @@ ZS::Output4 ZS::boomerang(ZPlayer& p, double mm, int t, bool delayQ, Output1& o1
     p.resetAll();
     p.setVzAir(1);
     p.chained_sj45(t, o1.jumps);
-    if(delayQ) p.s45(1);
+    p.s45(delayTick);
     double z3 = p.Z();
 
     // Lerp (0, jamDis), (z3, 1) to find (reqFwSpeed, mm)
     double reqFwSpeed = (mm - o1.jamDis) / (z3 - o1.jamDis);
-    log += "Required FW airspeed: " + std::to_string(reqFwSpeed) + "\n";
+    log += "FW airspeed req: " + std::to_string(reqFwSpeed) + "\n";
 
     // do borderline boomerang
     auto samp = [&](double vi, double m, bool falseZtrueVz){
@@ -294,13 +340,13 @@ ZS::Output4 ZS::boomerang(ZPlayer& p, double mm, int t, bool delayQ, Output1& o1
     double v1 = samp(1, m1, true);
     double reqBwSpeed = (reqFwSpeed - v0)/(v1 - v0);
 
-    log += "Required BW speed for boomerang: " + std::to_string(reqBwSpeed) + "\n";
+    log += "BW speedreq for boomerang: " + std::to_string(reqBwSpeed) + "\n";
 
     // Simulate boomerang speed assuming it is possible
     p.resetAll();
     p.setVzAir(reqFwSpeed);
     p.chained_sj45(t, o1.jumps);
-    if(delayQ) p.s45(1);
+    p.s45(delayTick);
     double boomSpeed = p.Vz();
 
     if(-reqBwSpeed < -o1.bestBwSpeed)
@@ -311,7 +357,7 @@ ZS::Output4 ZS::boomerang(ZPlayer& p, double mm, int t, bool delayQ, Output1& o1
 
 
 // Finding the velocity convergence of chained loop by solving the equation of reqBwSpeed = finalSpeed
-double ZS::delayedPendulum(ZPlayer& p, double mm, int t, int jumps){
+double ZS::delayedPendulum(ZPlayer& p, double mm, int t, int jumps, int delayTick){
 
     auto samp = [&](double vi, double m, bool falseZtrueVz){
         p.resetAll();
@@ -319,7 +365,7 @@ double ZS::delayedPendulum(ZPlayer& p, double mm, int t, int jumps){
         p.sj45(m, 1);
         p.sa45(t - 1);
         p.chained_sj45(t, jumps);
-        p.s45(1);
+        p.s45(delayTick);
         return falseZtrueVz? p.Vz() : p.Z();
     };
 
@@ -385,7 +431,7 @@ double ZS::delayedPendulum(ZPlayer& p, double mm, int t, int jumps){
         p.sa45(ma, 1);
         p.sa45(t - inertiaTick - 1);
         p.chained_sj45(t, jumps);
-        p.s45(1);
+        p.s45(delayTick);
         return falseZtrueVz? p.Vz() : p.Z();
     };
 
@@ -520,8 +566,9 @@ double ZS::nondelayedPendulum(ZPlayer& p, double mm, int t, int jumps, double ma
 
 // ----------------- Backwall Solver ----------------
 
-ZS::halfStrat ZS::backwallSolve(double mm, int t, bool delayQ){
-    ZPlayer p;
+ZS::strat ZS::backwallSolve(double mm, int t, int delayTick){
+    if(delayTick > 0) log += "delayTick = " + fmt(delayTick) + "\n";
+    ZPlayer p(speed, slowness);
     double bestSpeed = 0;
     int stratType = -1;
 
@@ -531,14 +578,20 @@ ZS::halfStrat ZS::backwallSolve(double mm, int t, bool delayQ){
 
     ZPlayer::State prevJump;
 
+    if(delayTick > 0){
+        p.saveState();
+        p.s45(delayTick);
+    } 
+
     while (true){
         prevJump = p.getState();
-        if(delayQ && jumps != 0) p.loadState(); // Undo run 1t
+        if(delayTick > 0)
+            p.loadState(); // Undo run
         p.sj45(t);
         
-        if(delayQ){
+        if(delayTick > 0){
             p.saveState();
-            p.s45(1);
+            p.s45(delayTick);
         } 
 
         if(p.Z() > mm){
@@ -553,7 +606,7 @@ ZS::halfStrat ZS::backwallSolve(double mm, int t, bool delayQ){
     p.resetAll();
     p.setVz(1);
     p.chained_sj45(t, jumps);
-    if(delayQ) p.s45(1);
+    p.s45(delayTick);
     z1ground = p.Z();
 
     auto fitMax = [&](bool isGround, double z_start, double z_end){
@@ -579,7 +632,7 @@ ZS::halfStrat ZS::backwallSolve(double mm, int t, bool delayQ){
 
     int x = fitMax(true, z0, z1ground);
 
-    log += "The mm could fit at most " +  std::to_string(x) + " s45's before the sprint jumps\n";
+    log += "Fit at most s45(" +  fmt(x) + ") r(sj45(" + fmt(t) + "), " + fmt(jumps) + ")\n";
 
     double zRun0 = p.Z() + (z1ground - z0) * p.Vz() + z0;
     double runBaseSpeed = p.Vz();
@@ -613,7 +666,7 @@ ZS::halfStrat ZS::backwallSolve(double mm, int t, bool delayQ){
     p.resetAll();
     p.sa45(t - 1);
     p.chained_sj45(t, jumps);
-    if(delayQ) p.s45(1);
+    p.s45(delayTick);
     double maxPessiSpeed = p.Vz();
     bool needSj = (p.Z() < mm);
 
@@ -627,7 +680,7 @@ ZS::halfStrat ZS::backwallSolve(double mm, int t, bool delayQ){
             } else p.sj45(m, 1);
             p.sa45(inertiaQ ? t - 2 : t - 1);
             p.chained_sj45(t, jumps);
-            if(delayQ) p.s45(1);
+            p.s45(delayTick);
             return falseZtrueVz? p.Vz() : p.Z();
         };
 
@@ -638,7 +691,7 @@ ZS::halfStrat ZS::backwallSolve(double mm, int t, bool delayQ){
         p.resetAll();
         p.setVzAir(1);
         p.chained_sj45(t, jumps);
-        if(delayQ) p.s45(1);
+        p.s45(delayTick);
         z1air = p.Z();
 
         // deltaZ =  (z1air - z0) * air_vi + z0
@@ -646,7 +699,7 @@ ZS::halfStrat ZS::backwallSolve(double mm, int t, bool delayQ){
 
         int y = fitMax(false, z0, z1air);
         p.chained_sj45(t, jumps);
-        if(delayQ) p.s45(1);
+        p.s45(delayTick);
         double pessiSpeed = p.Vz();
 
         auto samp = [&](double ma, bool falseZtrueVz, bool inertiaQ = false){
@@ -656,12 +709,21 @@ ZS::halfStrat ZS::backwallSolve(double mm, int t, bool delayQ){
                 p.sa45(ma, 1);
                 p.sa45(inertiaQ ? y - 1 : y);
                 p.chained_sj45(t, jumps);
+                p.s45(delayTick);
             }else{
-                p.sj45(ma, 1);
-                p.sa45(t - 1);
-                p.chained_sj45(t, jumps - 1);
+                if(jumps > 0){
+                    p.sj45(ma, 1);
+                    p.sa45(t - 1);
+                    p.chained_sj45(t, jumps - 1);
+                    p.s45(delayTick);
+                }else{
+                    // History: speed 4 4tmm 1.5bm backwalled edge case
+                    p.s45(ma, 1);
+                    p.s45(delayTick - 1);
+                }
+
             }
-            if(delayQ) p.s45(1);
+            
             return falseZtrueVz? p.Vz() : p.Z();
         };
 
@@ -669,9 +731,9 @@ ZS::halfStrat ZS::backwallSolve(double mm, int t, bool delayQ){
         stratType = ZS::PESSI;
     }
 
-    if(!delayQ && jumps == 0){
+    if(delayTick == 0 && jumps == 0){
         // Rest of the strategies doesn't make sense for them.
-        return ZS::halfStrat{stratType, bestSpeed};
+        return ZS::strat{stratType, bestSpeed};
     }
 
     // 2. airstrat + s45(x)
@@ -682,7 +744,7 @@ ZS::halfStrat ZS::backwallSolve(double mm, int t, bool delayQ){
         p.setVzAir(1);
         p.s45(x);
         p.chained_sj45(t, jumps);
-        if(delayQ) p.s45(1);
+        p.s45(delayTick);
         zRun1 = p.Z();
 
         // deltaZ =  (zRun1 - zRun0) * air_vi + zRun0
@@ -691,7 +753,7 @@ ZS::halfStrat ZS::backwallSolve(double mm, int t, bool delayQ){
         int y = fitMax(false, zRun0, zRun1);
         p.s45(x);
         p.chained_sj45(t, jumps);
-        if(delayQ) p.s45(1);
+        p.s45(delayTick);
         double a7runBaseSpeed = p.Vz();
 
         auto samp = [&](double ma, bool falseZtrueVz, bool inertiaQ = false){
@@ -707,7 +769,7 @@ ZS::halfStrat ZS::backwallSolve(double mm, int t, bool delayQ){
                 p.s45(x - 1);
             }
             p.chained_sj45(t, jumps);
-            if(delayQ) p.s45(1);
+            p.s45(delayTick);
             return falseZtrueVz? p.Vz() : p.Z();
         };
 
@@ -720,8 +782,6 @@ ZS::halfStrat ZS::backwallSolve(double mm, int t, bool delayQ){
 
     }
 
-    
-
     // 3. ground speed + s45(x)
 
     {
@@ -731,7 +791,7 @@ ZS::halfStrat ZS::backwallSolve(double mm, int t, bool delayQ){
             p.s45(m, 1);
             p.s45(inertiaQ ? x - 1 : x);
             p.chained_sj45(t, jumps);
-            if(delayQ) p.s45(1);
+            p.s45(delayTick);
             return falseZtrueVz? p.Vz() : p.Z();
         };
 
@@ -742,17 +802,57 @@ ZS::halfStrat ZS::backwallSolve(double mm, int t, bool delayQ){
         }
     }
 
-    return ZS::halfStrat{stratType, bestSpeed};
+    return ZS::strat{stratType, bestSpeed};
 }
 
 ZS::fullStrat ZS::backwallSolver(double mm, int t){
     log += "\nOptimal Backwalled Solver ----------------------- \n";
-    log += "Target mm: " + std::to_string(mm) + ", airtime: " + std::to_string(t) + "\n";
+    log += "Target mm: " + fmt(mm) + ", airtime: " + std::to_string(t) + "\n";
     log += "\n- Delayed section: \n";
-    ZS::halfStrat delayed = backwallSolve(mm, t, true);
+
+    int delayTick = 1;
+    ZS::strat delayed = backwallSolve(mm, t, DELAYED);
+
+    double dS = delayed.optimalSpeed;
+    int dT = delayed.stratType;
+
+    ZPlayer p(speed, slowness);
+    p.s45(1);
+    double sprint45Vz = p.Vz();
+    double terminalSpeed = sprint45Vz/ 0.454;
+    double bestDelayTick = delayTick;
+
+    p.resetAll();
+    p.sj45(t);
+    p.s45(1);
+
+    // only low speed could delayTick > 1 benifit, delay long ticks were already considered if jumps == 0, skip
+    if(dS < terminalSpeed && p.Z() < mm){
+
+        log += "Best vz = " +  std::to_string(dS) + "\n\n";
+        int maxDelayTick = -1;
+        p.resetAll();
+        for(; p.Z() < mm; maxDelayTick ++)
+            p.s45(1);
+
+        log += "(max) ";
+        
+        ZS::strat newDelayedStrat = backwallSolve(mm, t, maxDelayTick);
+        log += "Best vz = " +  std::to_string(newDelayedStrat.optimalSpeed) + "\n\n";
+        if(newDelayedStrat.optimalSpeed > dS){
+            dS = newDelayedStrat.optimalSpeed;
+            dT = newDelayedStrat.stratType;
+
+            delayTick = maxDelayTick;
+        }
+
+    }
+    p.resetAll();
+
+    p.resetAll();
     log += "\n- Nondelayed section: \n";
-    ZS::halfStrat nondelayed = backwallSolve(mm, t, false);
-    return ZS::fullStrat{delayed.stratType, delayed.optimalSpeed, nondelayed.stratType, nondelayed.optimalSpeed};
+    ZS::strat nondelayed = backwallSolve(mm, t, NONDELAYED);
+    return ZS::fullStrat{dT, dS, nondelayed.stratType, nondelayed.optimalSpeed, delayTick};
 }
 
 // ----------------- Utility Functions ----------------
@@ -797,17 +897,17 @@ bool ZS::poss(double mm, int t_mm, int max_t, double threshold, bool backwallQ, 
     ZS::fullStrat bestStrat = backwallQ ? backwallSolver(mm, t_mm) : optimalSolver(mm, t_mm);
     double dS = bestStrat.delaySpeed;
     double ndS = bestStrat.nondelaySpeed;
-    ZPlayer dP;
+    ZPlayer dP(speed, slowness);
     dP.setVz(dS);
     dP.sj45(1);
-    ZPlayer ndP;
+    ZPlayer ndP(speed, slowness);
     ndP.setVzAir(ndS);
     ndP.sj45(1);
     content += "\n-------------------------------------------\n";
     content += std::string("For") + (backwallQ ? " backwalled " : " ") + "mm = " + fmt(mm) + " (airtime = " + fmt(t_mm)
     + "), t <= " + std::to_string(max_t) + ", threshold = " + fmt(threshold) + ", offset:" + fmt(shift) + "\n";
     content += "- NonDelayedSpeed: " + fmt(ndS) + ", Type: " + strat2string(bestStrat.nondelayStrat) + "\n";
-    content += "- DelayedSpeed: " + fmt(dS) + ", Type: " + strat2string(bestStrat.delayStrat) + "\n";
+    content += "- DelayedSpeed(dt=" + std::to_string(bestStrat.delayTick) + "): " + fmt(dS) + ", Type: " + strat2string(bestStrat.delayStrat) + "\n";
     bool delayedBetter = true;
     for(int i = 2; i <= max_t; i++){
         dP.sa45(1);
@@ -844,7 +944,19 @@ bool ZS::poss(double mm, int t_mm, int max_t, double threshold, bool backwallQ, 
 
 }
 
-std::string ZSolver::fmt(double x) {
+void ZS::setEffect(int speed, int slowness){
+    this->speed = speed;
+    this->slowness = slowness;
+    std::cout << "Set Speed: " << speed << ", Slowness: " << slowness << "\n";
+}
+
+void ZS::clearEffects(){
+    speed = 0;
+    slowness = 0;
+    std::cout << "Cleared all effects";
+}
+
+std::string ZS::fmt(double x) {
     std::ostringstream oss;
     if (std::abs(x) < 1e-8 && x != 0)
         oss << std::scientific << std::setprecision(16);
@@ -868,6 +980,19 @@ std::string ZSolver::fmt(double x) {
             --end;
         s.erase(end + 1);
     }
+
+    return s;
+}
+
+std::string ZS::df(double x, int precision) {
+    std::ostringstream oss;
+    oss << std::fixed << std::setprecision(precision);
+    oss << x;
+    std::string s = oss.str();
+    auto end = s.find_last_not_of('0');
+    if (end != std::string::npos && s[end] == '.')
+        --end;
+    s.erase(end + 1);
 
     return s;
 }

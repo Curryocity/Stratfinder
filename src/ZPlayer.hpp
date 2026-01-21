@@ -19,22 +19,15 @@ public:
     static constexpr int GROUND = 0;
     static constexpr int AIR = 1;
 
-    static constexpr float PIf = 3.14159265358979323846f;
-    static constexpr double PId = 3.14159265358979323846264338327950288;
-
     static constexpr float GROUND_SLIP = 0.6f;
     static constexpr double DEFAULT_INERTIA = 0.005;
 
     /* trig */
-    static float SIN_TABLE[65536];
     static float sin45;
     static float cos45;
 
     /* MUST be called once before simulation */
     static void init();
-
-    static inline float sin(float deg);
-    static inline float cos(float deg);
 
     ZPlayer(int speed = 0, int slowness = 0);
 

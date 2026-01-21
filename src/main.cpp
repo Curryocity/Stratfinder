@@ -1,12 +1,21 @@
 #include <iostream>
+#include "ZPlayer.hpp"
 #include "ZSolver.hpp"
+#include "util.hpp"
+
+void init(){
+    util::init();
+    ZPlayer::init();
+}
 
 int main() {
 
     // We don't have GUI yet
-    ZSolver::init();
+
+    init();
     ZSolver s;
 
+    /*
     bool backwallq = false;
     std::string content;
     for(int speed = 0; speed <= 6; speed ++){
@@ -21,15 +30,16 @@ int main() {
             }
         }
     }
+    */
 
 
-    /*
     std::string ctx;
-    s.setEffect(0, 1);
-    s.poss(1.5, 12, 50, 0.001, false, ctx, ZSolver::ladder);
+    s.setEffect(3, 4);
+    s.poss(0.625, 11, 25, 0.0001, false, ctx, ZSolver::normal);
     s.printLog();
     std::cout << ctx << std::endl;
-    */
+
     
     return 0;
 }
+

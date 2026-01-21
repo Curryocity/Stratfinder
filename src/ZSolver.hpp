@@ -9,17 +9,18 @@ class ZSolver{
     static constexpr int NONDELAYED = 0;
     static constexpr int DELAYED = 1;
 
+    // Normal types
     static constexpr int SLINGSHOT = 0; // Bw speed into sj45
     static constexpr int TRUE_ROBO = 1; 
     static constexpr int ROBO = 2;
     static constexpr int BOOMERANG = 3; // Fw airspeed into sj45
     static constexpr int PENDULUM = 4; // Chained loops
-    // backwall strat types
+
+    // Backwall types
     static constexpr int ANGLED_JT = 5;
     static constexpr int PESSI = 6;
     static constexpr int A7RUN = 7;
     static constexpr int RUN = 8;
-
 
     static constexpr double groundInertia = 0.005/0.6/0.91;
     static constexpr double airInertia = 0.005/0.91;
@@ -70,9 +71,6 @@ class ZSolver{
         Output4 o4;
     };
 
-
-    static void init();
-
     fullStrat optimalSolver(double mm, int t);
     strat optimalDelayed(double mm, int t, int delayTick = DELAYED);
 
@@ -95,8 +93,6 @@ class ZSolver{
     static constexpr double blockage = 0;
     static constexpr double ladder = 0.30000001192092896;
     static constexpr double normal = 0.6000000238418579;
-    std::string fmt(double x);
-    std::string df(double x, int precision = 16);
 
     void setEffect(int speed, int slowness);
     void clearEffects();

@@ -1,29 +1,14 @@
 #include <cmath>
 #include "ZPlayer.hpp"
+#include "util.hpp"
 
-/* static storage */
-float ZPlayer::SIN_TABLE[65536];
 float ZPlayer::sin45 = 0.0f;
 float ZPlayer::cos45 = 0.0f;
 
 /* Precompute sine table */
 void ZPlayer::init() {
-    for (int i = 0; i < 65536; ++i) {
-        SIN_TABLE[i] = std::sin(i * PId * 2.0 / 65536.0);
-    }
-
-    sin45 = sin(45.01f);
-    cos45 = cos(45.01f);
-}
-
-inline float ZPlayer::sin(float deg) {
-    float rad = deg * PIf / 180.0f;
-    return SIN_TABLE[(int)(rad * 10430.378f) & 65535];
-}
-
-inline float ZPlayer::cos(float deg) {
-    float rad = deg * PIf / 180.0f;
-    return SIN_TABLE[(int)(rad * 10430.378f + 16384.0f) & 65535];
+    sin45 = util::sin(45.01f);
+    cos45 = util::cos(45.01f);
 }
 
 ZPlayer::ZPlayer(int speed, int slowness) : speed(speed), slowness(slowness){}

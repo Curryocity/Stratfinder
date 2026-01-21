@@ -1,23 +1,18 @@
 #include <algorithm>
 #include <iostream>
 #include <cmath>
-#include <ostream>
-#include <iomanip>
-#include <sstream>
+
 #include "ZPlayer.hpp"
 #include "ZSolver.hpp"
+#include "util.hpp"
 
 using ZS = ZSolver;
-
-void ZS::init(){
-    ZPlayer::init();
-}
 
 // Finds the optimal speed for delayed and nondelayed strat: Given mm, mm-airtime
 ZS::fullStrat ZSolver::optimalSolver(double mm, int t)
 {
     log += "\nOptimal Solver ----------------------- \n";
-    log += "Target mm: " + fmt(mm) + ", airtime: " + std::to_string(t) + "\n";
+    log += "Target mm: " + util::fmt(mm) + ", airtime: " + std::to_string(t) + "\n";
 
     log += "\n- Delayed section: \n";
 
@@ -567,7 +562,7 @@ double ZS::nondelayedPendulum(ZPlayer& p, double mm, int t, int jumps, double ma
 // ----------------- Backwall Solver ----------------
 
 ZS::strat ZS::backwallSolve(double mm, int t, int delayTick){
-    if(delayTick > 0) log += "delayTick = " + fmt(delayTick) + "\n";
+    if(delayTick > 0) log += "delayTick = " + util::fmt(delayTick) + "\n";
     ZPlayer p(speed, slowness);
     double bestSpeed = 0;
     int stratType = -1;
@@ -632,7 +627,7 @@ ZS::strat ZS::backwallSolve(double mm, int t, int delayTick){
 
     int x = fitMax(true, z0, z1ground);
 
-    log += "Fit at most s45(" +  fmt(x) + ") r(sj45(" + fmt(t) + "), " + fmt(jumps) + ")\n";
+    log += "Fit at most s45(" +  util::fmt(x) + ") r(sj45(" + util::fmt(t) + "), " + util::fmt(jumps) + ")\n";
 
     double zRun0 = p.Z() + (z1ground - z0) * p.Vz() + z0;
     double runBaseSpeed = p.Vz();
@@ -807,7 +802,7 @@ ZS::strat ZS::backwallSolve(double mm, int t, int delayTick){
 
 ZS::fullStrat ZS::backwallSolver(double mm, int t){
     log += "\nOptimal Backwalled Solver ----------------------- \n";
-    log += "Target mm: " + fmt(mm) + ", airtime: " + std::to_string(t) + "\n";
+    log += "Target mm: " + util::fmt(mm) + ", airtime: " + std::to_string(t) + "\n";
     log += "\n- Delayed section: \n";
 
     int delayTick = 1;
@@ -910,10 +905,10 @@ bool ZS::poss(double mm, int t_mm, int max_t, double threshold, bool backwallQ, 
     ndP.setVzAir(ndS);
     ndP.sj45(1);
     content += "\n-------------------------------------------\n";
-    content += std::string("For") + (backwallQ ? " backwalled " : " ") + "mm = " + fmt(mm) + " (airtime = " + fmt(t_mm)
-    + "), t <= " + std::to_string(max_t) + ", threshold = " + fmt(threshold) + ", offset:" + fmt(shift) + "\n";
-    content += "- NonDelayedSpeed: " + fmt(ndS) + ", Type: " + strat2string(strat.nondelayStrat) + "\n";
-    content += "- DelayedSpeed(dt=" + std::to_string(strat.delayTick) + "): " + fmt(dS) + ", Type: " + strat2string(strat.delayStrat) + "\n";
+    content += std::string("For") + (backwallQ ? " backwalled " : " ") + "mm = " + util::fmt(mm) + " (airtime = " + util::fmt(t_mm)
+    + "), t <= " + std::to_string(max_t) + ", threshold = " + util::fmt(threshold) + ", offset:" + util::fmt(shift) + "\n";
+    content += "- NonDelayedSpeed: " + util::fmt(ndS) + ", Type: " + strat2string(strat.nondelayStrat) + "\n";
+    content += "- DelayedSpeed(dt=" + std::to_string(strat.delayTick) + "): " + util::fmt(dS) + ", Type: " + strat2string(strat.delayStrat) + "\n";
     bool delayedBetter = true;
     for(int i = 2; i <= max_t; i++){
         dP.sa45(1);
@@ -938,7 +933,7 @@ bool ZS::poss(double mm, int t_mm, int max_t, double threshold, bool backwallQ, 
             double jumpDis = zb - offset;
 
             content += "t = " + std::to_string(i) + ": "
-            + fmt(jumpDis) + " + " + fmt(offset) + " b\n";
+            + util::fmt(jumpDis) + " + " + util::fmt(offset) + " b\n";
         }
     }
 
@@ -960,46 +955,5 @@ void ZS::clearEffects(){
     speed = 0;
     slowness = 0;
     std::cout << "Cleared all effects";
-}
-
-std::string ZS::fmt(double x) {
-    std::ostringstream oss;
-    if (std::abs(x) < 1e-8 && x != 0)
-        oss << std::scientific << std::setprecision(16);
-    else if (std::abs(x) < 1e-5)
-        oss << std::fixed << std::setprecision(9);
-    else
-        oss << std::fixed << std::setprecision(6);
-    oss << x;
-    std::string s = oss.str();
-
-    // Trim trailing zeros
-    if (auto pos = s.find('e'); pos != std::string::npos) {
-        // scientific notation
-        auto end = s.find_last_not_of('0', pos - 1);
-        if (s[end] == '.') --end;
-        s.erase(end + 1, pos - end - 1);
-    } else {
-        // fixed notation
-        auto end = s.find_last_not_of('0');
-        if (end != std::string::npos && s[end] == '.')
-            --end;
-        s.erase(end + 1);
-    }
-
-    return s;
-}
-
-std::string ZS::df(double x, int precision) {
-    std::ostringstream oss;
-    oss << std::fixed << std::setprecision(precision);
-    oss << x;
-    std::string s = oss.str();
-    auto end = s.find_last_not_of('0');
-    if (end != std::string::npos && s[end] == '.')
-        --end;
-    s.erase(end + 1);
-
-    return s;
 }
 

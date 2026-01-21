@@ -3,7 +3,8 @@
 This project is inspired by Cantnavet's [BMSolver](https://github.com/cantnavet/BmSolver).
 
 The program inputs mm(also supports backwalled mm) and mm airtime.
-Update: You could set speed/slowness effect via ZSolver::setEffect(int speed, int slowness)
+
+*Update: You could set speed/slowness effect via ZSolver::setEffect(int speed, int slowness)*
 
 1. Outputs the velocity and strategy type for optimal delayed and nondelayed strat.
 2. Find jumps within offset threshold (picking the best out of delayed and nondelayed strat).

@@ -2,9 +2,9 @@
 
 This project is inspired by Cantnavet's [BMSolver](https://github.com/cantnavet/BmSolver).
 
-The program inputs mm(also supports backwalled mm) and mm airtime.
+The program takes in mm(normal/backwalled) and mm airtime(constant).
 
-*Update: You could set speed/slowness effect via ZSolver::setEffect(int speed, int slowness)*
+***Update**: You could set speed/slowness effect via `ZSolver::setEffect(int speed, int slowness)`*
 
 1. Outputs the velocity and strategy type for optimal delayed and nondelayed strat.
 2. Find jumps within offset threshold (picking the best out of delayed and nondelayed strat).
@@ -18,10 +18,11 @@ The program inputs mm(also supports backwalled mm) and mm airtime.
 
 ```
 Optimal Solver ----------------------- 
-Target mm: 0.187500, airtime: 12
+Target mm: 0.1875, airtime: 12
 
 - Delayed section: 
-Estimates BW speed lowerBound: -0.269265
+delayTick = 1
+BW speed lowerBound: -0.269265
 Required BW speed: -0.573786
 Inertia triggered at t = 2 during delayed pendulum simulation.
 Vz on inertia tick: pos
@@ -35,57 +36,73 @@ Vz on inertia tick: neg
 Hit inertia on lowerbound, and slow down afterward 
 
 -------------------------------------------
-For mm = 0.187500 (airtime = 12), t <= 25, threshold = 0.010000
+For mm = 0.1875 (airtime = 12), t <= 25, threshold = 0.01, offset:0.6
 - NonDelayedSpeed: 0.185487, Type: Pendulum
-- DelayedSpeed: 0.290802, Type: Pendulum
-t = 2: 1.375000 + 0.001979 b
-t = 5: 2.250000 + 0.000667 b
-t = 16: 5.437500 + 0.004807 b
-t = 24: 7.750000 + 0.007449 b
+- DelayedSpeed(dt=1): 0.290802, Type: Pendulum
+t = 2: 1.375 + 0.001979 b
+t = 5: 2.25 + 0.000667 b
+t = 16: 5.4375 + 0.004807 b
+t = 24: 7.75 + 0.007449 b
 ```
 
-### 3bcmm 1.25bm (A casual e-5 double chilling here)
+### Slowness I 1.5bm 6-1 to ladder (perfect double 45.01)
 
 ```
+Set Speed: 0, Slowness: 1
+
+Optimal Solver ----------------------- 
+Target mm: 1.5, airtime: 12
+
+- Delayed section: 
+delayTick = 1
+BW speed lowerBound: -0.303187
+Required BW speed: -0.192072
+
+- Nondelayed section: 
+Max BW speed: -0.319588
+Required BW speed: -0.127684
+
 -------------------------------------------
-For mm = 1.250000 (airtime = 11), t <= 25, threshold = 0.001000
-- NonDelayedSpeed: 0.232769, Type: Slingshot
-- DelayedSpeed: 0.334247, Type: Slingshot
-(Nondelayed is better than Delayed at t = 8)
-t = 9: 3.562500 + 0.000980 b
-t = 15: 5.375000 + 0.000034 b
-t = 19: 6.562500 + 0.000391 b
+For mm = 1.5 (airtime = 12), t <= 25, threshold = 0.01, offset:0.3
+- NonDelayedSpeed: 0.237242, Type: Slingshot
+- DelayedSpeed(dt=1): 0.319588, Type: Slingshot
+(Nondelayed is better than Delayed at t = 4)
+t = 10: 3.5 + 0.009758 b
+t = 15: 5 + 0.000000137 b
 ```
 
 ### A weird true penta(6-2) featured in my [unlisted video](https://youtu.be/uTz3sbWMWuI)
 
 ```
 Optimal Backwalled Solver ----------------------- 
-Target mm: 9.875000, airtime: 7
+Target mm: 9.875, airtime: 7
 
 - Delayed section: 
+delayTick = 1
+Fit at most s45(0) r(sj45(7), 4)
 pessi speed: 0.439366
 run speed: 0.439368
 
 - Nondelayed section: 
+Fit at most s45(1) r(sj45(7), 4)
 Inertia triggered during pessi backwall solve.
 pessi speed: 0.340315
 a7run speed: 0.340377
 run speed: 0.340366
 
 -------------------------------------------
-For backwalled mm = 9.875000 (airtime = 7), t <= 25, threshold = 0.010000
+For backwalled mm = 9.875 (airtime = 7), t <= 25, threshold = 0.001, offset:0.6
 - NonDelayedSpeed: 0.340377, Type: A7Run
-- DelayedSpeed: 0.439368, Type: Run
+- DelayedSpeed(dt=1): 0.439368, Type: Run
 (Nondelayed is better than Delayed at t = 3)
-t = 4: 2.312500 + 0.005133 b
-t = 7: 3.375000 + 0.002011 b
-t = 15: 6.000000 + 0.000305 b
-t = 16: 6.312500 + 0.001635 b
-t = 17: 6.625000 + 0.000720 b
-t = 24: 8.750000 + 0.008839 b
+t = 15: 6 + 0.000305 b
+t = 17: 6.625 + 0.00072 b
 ```
 
-### TODO: GUI, ice/slime support, slime bounce jump finding?
-
-### Future Plan: 45bwmm finder, noturn (on mm) finder, input bruteforcer ... 
+### TODOs:
+1. x/z player
+2. input bruteforcer
+3. GUI
+4. ice/slime support
+5. slime bounce jump finding?
+6. 45bwmm finder (stratfind with limited turns on mm)

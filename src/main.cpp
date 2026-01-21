@@ -10,7 +10,7 @@ void init(){
 
 int main() {
 
-    // We don't have GUI yet
+    // We don't have GUI yet ;(
 
     init();
     ZSolver s;
@@ -35,7 +35,7 @@ int main() {
 
     std::string ctx;
     s.setEffect(3, 4);
-    s.poss(0.625, 11, 25, 0.0001, false, ctx, ZSolver::normal);
+    s.poss(0.625, 11, 25, 0.00001, false, ctx, ZSolver::normal);
     s.printLog();
     std::cout << ctx << std::endl;
 

@@ -14,7 +14,6 @@ public:
     
     static constexpr float FORWARD  =  1.0f;
     static constexpr float BACKWARD = -1.0f;
-    static constexpr float STOP     =  0.0f;
 
     static constexpr int GROUND = 0;
     static constexpr int AIR = 1;

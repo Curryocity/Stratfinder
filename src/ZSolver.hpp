@@ -86,9 +86,11 @@ class ZSolver{
 
     fullStrat backwallSolver(double mm, int t);
     strat backwallSolve(double mm, int t, int delayTick);
+
     static std::string strat2string(int stratType);
     void printLog();
     void clearLog();
+
     bool poss(double mm, int t_mm, int maxt, double threshold, bool backwallQ, std::string& content, double shift = normal, std::optional<fullStrat> provideStrat = std::nullopt);
     static constexpr double blockage = 0;
     static constexpr double ladder = 0.30000001192092896;
@@ -97,8 +99,8 @@ class ZSolver{
     void setEffect(int speed, int slowness);
     void clearEffects();
 
-
     private:
+
     int speed = 0;
     int slowness = 0;
     std::string log;

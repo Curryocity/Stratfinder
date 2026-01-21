@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <iostream>
 #include <cmath>
+#include <string>
 
 #include "ZPlayer.hpp"
 #include "ZSolver.hpp"
@@ -80,11 +81,14 @@ ZS::strat ZS::optimalDelayed(double mm, int t, int delayTick)
     ZS::strat out;
     if (earlyPrune(c, out)) return out;
 
-    double pendulumSpeed = delayedPendulum(p, mm, t, c.o1.jumps, delayTick);
-    if(pendulumSpeed >= -c.o2.reqBwSpeed) return strat{ZS::SLINGSHOT, c.o2.slingSpeed};
-    if(pendulumSpeed >= -c.o4.bwSpeedBoom) return strat{ZS::BOOMERANG, c.o4.boomSpeed};
+    double pendulumSpeed = delayedPendulum(p, mm, t, c.o1.jumps, delayTick);    
+    ZS::strat bestStrat = strat{ZS::PENDULUM, pendulumSpeed};
+    
+    if(pendulumSpeed >= -c.o2.reqBwSpeed)bestStrat = strat{ZS::SLINGSHOT, c.o2.slingSpeed};
+    if(pendulumSpeed >= -c.o4.bwSpeedBoom) bestStrat = strat{ZS::BOOMERANG, c.o4.boomSpeed};
+    if(bestStrat.optimalSpeed < c.o3.roboSpeed) bestStrat = strat{ZS::ROBO, c.o3.roboSpeed};
 
-    return strat{ZS::PENDULUM, pendulumSpeed};
+    return bestStrat;
 }
 
 // Runs: heuristics, slingShot, robo, boomerang (no equilibrium / no moveVec fit)
@@ -100,14 +104,16 @@ ZS::CoreCtx ZS::solverCore(ZPlayer& p, double mm, int t, int delayTick, double k
 // Applies the shared early-return rules (slingshot / true robo / robo vs boomerang).
 // Returns true if early prunable, and fills `out`.
 bool ZS::earlyPrune(const CoreCtx& c, ZS::strat& out){
-    if (c.o2.possSling) {
+    if (c.o2.possSling && (c.o2.slingSpeed > c.o3.roboSpeed) ) {
         out = { ZS::SLINGSHOT, c.o2.slingSpeed };
         return true;
     }
+
     if (c.o3.trueRoboQ) {
         out = { ZS::TRUE_ROBO, c.o3.roboSpeed };
         return true;
     }
+
     if (c.o4.possBoom) {
         if (c.o3.roboSpeed > c.o4.boomSpeed)
             out = { ZS::ROBO, c.o3.roboSpeed };
@@ -243,8 +249,8 @@ ZS::Output2 ZS::slingShot(ZPlayer& p, double mm, int t, int delayTick, Output1& 
 
 ZS::Output3 ZS::robo(ZPlayer& p, double mm, int t, int delayTick, int jumps){
 
-    // Robo doesn't make sense when jumps == 0
-    if(jumps == 0) return Output3{false, 0};
+    // Robo doesn't make sense
+    if(jumps == 0 && delayTick <= 1) return Output3{false, 0};
 
     p.resetAll();
     p.s45(1);
@@ -280,14 +286,23 @@ ZS::Output3 ZS::robo(ZPlayer& p, double mm, int t, int delayTick, int jumps){
     p.setVz(roboBwSpeed);
 
     p.s45(1);
-    p.sj45(1);
-    if(trueRoboQ) p.setZ(0);
-    p.sa45(t - 1);
-    p.chained_sj45(t, jumps - 1);
-    p.s45(delayTick);
+    if(jumps > 0){
+        p.sj45(1);
+        if(trueRoboQ) p.setZ(0);
+        p.sa45(t - 1);
+        p.chained_sj45(t, jumps - 1);
+        p.s45(delayTick);
+    }else{
+        p.s45(1);
+        if(trueRoboQ) p.setZ(0);
+        p.s45(delayTick - 1);
+    }
 
     double roboSpeed = p.Vz();
     p.resetAll();
+
+    log += "roboSpeed: " + util::fmt(roboSpeed) + "\n";
+    log += "isTrueRobo? " + std::to_string(trueRoboQ) + "\n";
 
     return Output3{trueRoboQ, roboSpeed};
 }

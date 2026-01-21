@@ -3,6 +3,7 @@
 This project is inspired by Cantnavet's [BMSolver](https://github.com/cantnavet/BmSolver).
 
 The program inputs mm(also supports backwalled mm) and mm airtime.
+Update: You could set speed/slowness effect via ZSolver::setEffect(int speed, int slowness)
 
 1. Outputs the velocity and strategy type for optimal delayed and nondelayed strat.
 2. Find jumps within offset threshold (picking the best out of delayed and nondelayed strat).
@@ -84,6 +85,6 @@ t = 17: 6.625000 + 0.000720 b
 t = 24: 8.750000 + 0.008839 b
 ```
 
-### TODO: GUI, Potion effect support, ice/slime support, slime bounce jump finding?
+### TODO: GUI, ice/slime support, slime bounce jump finding?
 
-### Future Plan: 45bwmm finder, noturn (on mm) finder ... 
+### Future Plan: 45bwmm finder, noturn (on mm) finder, input bruteforcer ... 

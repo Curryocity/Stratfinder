@@ -891,12 +891,18 @@ void ZS::clearLog(){
     log = "";
 }
 
-bool ZS::poss(double mm, int t_mm, int max_t, double threshold, bool backwallQ, std::string& content, double shift){
+bool ZS::poss(double mm, int t_mm, int max_t, double threshold, bool backwallQ, std::string& content, double shift, std::optional<fullStrat> provideStrat){
     content = "";
     bool hasJump = false;
-    ZS::fullStrat bestStrat = backwallQ ? backwallSolver(mm, t_mm) : optimalSolver(mm, t_mm);
-    double dS = bestStrat.delaySpeed;
-    double ndS = bestStrat.nondelaySpeed;
+    ZS::fullStrat strat;
+    if(!provideStrat){
+        strat = backwallQ ? backwallSolver(mm, t_mm) : optimalSolver(mm, t_mm);
+    }else{
+        strat = provideStrat.value();
+    }
+    
+    double dS = strat.delaySpeed;
+    double ndS = strat.nondelaySpeed;
     ZPlayer dP(speed, slowness);
     dP.setVz(dS);
     dP.sj45(1);
@@ -906,8 +912,8 @@ bool ZS::poss(double mm, int t_mm, int max_t, double threshold, bool backwallQ, 
     content += "\n-------------------------------------------\n";
     content += std::string("For") + (backwallQ ? " backwalled " : " ") + "mm = " + fmt(mm) + " (airtime = " + fmt(t_mm)
     + "), t <= " + std::to_string(max_t) + ", threshold = " + fmt(threshold) + ", offset:" + fmt(shift) + "\n";
-    content += "- NonDelayedSpeed: " + fmt(ndS) + ", Type: " + strat2string(bestStrat.nondelayStrat) + "\n";
-    content += "- DelayedSpeed(dt=" + std::to_string(bestStrat.delayTick) + "): " + fmt(dS) + ", Type: " + strat2string(bestStrat.delayStrat) + "\n";
+    content += "- NonDelayedSpeed: " + fmt(ndS) + ", Type: " + strat2string(strat.nondelayStrat) + "\n";
+    content += "- DelayedSpeed(dt=" + std::to_string(strat.delayTick) + "): " + fmt(dS) + ", Type: " + strat2string(strat.delayStrat) + "\n";
     bool delayedBetter = true;
     for(int i = 2; i <= max_t; i++){
         dP.sa45(1);
@@ -927,7 +933,7 @@ bool ZS::poss(double mm, int t_mm, int max_t, double threshold, bool backwallQ, 
         zb += shift;
         double offset = std::fmod(zb, 0.0625);
 
-        if (offset < threshold) {
+        if (offset < threshold && offset >= 0) {
             hasJump = true;
             double jumpDis = zb - offset;
 

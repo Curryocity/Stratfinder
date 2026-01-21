@@ -90,7 +90,7 @@ class ZSolver{
     static std::string strat2string(int stratType);
     void printLog();
     void clearLog();
-    bool poss(double mm, int t_mm, int maxt, double threshold, bool backwallQ, std::string& content, double shift = normal);
+    bool poss(double mm, int t_mm, int maxt, double threshold, bool backwallQ, std::string& content, double shift = normal, std::optional<fullStrat> provideStrat = std::nullopt);
     static constexpr double blockage = 0;
     static constexpr double ladder = 0.30000001192092896;
     static constexpr double normal = 0.6000000238418579;

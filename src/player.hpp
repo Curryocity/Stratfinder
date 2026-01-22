@@ -52,11 +52,9 @@ public:
         bool prev_sprint = false;
     };
 
-    static constexpr int NUL = 0, W = 1, S = 2, A = 1 * 4, D = 2 * 4;
-    static constexpr int WA = W + A, WD = W + D, SA = S + A, SD = S + D;
-
     struct action {
-        int WASD = NUL; 
+        int w = 0; 
+        int a = 0;
         int GAJ = GROUND; // 0-2
         int movementType = NORMAL; // 0-2
         int t = 1;

@@ -26,8 +26,8 @@ int main() {
 
     player p;
     p.setF(22.222);
-    player::action act1 = player::action{player::WA, player::AIR, player::SPRINT, 5};
-    player::action act2 = player::action{player::WD, player::JUMP, player::SPRINT, 2};
+    player::action act1 = player::action{1,1, player::AIR, player::SPRINT, 5};
+    player::action act2 = player::action{1,-1, player::JUMP, player::SPRINT, 2};
     p.doAction(act1);
     p.doAction(act2);
     std::cout << "X: " << util::df(p.X()) << ", Z: " << util::df(p.Z()) << "\n";

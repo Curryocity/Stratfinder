@@ -79,28 +79,18 @@ void player::move(float w, float a, bool airborne, int movementType, int repeat)
 
 void player::doAction(player::action& act){
 
-    auto converter = [](int value, bool div4){
-        if(div4) value /= 4;
-        value &= 0b11;
-        if(value == 2) value = -1;
-        return value;
-    };
-
-    int w = converter(act.WASD, false);
-    int a = converter(act.WASD, true);
-
     bool airborne = (act.GAJ == 1);
     int movementType = act.movementType;
     if(act.GAJ != 2){
-        move(w, a, airborne, movementType, act.t);
+        move(act.w, act.a, airborne, movementType, act.t);
     }else{
         if(movementType == SPRINT)
-            move(w, a, GROUND, SPRINTJUMP, 1);
+            move(act.w, act.a, GROUND, SPRINTJUMP, 1);
         else
-            move(w, a, GROUND, movementType, 1);
+            move(act.w, act.a, GROUND, movementType, 1);
 
         if(act.t > 1) 
-                move(w, a, AIR, movementType, act.t - 1);
+            move(act.w, act.a, AIR, movementType, act.t - 1);
     }
 }
 
@@ -134,10 +124,7 @@ void player::resetAll()
 }
 
 void player::saveState(){
-    savestate.z = z;
-    savestate.vz = vz;
-    savestate.prev_slip = prev_slip;
-    savestate.prev_sprint = prev_sprint;
+    savestate = { x, z, vx, vz, rotation, prev_slip, prev_sprint };
 }
 
 player::State player::getState(){

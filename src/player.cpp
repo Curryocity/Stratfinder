@@ -5,11 +5,11 @@
 
 player::player(int speed, int slowness) : speed(speed), slowness(slowness){}
 
-void player::move(float W, float A, bool airborne, int movementType, int repeat) {
+void player::move(float w, float a, bool airborne, int movementType, int repeat) {
     while (repeat--) {
 
-        float foward = W;
-        float strafe = A;
+        float foward = w;
+        float strafe = a;
 
         float slip = airborne ? 1.0f : GROUND_SLIP;
         x += vx;
@@ -74,6 +74,33 @@ void player::move(float W, float A, bool airborne, int movementType, int repeat)
 
         prev_slip = slip;
         prev_sprint = sprinting;
+    }
+}
+
+void player::doAction(player::action& act){
+
+    auto converter = [](int value, bool div4){
+        if(div4) value /= 4;
+        value &= 0b11;
+        if(value == 2) value = -1;
+        return value;
+    };
+
+    int w = converter(act.WASD, false);
+    int a = converter(act.WASD, true);
+
+    bool airborne = (act.GAJ == 1);
+    int movementType = act.movementType;
+    if(act.GAJ != 2){
+        move(w, a, airborne, movementType, act.t);
+    }else{
+        if(movementType == SPRINT)
+            move(w, a, GROUND, SPRINTJUMP, 1);
+        else
+            move(w, a, GROUND, movementType, 1);
+
+        if(act.t > 1) 
+                move(w, a, AIR, movementType, act.t - 1);
     }
 }
 

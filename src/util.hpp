@@ -65,7 +65,7 @@ class util{
         return s;
     }
 
-    static std::string df(double x, int precision) {
+    static std::string df(double x, int precision = 16) {
         std::ostringstream oss;
         oss << std::fixed << std::setprecision(precision);
         oss << x;

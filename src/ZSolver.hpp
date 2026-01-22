@@ -1,9 +1,9 @@
 #pragma once
 #include <optional>
 #include <string>
-#include "ZPlayer.hpp"
+#include "zEngine.hpp"
 
-class ZSolver{
+class zSolver{
     public:
 
     static constexpr int NONDELAYED = 0;
@@ -74,15 +74,15 @@ class ZSolver{
     fullStrat optimalSolver(double mm, int t);
     strat optimalDelayed(double mm, int t, int delayTick = DELAYED);
 
-    CoreCtx solverCore(ZPlayer& p, double mm, int t, int delayTick, double knownBwCap);
+    CoreCtx solverCore(zEngine& p, double mm, int t, int delayTick, double knownBwCap);
     bool earlyPrune(const CoreCtx& c, strat& out);
-    double delayedPendulum(ZPlayer& p, double mm, int t, int jumps, int delayTick);
-    double nondelayedPendulum(ZPlayer& p, double mm, int t, int jumps, double maxBwSpeed);
+    double delayedPendulum(zEngine& p, double mm, int t, int jumps, int delayTick);
+    double nondelayedPendulum(zEngine& p, double mm, int t, int jumps, double maxBwSpeed);
 
-    Output1 mmHeuristics(ZPlayer& p, double mm, int t, int delayTick, double knownBestBwSpeed);
-    Output2 slingShot   (ZPlayer& p, double mm, int t, int delayTick, Output1& o1);
-    Output3 robo        (ZPlayer& p, double mm, int t, int delayTick, int jumps);
-    Output4 boomerang   (ZPlayer& p, double mm, int t, int delayTick, Output1& o1);
+    Output1 mmHeuristics(zEngine& p, double mm, int t, int delayTick, double knownBestBwSpeed);
+    Output2 slingShot   (zEngine& p, double mm, int t, int delayTick, Output1& o1);
+    Output3 robo        (zEngine& p, double mm, int t, int delayTick, int jumps);
+    Output4 boomerang   (zEngine& p, double mm, int t, int delayTick, Output1& o1);
 
     fullStrat backwallSolver(double mm, int t);
     strat backwallSolve(double mm, int t, int delayTick);

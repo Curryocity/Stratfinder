@@ -1,22 +1,22 @@
 #include <cmath>
-#include "ZPlayer.hpp"
+#include "zEngine.hpp"
 #include "util.hpp"
 
-float ZPlayer::sin45 = 0.0f;
-float ZPlayer::cos45 = 0.0f;
+float zEngine::sin45 = 0.0f;
+float zEngine::cos45 = 0.0f;
 
 /* Precompute sine table */
-void ZPlayer::init() {
+void zEngine::init() {
     sin45 = util::sin(45.01f);
     cos45 = util::cos(45.01f);
 }
 
-ZPlayer::ZPlayer(int speed, int slowness) : speed(speed), slowness(slowness){}
+zEngine::zEngine(int speed, int slowness) : speed(speed), slowness(slowness){}
 
 /*
  * Used for zSolver, sprinted 45 zAxis movement only
  */
-void ZPlayer::simpleMove(float moveVec, bool airborne, bool sprintJumpQ, int repeat) {
+void zEngine::simMove(float moveVec, bool airborne, bool sprintJumpQ, int repeat) {
     while (repeat--) {
 
         float slip = airborne ? 1.0f : GROUND_SLIP;
@@ -80,115 +80,108 @@ void ZPlayer::simpleMove(float moveVec, bool airborne, bool sprintJumpQ, int rep
     }
 }
 
-double ZPlayer::Z(){
+double zEngine::Z(){
     return z;
 }
 
-double ZPlayer::Vz(){
+double zEngine::Vz(){
     return vz;
 }
 
-void ZPlayer::setZ(double value){
+void zEngine::setZ(double value){
     z = value;
 }
 
-void ZPlayer::setVz(double value){
+void zEngine::setVz(double value){
     vz = value;
 }
 
-void ZPlayer::setVzAir(double value){
+void zEngine::setVzAir(double value){
     vz = value;
     prev_slip = 1.0f;
 }
 
-void ZPlayer::resetAll()
+void zEngine::resetAll()
 {
     z = 0;
     vz = 0;
     prev_slip = -1;
-    prev_sprint = false;
     resetClock();
 }
 
-void ZPlayer::resetClock(){
+void zEngine::resetClock(){
     clock = 0;
     last_inertia = -1;
     forceInertia = false;
 }
 
-int ZPlayer::lastInertia(){
+int zEngine::lastInertia(){
     return last_inertia;
 }
 
-bool ZPlayer::hitVelNeg(){
+bool zEngine::hitVelNeg(){
     return hit_vel_neg;
 }
 
-void ZPlayer::saveState(){
+void zEngine::saveState(){
     savestate.z = z;
     savestate.vz = vz;
     savestate.prev_slip = prev_slip;
-    savestate.prev_sprint = prev_sprint;
 }
 
-ZPlayer::State ZPlayer::getState(){
-    return { z, vz, prev_slip, prev_sprint };
+zEngine::State zEngine::getState(){
+    return { z, vz, prev_slip };
 }
 
-void ZPlayer::loadState(const ZPlayer::State& s) {
+void zEngine::loadState(const zEngine::State& s) {
     z = s.z;
     vz = s.vz;
     prev_slip = s.prev_slip;
-    prev_sprint = s.prev_sprint;
 }
 
-void ZPlayer::toggleInertia(bool on){
+void zEngine::toggleInertia(bool on){
     inertia_on = on;
 }
 
-void ZPlayer::forceInertiaNext(){
+void zEngine::forceInertiaNext(){
     forceInertia = true;
 }
 
-void ZPlayer::sprintDelay(bool delayQ){
-    sprint_delay = delayQ;
-}
 
-void ZPlayer::setEffect(int speed, int slowness){
+void zEngine::setEffect(int speed, int slowness){
     this->speed = speed;
     this->slowness = slowness;
 }
 
-void ZPlayer::clearEffects(){
+void zEngine::clearEffects(){
     speed = 0;
     slowness = 0;
 }
 
-void ZPlayer::loadState(){
+void zEngine::loadState(){
     z = savestate.z;
     vz = savestate.vz;
     prev_slip = savestate.prev_slip;
-    prev_sprint = savestate.prev_sprint;
 }
 
-void ZPlayer::sj45(float moveVec, int duration){
-    simpleMove(moveVec, GROUND, true, 1);
-    simpleMove(moveVec, AIR, false, duration - 1);
+void zEngine::sj45(float moveVec, int duration){
+    simMove(moveVec, GROUND, true, 1);
+    simMove(moveVec, AIR, false, duration - 1);
 }
 
-void ZPlayer::sa45(float moveVec, int duration){
-    simpleMove(moveVec, AIR, false, duration);
+void zEngine::sa45(float moveVec, int duration){
+    simMove(moveVec, AIR, false, duration);
 }
 
-void ZPlayer::s45(float moveVec, int duration){
-    simpleMove(moveVec, GROUND, false, duration);
+void zEngine::s45(float moveVec, int duration){
+    simMove(moveVec, GROUND, false, duration);
 }
 
-void ZPlayer::sj45(int duration){ sj45(FORWARD, duration);}
-void ZPlayer::sa45(int duration){ sa45(FORWARD, duration);}
-void ZPlayer::s45 (int duration){  s45(FORWARD, duration);}
+void zEngine::sj45(int duration){ sj45(FORWARD, duration);}
+void zEngine::sa45(int duration){ sa45(FORWARD, duration);}
+void zEngine::s45 (int duration){  s45(FORWARD, duration);}
 
-void ZPlayer::chained_sj45(int airtime, int repeat){
+void zEngine::chained_sj45(int airtime, int repeat){
     while (repeat--) 
         sj45(airtime);
 }

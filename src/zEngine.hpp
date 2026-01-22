@@ -1,6 +1,6 @@
 #pragma once
 
-class ZPlayer {
+class zEngine {
 public:
 
     struct State
@@ -9,7 +9,6 @@ public:
         double vz = 0.0;
 
         float prev_slip = -1;
-        bool prev_sprint = false;
     };
     
     static constexpr float FORWARD  =  1.0f;
@@ -28,9 +27,9 @@ public:
     /* MUST be called once before simulation */
     static void init();
 
-    ZPlayer(int speed = 0, int slowness = 0);
+    zEngine(int speed = 0, int slowness = 0);
 
-    void simpleMove(float moveVec, bool airborne, bool sprintJumpQ,  int repeat);
+    void simMove(float moveVec, bool airborne, bool sprintJumpQ,  int repeat);
 
     void sj45(float moveVec, int duration);
     void sa45(float moveVec, int duration);
@@ -71,11 +70,9 @@ private:
     double vz = 0.0;
 
     float prev_slip = -1;
-    bool prev_sprint = false;
 
     bool inertia_on = false; 
     bool forceInertia = false; // If true, next vz update will apply inertia, then toggle off
-    bool sprint_delay = true; 
 
     int clock = 0;  // increases every tick, used for inertia timing
     int last_inertia = -1; // the clock value of last inertia trigger

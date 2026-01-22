@@ -3,14 +3,14 @@
 #include <cmath>
 #include <string>
 
-#include "ZPlayer.hpp"
-#include "ZSolver.hpp"
+#include "zEngine.hpp"
+#include "zSolver.hpp"
 #include "util.hpp"
 
-using ZS = ZSolver;
+using ZS = zSolver;
 
 // Finds the optimal speed for delayed and nondelayed strat: Given mm, mm-airtime
-ZS::fullStrat ZSolver::optimalSolver(double mm, int t)
+ZS::fullStrat zSolver::optimalSolver(double mm, int t)
 {
     log += "\nOptimal Solver ----------------------- \n";
     log += "Target mm: " + util::fmt(mm) + ", airtime: " + std::to_string(t) + "\n";
@@ -24,7 +24,7 @@ ZS::fullStrat ZSolver::optimalSolver(double mm, int t)
     int dT = delayedStrat.stratType;
     double dS = delayedStrat.optimalSpeed;
 
-    ZPlayer p(speed, slowness);
+    zEngine p(speed, slowness);
     p.s45(1);
     double sprint45Vz = p.Vz();
     double terminalSpeed = sprint45Vz/ 0.454;
@@ -73,7 +73,7 @@ ZS::fullStrat ZSolver::optimalSolver(double mm, int t)
 ZS::strat ZS::optimalDelayed(double mm, int t, int delayTick)
 {
     log += "delayTick = " + std::to_string(delayTick) + "\n";
-    ZPlayer p(speed, slowness);
+    zEngine p(speed, slowness);
     mm += 0.6f;
 
     ZS::CoreCtx c = solverCore(p, mm, t, delayTick, 0);
@@ -92,7 +92,7 @@ ZS::strat ZS::optimalDelayed(double mm, int t, int delayTick)
 }
 
 // Runs: heuristics, slingShot, robo, boomerang (no equilibrium / no moveVec fit)
-ZS::CoreCtx ZS::solverCore(ZPlayer& p, double mm, int t, int delayTick, double knownBwCap){
+ZS::CoreCtx ZS::solverCore(zEngine& p, double mm, int t, int delayTick, double knownBwCap){
     CoreCtx c;
     c.o1 = ZS::mmHeuristics(p, mm, t, delayTick, knownBwCap);
     c.o2 = ZS::slingShot(p, mm, t, delayTick, c.o1);
@@ -125,14 +125,14 @@ bool ZS::earlyPrune(const CoreCtx& c, ZS::strat& out){
 }
 
 // Gather samples, preReq knowledges for later calculation. If there is no knownBwCap, it yolos a reasonable lowerbound.
-ZS::Output1 ZS::mmHeuristics(ZPlayer& p, double mm, int t, int delayTick, double knownBwCap){
+ZS::Output1 ZS::mmHeuristics(zEngine& p, double mm, int t, int delayTick, double knownBwCap){
     
     // Amount of sj45(t)'s an mm could fit, without bwSpeed
     int jumps = 0;
     double overJamDis;
     double jamDis;
 
-    ZPlayer::State prevJump;
+    zEngine::State prevJump;
 
     
     if(delayTick > 0){
@@ -200,7 +200,7 @@ ZS::Output1 ZS::mmHeuristics(ZPlayer& p, double mm, int t, int delayTick, double
     return Output1{jumps, overJamDis, jamDis, bestBwSpeed, bwmmDis};
 }
 
-ZS::Output2 ZS::slingShot(ZPlayer& p, double mm, int t, int delayTick, Output1& o1){
+ZS::Output2 ZS::slingShot(zEngine& p, double mm, int t, int delayTick, Output1& o1){
 
     double slingSpeed = 0;
     // Lerp (0, overJamDis), (bestBwSpeed, bwmmDis) to find (reqVz, mm)
@@ -247,7 +247,7 @@ ZS::Output2 ZS::slingShot(ZPlayer& p, double mm, int t, int delayTick, Output1& 
 }
 
 
-ZS::Output3 ZS::robo(ZPlayer& p, double mm, int t, int delayTick, int jumps){
+ZS::Output3 ZS::robo(zEngine& p, double mm, int t, int delayTick, int jumps){
 
     // Robo doesn't make sense
     if(jumps == 0 && delayTick <= 1) return Output3{false, 0};
@@ -308,7 +308,7 @@ ZS::Output3 ZS::robo(ZPlayer& p, double mm, int t, int delayTick, int jumps){
 }
 
 
-ZS::Output4 ZS::boomerang(ZPlayer& p, double mm, int t, int delayTick, Output1& o1){
+ZS::Output4 ZS::boomerang(zEngine& p, double mm, int t, int delayTick, Output1& o1){
 
     // Bommerang doesn't make sense when that
     if(o1.jumps == 0 && delayTick <= 1) return Output4{-INFINITY, 0, false};
@@ -367,7 +367,7 @@ ZS::Output4 ZS::boomerang(ZPlayer& p, double mm, int t, int delayTick, Output1& 
 
 
 // Finding the velocity convergence of chained loop by solving the equation of reqBwSpeed = finalSpeed
-double ZS::delayedPendulum(ZPlayer& p, double mm, int t, int jumps, int delayTick){
+double ZS::delayedPendulum(zEngine& p, double mm, int t, int jumps, int delayTick){
 
     auto samp = [&](double vi, double m, bool falseZtrueVz){
         p.resetAll();
@@ -488,7 +488,7 @@ double ZS::delayedPendulum(ZPlayer& p, double mm, int t, int jumps, int delayTic
 }
 
 // Given maxBwSpeed, fit the best fw air strat (angled jt sj45)
-double ZS::nondelayedPendulum(ZPlayer& p, double mm, int t, int jumps, double maxBwSpeed){
+double ZS::nondelayedPendulum(zEngine& p, double mm, int t, int jumps, double maxBwSpeed){
     
     auto samp = [&](double m, bool falseZtrueVz){
         p.resetAll();
@@ -578,7 +578,7 @@ double ZS::nondelayedPendulum(ZPlayer& p, double mm, int t, int jumps, double ma
 
 ZS::strat ZS::backwallSolve(double mm, int t, int delayTick){
     if(delayTick > 0) log += "delayTick = " + util::fmt(delayTick) + "\n";
-    ZPlayer p(speed, slowness);
+    zEngine p(speed, slowness);
     double bestSpeed = 0;
     int stratType = -1;
 
@@ -586,7 +586,7 @@ ZS::strat ZS::backwallSolve(double mm, int t, int delayTick){
     int jumps = 0;
     double z0, zOverJump, z1ground, z1air;
 
-    ZPlayer::State prevJump;
+    zEngine::State prevJump;
 
     if(delayTick > 0){
         p.saveState();
@@ -826,7 +826,7 @@ ZS::fullStrat ZS::backwallSolver(double mm, int t){
     double dS = delayed.optimalSpeed;
     int dT = delayed.stratType;
 
-    ZPlayer p(speed, slowness);
+    zEngine p(speed, slowness);
     p.s45(1);
     double sprint45Vz = p.Vz();
     double terminalSpeed = sprint45Vz/ 0.454;
@@ -913,10 +913,10 @@ bool ZS::poss(double mm, int t_mm, int max_t, double threshold, bool backwallQ, 
     
     double dS = strat.delaySpeed;
     double ndS = strat.nondelaySpeed;
-    ZPlayer dP(speed, slowness);
+    zEngine dP(speed, slowness);
     dP.setVz(dS);
     dP.sj45(1);
-    ZPlayer ndP(speed, slowness);
+    zEngine ndP(speed, slowness);
     ndP.setVzAir(ndS);
     ndP.sj45(1);
     content += "\n-------------------------------------------\n";

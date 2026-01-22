@@ -1,14 +1,14 @@
 # HI
 
-This project is inspired by Cantnavet's [BMSolver](https://github.com/cantnavet/BmSolver).
+Here is a distance jump solver in Minecraft 1.8.9. (inspired by Cantnavet's [BMSolver](https://github.com/cantnavet/BmSolver))
 
 The program takes in mm(normal/backwalled) and mm airtime(constant).
-
-***Update**: You could set speed/slowness effect via `ZSolver::setEffect(int speed, int slowness)`*
 
 1. Outputs the velocity and strategy type for optimal delayed and nondelayed strat.
 2. Find jumps within offset threshold (picking the best out of delayed and nondelayed strat).
 3. Logs stratfind decision making.
+
+***Feature**: You could set speed/slowness effect via `ZSolver::setEffect(int speed, int slowness)`*
 
 **(Considers inertia)**
 
@@ -100,9 +100,8 @@ t = 17: 6.625 + 0.00072 b
 ```
 
 ### TODOs:
-1. x/z player
-2. input bruteforcer
-3. GUI
-4. ice/slime support
-5. slime bounce jump finding?
-6. 45bwmm finder (stratfind with limited turns on mm)
+1. input bruteforcer
+2. GUI
+3. ice/slime support
+4. slime bounce jump finding?
+5. 45bwmm finder (stratfind with limited turns on mm)

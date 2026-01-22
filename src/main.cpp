@@ -1,11 +1,12 @@
 #include <iostream>
-#include "ZPlayer.hpp"
-#include "ZSolver.hpp"
+#include "zEngine.hpp"
+#include "zSolver.hpp"
 #include "util.hpp"
+#include "player.hpp"
 
 void init(){
     util::init();
-    ZPlayer::init();
+    zEngine::init();
 }
 
 int main() {
@@ -13,30 +14,7 @@ int main() {
     // We don't have GUI yet ;(
 
     init();
-    ZSolver s;
-
-    bool backwallq = false;
-    int max_t = 40;
-    std::string content;
-    for(int speed = 0; speed <= 6; speed ++){
-        for(int slow = 0; slow <= 6; slow ++){
-            s.setEffect(speed, slow);
-            for(double t_mm = 11; t_mm <= 12; t_mm += 1){
-                for(double x = 0.0625; x <= 2; x += 0.0625){
-                    ZSolver::fullStrat strat = s.optimalSolver(x, t_mm);
-                    if( (strat.nondelayStrat != ZSolver::PENDULUM && strat.delayStrat != ZSolver::PENDULUM) || strat.delayTick > 1) continue;
-                    bool hasJump = s.poss(x, t_mm, max_t, 1e-5, backwallq, content, ZSolver::normal, strat);
-                    if(hasJump) std::cout << content;
-                    hasJump = s.poss(x, t_mm, max_t, 1e-5, backwallq, content, ZSolver::ladder, strat);
-                    if(hasJump) std::cout << content;
-                    hasJump = s.poss(x, t_mm, max_t, 1e-5, backwallq, content, ZSolver::blockage, strat);
-                    if(hasJump) std::cout << content;
-                }
-            }
-        }
-    }
-
-
+    zSolver s;
 
     /*
     std::string ctx;
@@ -45,8 +23,13 @@ int main() {
     s.printLog();
     std::cout << ctx << std::endl;
     */
-    
 
+    player p;
+    p.setF(22.222);
+    p.move(1, 1, player::AIR, player::SPRINT, 5);
+    p.move(1, -1, player::GROUND, player::SPRINTJUMP, 1);
+    std::cout << "X: " << util::df(p.X()) << ", Z: " << util::df(p.Z()) << "\n";
+    std::cout << "Vx: " << util::df(p.Vx()) << ", Vz: " << util::df(p.Vz());
     return 0;
 }
 

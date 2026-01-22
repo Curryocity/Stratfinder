@@ -26,8 +26,8 @@ int main() {
 
     player p;
     p.setF(22.222);
-    p.move(1, 1, player::AIR, player::SPRINT, 5);
-    p.move(1, -1, player::GROUND, player::SPRINTJUMP, 1);
+    p.sa(1,1, 5);
+    p.sj(1, -1, 1);
     std::cout << "X: " << util::df(p.X()) << ", Z: " << util::df(p.Z()) << "\n";
     std::cout << "Vx: " << util::df(p.Vx()) << ", Vz: " << util::df(p.Vz());
     return 0;

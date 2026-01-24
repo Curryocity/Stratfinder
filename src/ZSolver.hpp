@@ -1,6 +1,7 @@
 #pragma once
 #include <optional>
 #include <string>
+#include <vector>
 #include "zEngine.hpp"
 
 class zSolver{
@@ -71,6 +72,8 @@ class zSolver{
         Output4 o4;
     };
 
+    fullStrat maxMMSolver(int t);
+
     fullStrat optimalSolver(double mm, int t);
     strat optimalDelayed(double mm, int t, int delayTick = DELAYED);
 
@@ -97,12 +100,14 @@ class zSolver{
     static constexpr double blockage = 0;
     static constexpr double ladder = 0.30000001192092896;
     static constexpr double normal = 0.6000000238418579;
+    bool equalJumpListCheck(int t_mm, int maxt, fullStrat strat1, fullStrat strat2, std::vector<double> shifts = { 0.0, ladder, normal });
 
     void setEffect(int speed, int slowness);
     void clearEffects();
 
     private:
 
+    
     int speed = 0;
     int slowness = 0;
     std::string log;

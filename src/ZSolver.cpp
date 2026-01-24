@@ -1,7 +1,9 @@
 #include <algorithm>
+#include <climits>
 #include <iostream>
 #include <cmath>
 #include <string>
+#include <vector>
 
 #include "zEngine.hpp"
 #include "zSolver.hpp"
@@ -9,8 +11,41 @@
 
 using ZS = zSolver;
 
+ZS::fullStrat ZS::maxMMSolver(int t){
+    zEngine p(speed, slowness);
+    p.sj45(t);
+    double v0 = p.Vz();
+    p.setVzAir(1.0);
+    p.sj45(t);
+    double v1 = p.Vz();
+
+    // v_end = (v1 - v0) * v_init + v0;
+    // nonDelaySpeed = (v1 - v0) * nonDelaySpeed + v0;
+
+    double nonDelaySpeed = - v0/(v1 - v0 - 1.0);
+
+    p.setVzAir(nonDelaySpeed);
+    p.sj45(t);
+    nonDelaySpeed = p.Vz();
+    
+    p.s45(1);
+    double delaySpeed = p.Vz();
+
+    p.setVz(0);
+    p.s45(1);
+    double terminalSpeed = p.Vz()/ (1.0 - 0.6f * 0.91f);
+
+    int delayTick = 1;
+    if(terminalSpeed > delaySpeed){
+        delaySpeed = terminalSpeed;
+        delayTick = -1;
+    }
+
+    return fullStrat{-1, delaySpeed, -1, nonDelaySpeed, delayTick};
+}
+
 // Finds the optimal speed for delayed and nondelayed strat: Given mm, mm-airtime
-ZS::fullStrat zSolver::optimalSolver(double mm, int t)
+ZS::fullStrat ZS::optimalSolver(double mm, int t)
 {
     writeLog("\nOptimal Solver ----------------------- \n");
     writeLog("Target mm: " + util::fmt(mm) + ", airtime: " + std::to_string(t) + "\n");
@@ -27,7 +62,7 @@ ZS::fullStrat zSolver::optimalSolver(double mm, int t)
     zEngine p(speed, slowness);
     p.s45(1);
     double sprint45Vz = p.Vz();
-    double terminalSpeed = sprint45Vz/ 0.454;
+    double terminalSpeed = sprint45Vz/ (1.0 - 0.6f * 0.91f);
     // only low speed could delayTick > 1 benifit
     if(dS < terminalSpeed){
 
@@ -950,7 +985,7 @@ bool ZS::poss(double mm, int t_mm, int max_t, double threshold, bool backwallQ, 
     content += std::string("For") + (backwallQ ? " backwalled " : " ") + "mm = " + util::fmt(mm) + " (airtime = " + util::fmt(t_mm)
     + "), t <= " + std::to_string(max_t) + ", threshold = " + util::fmt(threshold) + ", offset:" + util::fmt(shift) + "\n";
     content += "- NonDelayedSpeed: " + util::df(ndS) + ", Type: " + strat2string(strat.nondelayStrat) + "\n";
-    content += "- DelayedSpeed(dt=" + std::to_string(strat.delayTick) + "): " + util::fmt(dS) + ", Type: " + strat2string(strat.delayStrat) + "\n";
+    content += "- DelayedSpeed(dt=" + std::to_string(strat.delayTick) + "): " + util::df(dS) + ", Type: " + strat2string(strat.delayStrat) + "\n";
     bool delayedBetter = true;
     for(int i = 2; i <= max_t; i++){
         dP.sa45(1);
@@ -976,6 +1011,7 @@ bool ZS::poss(double mm, int t_mm, int max_t, double threshold, bool backwallQ, 
 
             content += "t = " + std::to_string(i) + ": "
             + util::fmt(jumpDis) + " + " + util::fmt(offset) + " b\n";
+
         }
     }
 
@@ -986,6 +1022,66 @@ bool ZS::poss(double mm, int t_mm, int max_t, double threshold, bool backwallQ, 
     return hasJump;
 
 }
+
+
+
+bool ZS::equalJumpListCheck(int t_mm, int maxt, fullStrat strat1, fullStrat strat2, std::vector<double> shifts){
+
+    constexpr double pixel = 0.0625;
+
+    auto toPixels = [&](double z) -> int {
+        return (int)std::floor(z / pixel);
+    };
+
+    auto initEngines = [&](const fullStrat& s, zEngine& dE, zEngine& ndE)
+    {
+        dE = zEngine(speed, slowness);
+        dE.setVz(s.delaySpeed);
+        dE.sj45(1);
+
+        ndE = zEngine(speed, slowness);
+        ndE.setVzAir(s.nondelaySpeed);
+        ndE.sj45(1);
+    };
+
+    auto bestZ = [&](bool& delayedBetter, zEngine& dE, zEngine& ndE) -> double{
+        if (!delayedBetter)
+            return ndE.Z();
+
+        double zd = dE.Z();
+        double znd = ndE.Z();
+        if (znd > zd) {
+            delayedBetter = false;
+            return znd;
+        }
+        return zd;
+    };
+
+    zEngine dE1, ndE1, dE2, ndE2;
+    initEngines(strat1, dE1, ndE1);
+    initEngines(strat2, dE2, ndE2);
+
+    bool delayedBetter1 = true;
+    bool delayedBetter2 = true;
+
+    for (int t = 2; t <= maxt; ++t) {
+
+        // advance all engines by one air tick
+        dE1.sa45(1);   ndE1.sa45(1);
+        dE2.sa45(1);   ndE2.sa45(1);
+
+        double zb1 = bestZ(delayedBetter1, dE1, ndE1);
+        double zb2 = bestZ(delayedBetter2, dE2, ndE2);
+
+        for (double shift : shifts) {
+            if (toPixels(zb1 + shift) != toPixels(zb2 + shift)) return false;
+        }
+    }
+
+    return true;
+}
+
+
 
 void ZS::setEffect(int speed, int slowness){
     this->speed = speed;

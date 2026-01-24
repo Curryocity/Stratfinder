@@ -77,23 +77,6 @@ void player::move(float w, float a, bool airborne, int movementType, int repeat)
     }
 }
 
-void player::doAction(player::action& act){
-
-    bool airborne = (act.GAJ == 1);
-    int movementType = act.movementType;
-    if(act.GAJ != 2){
-        move(act.w, act.a, airborne, movementType, act.t);
-    }else{
-        if(movementType == SPRINT)
-            move(act.w, act.a, GROUND, SPRINTJUMP, 1);
-        else
-            move(act.w, act.a, GROUND, movementType, 1);
-
-        if(act.t > 1) 
-            move(act.w, act.a, AIR, movementType, act.t - 1);
-    }
-}
-
 double player::F(){ return rotation;}
 double player::X(){ return x;}
 double player::Z(){ return z;}

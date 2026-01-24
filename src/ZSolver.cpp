@@ -922,7 +922,7 @@ bool ZS::poss(double mm, int t_mm, int max_t, double threshold, bool backwallQ, 
     content += "\n-------------------------------------------\n";
     content += std::string("For") + (backwallQ ? " backwalled " : " ") + "mm = " + util::fmt(mm) + " (airtime = " + util::fmt(t_mm)
     + "), t <= " + std::to_string(max_t) + ", threshold = " + util::fmt(threshold) + ", offset:" + util::fmt(shift) + "\n";
-    content += "- NonDelayedSpeed: " + util::fmt(ndS) + ", Type: " + strat2string(strat.nondelayStrat) + "\n";
+    content += "- NonDelayedSpeed: " + util::df(ndS) + ", Type: " + strat2string(strat.nondelayStrat) + "\n";
     content += "- DelayedSpeed(dt=" + std::to_string(strat.delayTick) + "): " + util::fmt(dS) + ", Type: " + strat2string(strat.delayStrat) + "\n";
     bool delayedBetter = true;
     for(int i = 2; i <= max_t; i++){

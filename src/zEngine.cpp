@@ -5,6 +5,10 @@
 float zEngine::sin45 = 0.0f;
 float zEngine::cos45 = 0.0f;
 
+inline float fl(double x) {
+    return static_cast<float>(x);
+}
+
 /* Precompute sine table */
 void zEngine::init() {
     sin45 = util::sin(45.01f);
@@ -45,8 +49,8 @@ void zEngine::simMove(float moveVec, bool airborne, bool sprintJumpQ, int repeat
             accel = 0.02f;
         } else{
             accel = 0.1f;
-            if (speed > 0)    accel *= 1 + 0.2f * speed;
-            if (slowness > 0) accel *= 1 + (-0.15f) * slowness;
+            if (speed > 0)    accel *= 1.0 + 0.2f * (double) speed;
+            if (slowness > 0) accel *= 1.0 + (-0.15f) * (double) slowness;
             if (accel < 0) accel = 0;
         }
         

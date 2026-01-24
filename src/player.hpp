@@ -52,15 +52,8 @@ public:
         bool prev_sprint = false;
     };
 
-    struct action {
-        int w = 0; 
-        int a = 0;
-        int GAJ = GROUND; // 0-2
-        int movementType = NORMAL; // 0-2
-        int t = 1;
-    };
 
-    static constexpr int GROUND = 0, AIR = 1, JUMP = 2;
+    static constexpr int GROUND = 0, AIR = 1;
 
     static constexpr float GROUND_SLIP = 0.6f;
     static constexpr double DEFAULT_INERTIA = 0.005;
@@ -74,7 +67,6 @@ public:
     static constexpr int SPRINTJUMP = 3;
 
     void move(float forward, float strafe, bool airborne, int movementType, int repeat);
-    void doAction(action& act);
 
     /* ===== auto-generated movement function ===== */
     TYPES(GEN_GAJ)

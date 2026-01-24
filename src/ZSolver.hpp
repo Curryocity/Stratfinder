@@ -88,8 +88,10 @@ class zSolver{
     strat backwallSolve(double mm, int t, int delayTick);
 
     static std::string strat2string(int stratType);
+    void writeLog(std::string str);
     void printLog();
     void clearLog();
+    void toggleLog(bool on);
 
     bool poss(double mm, int t_mm, int maxt, double threshold, bool backwallQ, std::string& content, double shift = normal, std::optional<fullStrat> provideStrat = std::nullopt);
     static constexpr double blockage = 0;
@@ -104,4 +106,5 @@ class zSolver{
     int speed = 0;
     int slowness = 0;
     std::string log;
+    bool logOn = true;
 };

@@ -80,8 +80,8 @@ public:
     void setF(float rot);
     void setX(double x);
     void setZ(double z);
-    void setVx(double vx, bool airborne);
-    void setVz(double vz, bool airborne);
+    void setVx(double vx, bool airborne = false);
+    void setVz(double vz, bool airborne = false);
 
     void saveState();
     State getState();

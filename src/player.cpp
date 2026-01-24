@@ -32,8 +32,8 @@ void player::move(float w, float a, bool airborne, int movementType, int repeat)
             accel = 0.02f;
         } else{
             accel = 0.1f;
-            if (speed > 0)    accel *= 1.0 + 0.2f * speed;
-            if (slowness > 0) accel *= 1.0 + (-0.15f) * slowness;
+            if (speed > 0)    accel *= 1.0 + 0.2f * (double) speed;
+            if (slowness > 0) accel *= 1.0 + (-0.15f) * (double) slowness;
             if (accel < 0) accel = 0;
         }
 

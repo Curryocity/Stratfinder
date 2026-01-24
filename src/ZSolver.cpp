@@ -12,10 +12,10 @@ using ZS = zSolver;
 // Finds the optimal speed for delayed and nondelayed strat: Given mm, mm-airtime
 ZS::fullStrat zSolver::optimalSolver(double mm, int t)
 {
-    log += "\nOptimal Solver ----------------------- \n";
-    log += "Target mm: " + util::fmt(mm) + ", airtime: " + std::to_string(t) + "\n";
+    writeLog("\nOptimal Solver ----------------------- \n");
+    writeLog("Target mm: " + util::fmt(mm) + ", airtime: " + std::to_string(t) + "\n");
 
-    log += "\n- Delayed section: \n";
+    writeLog("\n- Delayed section: \n");
 
     // Solve delayed version first to get maxBwSpeed
     int bestDelayTick = 1;
@@ -31,17 +31,17 @@ ZS::fullStrat zSolver::optimalSolver(double mm, int t)
     // only low speed could delayTick > 1 benifit
     if(dS < terminalSpeed){
 
-        log += "Best vz = " +  std::to_string(dS) + "\n\n";
+        writeLog( "Best vz = " +  std::to_string(dS) + "\n\n");
         int maxDelayTick = -1;
         p.resetAll();
         for(; p.Z() < mm + 0.6f; maxDelayTick ++)
             p.s45(1);
 
-        log += "maxDelayTick = " + std::to_string(maxDelayTick) + "\n";
+        writeLog( "maxDelayTick = " + std::to_string(maxDelayTick) + "\n");
         
         for(delayTick = std::max(2, maxDelayTick - 1); delayTick <= maxDelayTick; delayTick ++){
             ZS::strat newDelayedStrat = optimalDelayed(mm, t, delayTick);
-            log += "Best vz = " +  std::to_string(newDelayedStrat.optimalSpeed) + "\n\n";
+            writeLog( "Best vz = " +  std::to_string(newDelayedStrat.optimalSpeed) + "\n\n");
             if(newDelayedStrat.optimalSpeed > dS){
                 dS = newDelayedStrat.optimalSpeed;
                 dT = newDelayedStrat.stratType;
@@ -56,8 +56,8 @@ ZS::fullStrat zSolver::optimalSolver(double mm, int t)
 
     mm += 0.6f;
 
-    log += "\n- Nondelayed section: \n";
-    log += "Max BW speed: " + std::to_string(maxBwSpeed) + "\n";
+    writeLog( "\n- Nondelayed section: \n");
+    writeLog( "Max BW speed: " + std::to_string(maxBwSpeed) + "\n");
     // Then solve nondelayed, given the knowledge of maxBwSpeed
     ZS::CoreCtx c = solverCore(p, mm, t, NONDELAYED, maxBwSpeed);
 
@@ -72,7 +72,7 @@ ZS::fullStrat zSolver::optimalSolver(double mm, int t)
 // Finds the optimal delayed speed: Given mm, mm-airtime
 ZS::strat ZS::optimalDelayed(double mm, int t, int delayTick)
 {
-    log += "delayTick = " + std::to_string(delayTick) + "\n";
+    writeLog( "delayTick = " + std::to_string(delayTick) + "\n");
     zEngine p(speed, slowness);
     mm += 0.6f;
 
@@ -180,7 +180,7 @@ ZS::Output1 ZS::mmHeuristics(zEngine& p, double mm, int t, int delayTick, double
         }
         p.s45(1);
         bestBwSpeed = -p.Vz();
-        log += "BW speed lowerBound: " + std::to_string(bestBwSpeed) + "\n";
+        writeLog( "BW speed lowerBound: " + std::to_string(bestBwSpeed) + "\n");
 
         
     }else{
@@ -206,7 +206,7 @@ ZS::Output2 ZS::slingShot(zEngine& p, double mm, int t, int delayTick, Output1& 
     // Lerp (0, overJamDis), (bestBwSpeed, bwmmDis) to find (reqVz, mm)
     double reqBwSpeed = o1.bestBwSpeed * (o1.overJamDis - mm) / (o1.overJamDis - o1.bwmmDis);
     bool poss = false;
-    log += "Required BW speed: " + std::to_string(reqBwSpeed) + "\n";
+    writeLog( "Required BW speed: " + std::to_string(reqBwSpeed) + "\n");
 
     if(-reqBwSpeed >= groundInertia){
         p.resetAll();
@@ -216,7 +216,7 @@ ZS::Output2 ZS::slingShot(zEngine& p, double mm, int t, int delayTick, Output1& 
         slingSpeed = p.Vz();
     }else{
         // If reqBwSpeed hits inertia, set bwSpeed to just hit inertia barely(has the effect to extend the mm by ~0.0091575), angled the first jump tick.
-        log += "This backward speed hits inertia! Fixing... \n";
+        writeLog( "This backward speed hits inertia! Fixing... \n");
         double extendedmm = mm + groundInertia;
 
         auto getSample = [&](double m, bool falseZtrueVz){
@@ -243,6 +243,16 @@ ZS::Output2 ZS::slingShot(zEngine& p, double mm, int t, int delayTick, Output1& 
     // ReqBwSpeed could be reached
     if(o1.bwmmDis < mm) poss = true;
 
+    p.resetAll();
+    p.setVz(reqBwSpeed);
+    p.sj45(t);
+    // it becomes a boomerang
+    if(p.Z() < 0){
+        poss = false;
+        slingSpeed = -INFINITY;
+        writeLog("Slingshot isn't poss cuz you land behind the mm, it's a boomerang.\n");
+    }
+
     return Output2{reqBwSpeed, slingSpeed, poss};
 }
 
@@ -268,7 +278,7 @@ ZS::Output3 ZS::robo(zEngine& p, double mm, int t, int delayTick, int jumps){
 
     // The border of robo and true robo
     // The formula is v_0 = -hhSpeed*(0.6/slip)^3/(1+0.91*slip), derived from v_0 + v_1 = 0
-    double borderSpeed = -hhSpeed/1.546;
+    double borderSpeed = -hhSpeed/(1.0 + 0.6f * 0.91f);
     p.setVz(borderSpeed);
     p.s45(1);
     p.chained_sj45(t, jumps);
@@ -301,8 +311,8 @@ ZS::Output3 ZS::robo(zEngine& p, double mm, int t, int delayTick, int jumps){
     double roboSpeed = p.Vz();
     p.resetAll();
 
-    log += "roboSpeed: " + util::fmt(roboSpeed) + "\n";
-    log += "isTrueRobo? " + std::to_string(trueRoboQ) + "\n";
+    writeLog( "roboSpeed: " + util::fmt(roboSpeed) + "\n");
+    writeLog( "isTrueRobo? " + std::to_string(trueRoboQ) + "\n");
 
     return Output3{trueRoboQ, roboSpeed};
 }
@@ -324,7 +334,7 @@ ZS::Output4 ZS::boomerang(zEngine& p, double mm, int t, int delayTick, Output1& 
 
     // Lerp (0, jamDis), (z3, 1) to find (reqFwSpeed, mm)
     double reqFwSpeed = (mm - o1.jamDis) / (z3 - o1.jamDis);
-    log += "FW airspeed req: " + std::to_string(reqFwSpeed) + "\n";
+    writeLog( "FW airspeed req: " + std::to_string(reqFwSpeed) + "\n");
 
     // do borderline boomerang
     auto samp = [&](double vi, double m, bool falseZtrueVz){
@@ -350,7 +360,7 @@ ZS::Output4 ZS::boomerang(zEngine& p, double mm, int t, int delayTick, Output1& 
     double v1 = samp(1, m1, true);
     double reqBwSpeed = (reqFwSpeed - v0)/(v1 - v0);
 
-    log += "BW speedreq for boomerang: " + std::to_string(reqBwSpeed) + "\n";
+    writeLog( "BW speedreq for boomerang: " + std::to_string(reqBwSpeed) + "\n");
 
     // Simulate boomerang speed assuming it is possible
     p.resetAll();
@@ -361,6 +371,15 @@ ZS::Output4 ZS::boomerang(zEngine& p, double mm, int t, int delayTick, Output1& 
 
     if(-reqBwSpeed < -o1.bestBwSpeed)
         poss = true;
+
+    p.resetAll();
+    p.setVz(reqBwSpeed);
+    p.sj45(t);
+    if(p.Z() < 0){
+        poss = false;
+        boomSpeed = -INFINITY;
+        writeLog( "Even if reqBwSpeed is achievable, a full sj45(t) isn't enough to do a borderline boomerang\n");
+    }
 
     return Output4{reqBwSpeed, boomSpeed, poss};
 }
@@ -410,7 +429,7 @@ double ZS::delayedPendulum(zEngine& p, double mm, int t, int jumps, int delayTic
     int inertiaTick = p.lastInertia();
     bool hitVelNeg = p.hitVelNeg();
 
-    log += "Inertia triggered at t = " + std::to_string(inertiaTick) + " during delayed pendulum simulation.\n" + "Vz on inertia tick: " + (hitVelNeg ? "neg" : "pos") + "\n";
+    writeLog( "Inertia triggered at t = " + std::to_string(inertiaTick) + " during delayed pendulum simulation.\n" + "Vz on inertia tick: " + (hitVelNeg ? "neg" : "pos") + "\n");
 
     auto ISamp = [&](double vi, double m){
         p.resetAll();
@@ -465,7 +484,7 @@ double ZS::delayedPendulum(zEngine& p, double mm, int t, int jumps, int delayTic
         // Hit inertia on lowerbound, and slow down afterward
         pendulumSpeed = convergenceVzOnInertia(m0LB, m1LB, true);
 
-        log += "Hit inertia on lowerbound, and slow down afterward \n";
+        writeLog( "Hit inertia on lowerbound, and slow down afterward \n");
     }else{
         // hit inertia on lowerbound, full speed
         double v0 = fullISamp(0, 1, m0LB, true, true);
@@ -478,9 +497,9 @@ double ZS::delayedPendulum(zEngine& p, double mm, int t, int jumps, int delayTic
 
         if(tempV > pendulumSpeed){
             pendulumSpeed = tempV;
-            log += "Avoid inertia on upperbound, and slow down afterward \n";
+            writeLog( "Avoid inertia on upperbound, and slow down afterward \n");
         }else {
-            log += "Hit inertia on lowerbound, full speed \n";
+            writeLog( "Hit inertia on lowerbound, full speed \n");
         }
     }
 
@@ -512,7 +531,7 @@ double ZS::nondelayedPendulum(zEngine& p, double mm, int t, int jumps, double ma
     int inertiaTick = p.lastInertia();
     bool hitVelNeg = p.hitVelNeg();
 
-    log += "Inertia triggered at t = " + std::to_string(inertiaTick) + " during nondelayed pendulum simulation.\n" + "Vz on inertia tick: " + (hitVelNeg ? "neg" : "pos") + "\n";
+    writeLog( "Inertia triggered at t = " + std::to_string(inertiaTick) + " during nondelayed pendulum simulation.\n" + "Vz on inertia tick: " + (hitVelNeg ? "neg" : "pos") + "\n");
 
     // NOTE: It is proven that avoiding inertia below is never optimal, same as the ground case.
 
@@ -550,7 +569,7 @@ double ZS::nondelayedPendulum(zEngine& p, double mm, int t, int jumps, double ma
         double ma = (mm - x0)/(x1 - x0);
 
         pendulumSpeed = fullISamp(ma, mInertiaLB, true, true);
-        log += "Hit inertia on lowerbound, and slow down afterward \n";
+        writeLog( "Hit inertia on lowerbound, and slow down afterward \n");
     }else{
         // hit inertia on lowerbound, full speed
         pendulumSpeed = fullISamp(1, mInertiaLB, true, true);
@@ -564,9 +583,9 @@ double ZS::nondelayedPendulum(zEngine& p, double mm, int t, int jumps, double ma
 
         if(tempV > pendulumSpeed){
             pendulumSpeed = tempV;
-            log += "Avoid inertia on upperbound, and slow down afterward \n";
+            writeLog( "Avoid inertia on upperbound, and slow down afterward \n");
         }else {
-            log += "Hit inertia on lowerbound, full speed \n";
+            writeLog( "Hit inertia on lowerbound, full speed \n");
         }
             
     }
@@ -577,7 +596,7 @@ double ZS::nondelayedPendulum(zEngine& p, double mm, int t, int jumps, double ma
 // ----------------- Backwall Solver ----------------
 
 ZS::strat ZS::backwallSolve(double mm, int t, int delayTick){
-    if(delayTick > 0) log += "delayTick = " + util::fmt(delayTick) + "\n";
+    if(delayTick > 0) writeLog( "delayTick = " + util::fmt(delayTick) + "\n");
     zEngine p(speed, slowness);
     double bestSpeed = 0;
     int stratType = -1;
@@ -642,7 +661,7 @@ ZS::strat ZS::backwallSolve(double mm, int t, int delayTick){
 
     int x = fitMax(true, z0, z1ground);
 
-    log += "Fit at most s45(" +  util::fmt(x) + ") r(sj45(" + util::fmt(t) + "), " + util::fmt(jumps) + ")\n";
+    writeLog( "Fit at most s45(" +  util::fmt(x) + ") r(sj45(" + util::fmt(t) + "), " + util::fmt(jumps) + ")\n");
 
     double zRun0 = p.Z() + (z1ground - z0) * p.Vz() + z0;
     double runBaseSpeed = p.Vz();
@@ -658,7 +677,7 @@ ZS::strat ZS::backwallSolve(double mm, int t, int delayTick){
         double speed = sampler(moveVec, getVz, notInertia);
 
         if (checkInertia && p.lastInertia() != -1) {
-            log += "Inertia triggered during " + name + " backwall solve.\n";
+            writeLog( "Inertia triggered during " + name + " backwall solve.\n");
             double zi0 = sampler(0, getZ, YesInertia);
             double zi1 = sampler(1, getZ, YesInertia);
             double mInertia = (mm - zi0) / (zi1 - zi0);
@@ -666,7 +685,7 @@ ZS::strat ZS::backwallSolve(double mm, int t, int delayTick){
             double tempV = sampler(mInertia, getVz, YesInertia);
             speed = tempV > baseSpeed ? tempV : baseSpeed;
         }
-        log += name + " speed: " + std::to_string(speed) + "\n";
+        writeLog( name + " speed: " + std::to_string(speed) + "\n");
         return speed;
     };
 
@@ -816,9 +835,9 @@ ZS::strat ZS::backwallSolve(double mm, int t, int delayTick){
 }
 
 ZS::fullStrat ZS::backwallSolver(double mm, int t){
-    log += "\nOptimal Backwalled Solver ----------------------- \n";
-    log += "Target mm: " + util::fmt(mm) + ", airtime: " + std::to_string(t) + "\n";
-    log += "\n- Delayed section: \n";
+    writeLog( "\nOptimal Backwalled Solver ----------------------- \n");
+    writeLog( "Target mm: " + util::fmt(mm) + ", airtime: " + std::to_string(t) + "\n");
+    writeLog( "\n- Delayed section: \n");
 
     int delayTick = 1;
     ZS::strat delayed = backwallSolve(mm, t, DELAYED);
@@ -839,16 +858,16 @@ ZS::fullStrat ZS::backwallSolver(double mm, int t){
     // only low speed could delayTick > 1 benifit, delay long ticks were already considered if jumps == 0, skip
     if(dS < terminalSpeed && p.Z() < mm){
 
-        log += "Best vz = " +  std::to_string(dS) + "\n\n";
+        writeLog( "Best vz = " +  std::to_string(dS) + "\n\n");
         int maxDelayTick = -1;
         p.resetAll();
         for(; p.Z() < mm; maxDelayTick ++)
             p.s45(1);
 
-        log += "(max) ";
+        writeLog( "(max) ");
         
         ZS::strat newDelayedStrat = backwallSolve(mm, t, maxDelayTick);
-        log += "Best vz = " +  std::to_string(newDelayedStrat.optimalSpeed) + "\n\n";
+        writeLog( "Best vz = " +  std::to_string(newDelayedStrat.optimalSpeed) + "\n\n");
         if(newDelayedStrat.optimalSpeed > dS){
             dS = newDelayedStrat.optimalSpeed;
             dT = newDelayedStrat.stratType;
@@ -860,7 +879,7 @@ ZS::fullStrat ZS::backwallSolver(double mm, int t){
     p.resetAll();
 
     p.resetAll();
-    log += "\n- Nondelayed section: \n";
+    writeLog( "\n- Nondelayed section: \n");
     ZS::strat nondelayed = backwallSolve(mm, t, NONDELAYED);
     return ZS::fullStrat{dT, dS, nondelayed.stratType, nondelayed.optimalSpeed, delayTick};
 }
@@ -892,6 +911,10 @@ std::string ZS::strat2string(int stratType) {
     }
 }
 
+void ZS::writeLog(std::string str){
+    if(logOn) log += str;
+}
+
 void ZS::printLog(){
     std::cout << "LOG ----------------------- \n";
     std::cout << log;
@@ -899,6 +922,10 @@ void ZS::printLog(){
 
 void ZS::clearLog(){
     log = "";
+}
+
+void ZS::toggleLog(bool on){
+    logOn = on;
 }
 
 bool ZS::poss(double mm, int t_mm, int max_t, double threshold, bool backwallQ, std::string& content, double shift, std::optional<fullStrat> provideStrat){

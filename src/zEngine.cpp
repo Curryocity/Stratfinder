@@ -49,12 +49,12 @@ void zEngine::simMove(float moveVec, bool airborne, bool sprintJumpQ, int repeat
             accel = 0.02f;
         } else{
             accel = 0.1f;
-            if (speed > 0)    accel *= 1.0 + 0.2f * (double) speed;
-            if (slowness > 0) accel *= 1.0 + (-0.15f) * (double) slowness;
+            if (speed > 0)    accel *= 1.0f + 0.2f * (double) speed;
+            if (slowness > 0) accel *= 1.0f + (-0.15f) * (double) slowness;
             if (accel < 0) accel = 0;
         }
         
-        accel *= 1.0 + 0.3f;  // sprinting multiplier
+        accel *= 1.0f + 0.3f;  // sprinting multiplier
 
         /* ground drag */
         if (!airborne) {

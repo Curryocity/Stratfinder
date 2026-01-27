@@ -195,6 +195,7 @@ ZS::Output1 ZS::mmHeuristics(zEngine& p, double mm, int t, int delayTick, double
         jumps ++;
     }
 
+    writeLog("Full jumps: " + std::to_string(jumps) + "\n");
 
     double bestBwSpeed;
     if(knownBwCap == 0){

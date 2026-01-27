@@ -4,6 +4,7 @@
 #include "zSolver.hpp"
 #include "util.hpp"
 #include "player.hpp"
+#include "inputFinder.hpp"
 
 void init(){
     util::init();
@@ -18,30 +19,29 @@ int main() {
     zSolver s;
 
     bool backwallq = false;
-    int max_t = 116;
-    double threshold = 1e-10;
+    int max_t = 30;
+    double threshold = 1e-5;
     std::string content;
     
-    if(true){
+    if(false){
         s.toggleLog(false);
-        for(int speed = 0; speed <= 255; speed ++){
+        for(int speed = 0; speed <= 60; speed ++){
             for(int slow = 0; slow <= 6; slow ++){
                 s.setEffect(speed, slow);
-                for(double t_mm = 2; t_mm <= 12; t_mm += 1){
+                for(double t_mm = 11; t_mm <= 11; t_mm += 1){
                     zSolver::fullStrat maxi = s.maxMMSolver(t_mm);
-                    for(double x = 0.125; x <= 5000; x += 0.0625){
+                    for(double x = 2.5; x <= 9; x += 0.0625){
                         zSolver::fullStrat strat = s.optimalSolver(x, t_mm);
-                        bool hasJump = s.poss(x, t_mm, max_t, threshold, backwallq, content, zSolver::normal, strat);
-                        if(hasJump) std::cout << content;
-                        hasJump = s.poss(x, t_mm, max_t, threshold, backwallq, content, zSolver::ladder, strat);
-                        if(hasJump) std::cout << content;
-                        hasJump = s.poss(x, t_mm, max_t, threshold, backwallq, content, zSolver::blockage, strat);
-                        if(hasJump) std::cout << content;
-                        hasJump = s.poss(x, t_mm, max_t, threshold, backwallq, content, zSolver::normal - 0.001, strat);
-                        if(hasJump) std::cout << content;
+                        if(strat.delayTick == 1 && (strat.nondelayStrat == zSolver::SLINGSHOT || strat.nondelayStrat == zSolver::BOOMERANG) ) {
+                            bool hasJump = s.poss(x, t_mm, max_t, threshold, backwallq, content, zSolver::normal, strat);
+                            if(hasJump) std::cout << content;
+                            hasJump = s.poss(x, t_mm, max_t, threshold, backwallq, content, zSolver::ladder, strat);
+                            if(hasJump) std::cout << content;
+
+                        }
 
                         if(maxi.delaySpeed - strat.delaySpeed < 1e-3){
-                            if(s.equalJumpListCheck(t_mm, max_t, strat, maxi, {zSolver::normal, zSolver::ladder, zSolver::blockage, zSolver::normal - 0.001})) break;
+                            if(s.equalJumpListCheck(t_mm, max_t, strat, maxi, {zSolver::normal, zSolver::ladder})) break;
                         }
                     }
                     if(maxi.delayTick == -1) break;
@@ -77,10 +77,33 @@ int main() {
     }
 
     if(false){
-        s.setEffect(0, 0);
-        s.poss(3, 12, 25, 1e-2, false, content, zSolver::normal);
+        s.setEffect(0, 4);
+        s.poss( 4, 11, 50, 1e-2, false, content, zSolver::normal);
         s.printLog();
         std::cout << content;
+    }
+
+    if(true){
+        inputFinder IF;
+        IF.listAllInputs(-0.24, 12, 1e-5, 0, -1.6);
+    }
+
+    if(false){
+        inputFinder IF;
+        inputFinder::sequence seq;
+        seq.airtime = 10;
+
+        seq.inputs = {
+            {-1, 1, 3},
+            {1, 0, 5},
+            {1, 1, 7}
+        };
+
+        // no jump at all
+        seq.jumpMap = {0, 1, 0, 0 ,0 ,0,0,0, 0, 0 ,0 ,0,0,0, 0 ,0};
+
+        std::string str = IF.seqToString(seq);
+        std::cout << str;
     }
 
     return 0;

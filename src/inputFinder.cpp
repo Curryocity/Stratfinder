@@ -12,6 +12,8 @@ void IF::listAllInputs(double targetVz, int airtime, double error, double maxFw,
         << "TargetVz = " << targetVz
         << ", airtime = " << airtime
         << ", error = " << error
+        << ", maxFw = " << maxFw
+        << ", maxBw = " << maxBw
         << "\n";
 
     std::vector<IF::sequence> results =
@@ -42,6 +44,7 @@ std::vector<IF::sequence> IF::matchZSpeed(double targetVz, int airtime, double e
 }
 
 std::vector<IF::sequence> IF::inputDfs(double targetVz, int airtime, double error, double maxFw, double maxBw, int depthLimit){
+    std::cout << "Try searching depth = " << depthLimit << " inputs\n";
     std::vector<IF::sequence> result;
     std::vector<IF::input> inputChain;
 
@@ -93,6 +96,8 @@ void IF::inputDfsRec(std::vector<IF::input>& inputChain, int depth, int depthLim
                 if(w == prevW && a == prevA) break;
                 // the last input cannot be blank
                 if((depth == depthLimit - 1) && w == 0 && a == 0) break;
+                // pressing A/D without W/S is the same as stopping
+                if(straight && w == 0 && a != 0) break;
 
                 inputChain.push_back(IF::input{w, a, t});
                 inputDfsRec(inputChain, depth + 1, depthLimit, targetVz, airtime, error, maxFw, maxBw,result);
@@ -170,6 +175,7 @@ std::string IF::seqToString(IF::sequence& seq){
     int prevW = 0;
     int prevA = 0;
     int prevGAJ = 0; // Grounded = 0, Airborne = 1, Jump = 2
+
     for(IF::input input: seq.inputs){
         for(int i = 0; i < input.t; i++){
             // ToggleSprint: assume sprinting when holding W
@@ -186,11 +192,13 @@ std::string IF::seqToString(IF::sequence& seq){
                 std::string modifier = sprintQ ? "s" : "w";
                 bool nothingQ = prevW == 0 && prevA == 0;
                 std::string gajStr = "";
+
                 if(prevGAJ == 2 || (prevGAJ == 1 && streakFromJump)) gajStr = "j";
                 else if(prevGAJ == 1) gajStr = "a";
 
                 if(nothingQ){
-                    desc += "st" + gajStr + "(" + std::to_string(streak) + ") ";
+                    if(!desc.empty())
+                        desc += "st" + gajStr + "(" + std::to_string(streak) + ") ";
                 }else{
                     std::string Wstr = (prevW == 1)? "w" : "s";
                     std::string Astr = (prevA == 1)? "a" : "d";

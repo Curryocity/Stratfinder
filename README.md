@@ -100,7 +100,7 @@ t = 17: 6.625 + 0.00072 b
 ```
 
 ### TODOs:
-1. input bruteforcer
+1. input bruteforcer (WIP)
 2. GUI
 3. ice/slime support
 4. slime bounce jump finding?

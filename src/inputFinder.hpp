@@ -39,7 +39,7 @@ class inputFinder {
 
     private:
 
-    int maxInputLength = 16;
+    int maxInputLength = 20;
     int maxDepth = 3;
     float rotation = 0.0f;
 

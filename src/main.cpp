@@ -1,5 +1,7 @@
+#include <cmath>
 #include <iostream>
 #include <optional>
+#include <vector>
 #include "zEngine.hpp"
 #include "zSolver.hpp"
 #include "util.hpp"
@@ -84,26 +86,20 @@ int main() {
     }
 
     if(true){
-        inputFinder IF;
-        IF.listAllInputs(-0.24, 12, 1e-5, 0, -1.6);
-    }
+        inputFinder f;
+        f.changeSettings(4, 40);
+        f.printSettings();
+        f.setEffect(0, 1);
+        double targetVz = -0.127684526;
+        double error = 1.02e-07;
+        double maxFw = 2.5;
+        double maxBw = -2.5;
+        double airtime = 12;
+        std::cout << "------------------------------\n";
+        std::cout << "Input Finder: \n";
+        std::cout << "targetVz: " << targetVz << ", error:" << error << ", maxFw: " << maxFw << ", maxBw: " << maxBw << ", airtime: " << airtime << "\n";
 
-    if(false){
-        inputFinder IF;
-        inputFinder::sequence seq;
-        seq.airtime = 10;
-
-        seq.inputs = {
-            {-1, 1, 3},
-            {1, 0, 5},
-            {1, 1, 7}
-        };
-
-        // no jump at all
-        seq.jumpMap = {0, 1, 0, 0 ,0 ,0,0,0, 0, 0 ,0 ,0,0,0, 0 ,0};
-
-        std::string str = IF.seqToString(seq);
-        std::cout << str;
+        f.matchZSpeed(inputFinder::zCond{targetVz, error, maxFw, maxBw}, airtime);
     }
 
     return 0;

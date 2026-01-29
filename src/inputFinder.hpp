@@ -35,9 +35,7 @@ class inputFinder {
     struct zCond{
         double targetVz = 0;
         double error = 1e-4;
-        double maxFw = 0;
-        double maxBw = -INFINITY;
-        double mm = INFINITY;
+        double mm = -INFINITY;
     };
 
     // Depth means how many inputs to try before
@@ -47,7 +45,7 @@ class inputFinder {
     bool inputDfsRec(zCond cond, int tick, int depth, int depthLimit, sequence& node, std::vector<ForwardSeq>& result);
 
     // Output the velocity after executing the sequence, if the used mm exceed maxFw. maxBw then output NaN.
-    double exeFwSeq(player p, const ForwardSeq& seq, double maxFw, double maxBw, double initVz = 0, bool initAir = false);
+    double exeFwSeq(player p, const ForwardSeq& seq, double mm, double initVz = 0, bool initAir = false);
 
     ForwardSeq buildForward(const sequence& seq);
     std::string fwSeqToString(const ForwardSeq& seq);

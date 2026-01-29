@@ -86,20 +86,20 @@ int main() {
     }
 
     if(true){
+        // Finding input for slowness I 1.5bm 6-1 to ladder (perfect double 45.01)
         inputFinder f;
         f.changeSettings(4, 40);
         f.printSettings();
         f.setEffect(0, 1);
         double targetVz = -0.127684526;
         double error = 1.02e-07;
-        double maxFw = 2.1;
-        double maxBw = -2.1;
+        double mm = -1.5;
         double airtime = 12;
         std::cout << "------------------------------\n";
         std::cout << "Input Finder: \n";
-        std::cout << "targetVz: " << targetVz << ", error: " << error << ", maxFw: " << maxFw << ", maxBw: " << maxBw << ", airtime: " << airtime << "\n";
+        std::cout << "targetVz: " << targetVz << ", error: " << error << ", mm: " << mm << ", airtime: " << airtime << "\n";
 
-        f.matchZSpeed(inputFinder::zCond{targetVz, error, maxFw, maxBw}, airtime);
+        f.matchZSpeed(inputFinder::zCond{targetVz, error, mm}, airtime);
     }
 
     return 0;

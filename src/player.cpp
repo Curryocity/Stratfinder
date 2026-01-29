@@ -95,8 +95,7 @@ void player::setVz(double value, bool airborne){
     prev_slip = airborne? 1.0f: GROUND_SLIP;
 }
 
-void player::resetAll()
-{
+void player::resetAll(){
     x = 0;
     z = 0;
     vx = 0;

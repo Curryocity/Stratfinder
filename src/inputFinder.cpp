@@ -45,7 +45,7 @@ bool IF::inputDfsRec(zCond cond, int tick, int depth, int depthLimit, sequence& 
     if (depth == depthLimit) {
         ForwardSeq fw = buildForward(node);
 
-        double vz = exeFwSeq(getDummy(), fw, cond.maxFw, cond.maxBw);
+        double vz = exeFwSeq(getDummy(), fw, cond.mm);
 
         if(!std::isnan(vz) && std::abs(vz - cond.targetVz) <= cond.error){
             fw.finalVz = vz;
@@ -63,8 +63,8 @@ bool IF::inputDfsRec(zCond cond, int tick, int depth, int depthLimit, sequence& 
 
         double maxInitVz = getTerminalSpeed(1, 0, 0);
         double minInitVz = getTerminalSpeed(-1, 0, 0);
-        double maxVz = exeFwSeq(getDummy(), fw, INFINITY, -INFINITY, maxInitVz, true);
-        double minVz = exeFwSeq(getDummy(), fw, INFINITY, -INFINITY, minInitVz, true);
+        double maxVz = exeFwSeq(getDummy(), fw, INFINITY, maxInitVz, true);
+        double minVz = exeFwSeq(getDummy(), fw, INFINITY, minInitVz, true);
 
         if(maxVz < (cond.targetVz - cond.error) || minVz > (cond.targetVz + cond.error)){
             // std::cout << fwSeqToString(fw) << "\n";
@@ -181,10 +181,16 @@ IF::ForwardSeq IF::buildForward(const sequence& seq){
     return ForwardSeq{inputs, isJump,padding, seq.airtime};
 }
 
-double IF::exeFwSeq(player p, const ForwardSeq& seq, double maxFw, double maxBw, double initVz, bool initAir){
+double IF::exeFwSeq(player p, const ForwardSeq& seq, double mm, double initVz, bool initAir){
 
     int tick = 0;
     int airClock = 0;
+
+    double zMax = 0, zMin = 0;
+
+    const bool doMMCheck = !std::isinf(mm);
+    bool prevAirborne = true;
+    double preZ = 0;
 
     p.resetAll();
 
@@ -193,8 +199,7 @@ double IF::exeFwSeq(player p, const ForwardSeq& seq, double maxFw, double maxBw,
 
             bool jumpQ = seq.isJump[tick];
 
-            if (airClock > 0)
-                airClock--;
+            if (airClock > 0) airClock--;
 
             bool airborne = airClock > 0;
             bool sprintQ = (in.w == 1);
@@ -209,13 +214,36 @@ double IF::exeFwSeq(player p, const ForwardSeq& seq, double maxFw, double maxBw,
             if (jumpQ)
                 airClock = seq.airtime;
 
-            // pruning
-            if (p.Z() > maxFw || p.Z() < maxBw)
-                return NAN;
+            // Update mm used
+            if(doMMCheck){
+                if(!airborne){
+                    if(prevAirborne){
+                        if(preZ > zMax) zMax = preZ;
+                        if(preZ < zMin) zMin = preZ;
+                    }else{
+                        double curZ = p.Z();
+                        bool preVzPos = curZ - preZ > 0;
+                        if(preVzPos && preZ > zMax) zMax = preZ;
+                        if(!preVzPos && curZ > zMax) zMax = curZ;
+
+                        if(!preVzPos && preZ < zMin) zMin = preZ;
+                        if(preVzPos && curZ < zMin) zMin = curZ;
+                    }
+                }
+
+                preZ = p.Z();
+                prevAirborne = airborne;
+
+                if(zMax - zMin > std::abs(mm) + 0.6f) return NAN;
+            }
 
             tick++;
         }
     }
+
+    
+    if (doMMCheck && (mm * p.Z() < 0))
+        return NAN;
 
     return p.Vz();
 }

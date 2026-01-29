@@ -35,8 +35,12 @@ class inputFinder {
     struct zCond{
         double targetVz = 0;
         double error = 1e-4;
-        double mm = -INFINITY;
+        double mm = -65536;
+        bool allowStrafe = true;
+        double maxXdeviation = INFINITY;
     };
+
+    static zCond genZCondLBUB(double lb, double ub, double mm, bool allowStrafe = true, double maxXdev = INFINITY);
 
     // Depth means how many inputs to try before
     std::vector<ForwardSeq> matchZSpeed(zCond cond, int airtime);
@@ -45,7 +49,7 @@ class inputFinder {
     bool inputDfsRec(zCond cond, int tick, int depth, int depthLimit, sequence& node, std::vector<ForwardSeq>& result);
 
     // Output the velocity after executing the sequence, if the used mm exceed maxFw. maxBw then output NaN.
-    double exeFwSeq(player p, const ForwardSeq& seq, double mm, double initVz = 0, bool initAir = false);
+    double exeFwSeq(player p, const ForwardSeq& seq, double mm, double maxXdev, double initVz = 0, bool initAir = false);
 
     ForwardSeq buildForward(const sequence& seq);
     std::string fwSeqToString(const ForwardSeq& seq);

@@ -1,11 +1,16 @@
 #include "inputFinder.hpp"
 #include "util.hpp"
 #include <cmath>
+#include <cstdlib>
 #include <iostream>
 #include <string>
 #include <vector>
 
 using IF = inputFinder;
+
+IF::zCond IF::genZCondLBUB(double lb, double ub, double mm, bool allowStrafe, double maxXdev){
+    return zCond{(lb + ub)/2, std::abs((ub - lb)/2), mm, allowStrafe, maxXdev};
+}
 
 std::vector<IF::ForwardSeq> IF::matchZSpeed(zCond cond, int airtime){
 
@@ -45,12 +50,12 @@ bool IF::inputDfsRec(zCond cond, int tick, int depth, int depthLimit, sequence& 
     if (depth == depthLimit) {
         ForwardSeq fw = buildForward(node);
 
-        double vz = exeFwSeq(getDummy(), fw, cond.mm);
+        double vz = exeFwSeq(getDummy(), fw, cond.mm, cond.maxXdeviation);
 
         if(!std::isnan(vz) && std::abs(vz - cond.targetVz) <= cond.error){
             fw.finalVz = vz;
             std::cout << "------------------------------------------------------------\n";
-            std::cout << "Found Seqeunce: " << fwSeqToString(fw) << "\nVz: " << util::df(vz) << "\n";
+            std::cout << "Found Seqeunce: " << fwSeqToString(fw) << "\nt = " << tick << "(+" << node.airDebt << "), Vz: " << util::df(vz) << "\n";
             result.emplace_back(std::move(fw));
         }
 
@@ -63,12 +68,10 @@ bool IF::inputDfsRec(zCond cond, int tick, int depth, int depthLimit, sequence& 
 
         double maxInitVz = getTerminalSpeed(1, 0, 0);
         double minInitVz = getTerminalSpeed(-1, 0, 0);
-        double maxVz = exeFwSeq(getDummy(), fw, INFINITY, maxInitVz, true);
-        double minVz = exeFwSeq(getDummy(), fw, INFINITY, minInitVz, true);
+        double maxVz = exeFwSeq(getDummy(), fw, INFINITY, INFINITY, maxInitVz, true);
+        double minVz = exeFwSeq(getDummy(), fw, INFINITY, INFINITY, minInitVz, true);
 
         if(maxVz < (cond.targetVz - cond.error) || minVz > (cond.targetVz + cond.error)){
-            // std::cout << fwSeqToString(fw) << "\n";
-            // std::cout << "maxVz: " << maxVz << "minVz: " << minVz << "\n";
             return true;
         } 
     }
@@ -86,8 +89,9 @@ bool IF::inputDfsRec(zCond cond, int tick, int depth, int depthLimit, sequence& 
     }
 
     for (int w = -1; w <= 1; w++) {
-        for (int a = straight ? 0: -1; a <= 0; a++) { // utilize A/D symmetry when facing straight
+        for (int a = straight ? 0: -1; a <= 1; a++) { // utilize A/D symmetry when facing straight
 
+            if(!cond.allowStrafe && a != 0) continue;
             // allow the extension of same movement key only when reaching max airtime int previous round
             if(prevT != node.airtime && w == prevW && a == prevA) continue;
             // pressing A/D without W/S gains same Vz as holding nothing when straight
@@ -120,10 +124,6 @@ bool IF::inputDfsRec(zCond cond, int tick, int depth, int depthLimit, sequence& 
                 } 
 
             }
-
-            // wa.s(3) w.s(1) wj.s(5) sa.w(7) s.w(4) w.s(1) wj.s(12) w.s(1)
-            // inputs: {-1,0,12}, {-1,0,2}, {1,0,11}, {-1,0,9}
-            // revJumps: 1:(0,1,12,0),    18:(14,4,11,0), 31:(25,6,9,5)
 
             for(int r = std::max(0, node.airDebt); r < pruneR; r ++){
                 // Last tick must be grounded, cannot reverse jump on the ending tick.
@@ -181,7 +181,7 @@ IF::ForwardSeq IF::buildForward(const sequence& seq){
     return ForwardSeq{inputs, isJump,padding, seq.airtime};
 }
 
-double IF::exeFwSeq(player p, const ForwardSeq& seq, double mm, double initVz, bool initAir){
+double IF::exeFwSeq(player p, const ForwardSeq& seq, double mm, double maxXdev, double initVz, bool initAir){
 
     int tick = 0;
     int airClock = 0;
@@ -216,6 +216,9 @@ double IF::exeFwSeq(player p, const ForwardSeq& seq, double mm, double initVz, b
 
             // Update mm used
             if(doMMCheck){
+
+                if(std::abs(p.X()) > maxXdev) return NAN;
+
                 if(!airborne){
                     if(prevAirborne){
                         if(preZ > zMax) zMax = preZ;

@@ -91,15 +91,18 @@ int main() {
         f.changeSettings(4, 40);
         f.printSettings();
         f.setEffect(0, 1);
-        double targetVz = -0.127684526;
-        double error = 1.02e-07;
-        double mm = -1.5;
+        inputFinder::zCond cond = inputFinder::genZCondLBUB(-0.1276844242999637, -0.1276846279184921, -1.5, false, 0.5);
+        double targetVz = cond.targetVz;
+        double error = cond.error;
+        double mm = cond.mm;
         double airtime = 12;
+        bool hasStrafe = cond.allowStrafe;
+        double maxXdev = cond.maxXdeviation;
         std::cout << "------------------------------\n";
         std::cout << "Input Finder: \n";
-        std::cout << "targetVz: " << targetVz << ", error: " << error << ", mm: " << mm << ", airtime: " << airtime << "\n";
+        std::cout << "targetVz: " << util::df(targetVz) << ", error: " << util::df(error) << ", mm: " << util::fmt(mm) << ", airtime: " << airtime << ", hasStrafe: " << hasStrafe <<  ", maxXdev: " << maxXdev << "\n";
 
-        f.matchZSpeed(inputFinder::zCond{targetVz, error, mm}, airtime);
+        f.matchZSpeed(cond, airtime);
     }
 
     return 0;

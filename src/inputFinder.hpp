@@ -19,6 +19,7 @@ class inputFinder {
     struct ForwardSeq {
         std::vector<input> inputs;
         std::vector<uint8_t> isJump;
+        int startTick = 0;
         int airtime = 12;
         double finalVz = 0;
     };

@@ -92,12 +92,12 @@ int main() {
         f.setEffect(0, 1);
         double targetVz = -0.127684526;
         double error = 1.02e-07;
-        double maxFw = 2.5;
-        double maxBw = -2.5;
+        double maxFw = 2.1;
+        double maxBw = -2.1;
         double airtime = 12;
         std::cout << "------------------------------\n";
         std::cout << "Input Finder: \n";
-        std::cout << "targetVz: " << targetVz << ", error:" << error << ", maxFw: " << maxFw << ", maxBw: " << maxBw << ", airtime: " << airtime << "\n";
+        std::cout << "targetVz: " << targetVz << ", error: " << error << ", maxFw: " << maxFw << ", maxBw: " << maxBw << ", airtime: " << airtime << "\n";
 
         f.matchZSpeed(inputFinder::zCond{targetVz, error, maxFw, maxBw}, airtime);
     }

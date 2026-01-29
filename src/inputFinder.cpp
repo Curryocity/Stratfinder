@@ -58,16 +58,13 @@ bool IF::inputDfsRec(zCond cond, int tick, int depth, int depthLimit, sequence& 
     }
 
     // prune
-
-    if(tick > 1){
+    if(tick > 0){
         ForwardSeq fw = buildForward(node);
 
         double maxInitVz = getTerminalSpeed(1, 0, 0);
         double minInitVz = getTerminalSpeed(-1, 0, 0);
         double maxVz = exeFwSeq(getDummy(), fw, INFINITY, -INFINITY, maxInitVz, true);
         double minVz = exeFwSeq(getDummy(), fw, INFINITY, -INFINITY, minInitVz, true);
-
-
 
         if(maxVz < (cond.targetVz - cond.error) || minVz > (cond.targetVz + cond.error)){
             // std::cout << fwSeqToString(fw) << "\n";
@@ -89,7 +86,7 @@ bool IF::inputDfsRec(zCond cond, int tick, int depth, int depthLimit, sequence& 
     }
 
     for (int w = -1; w <= 1; w++) {
-        for (int a = straight ? 0: -1; a <= 1; a++) { // utilize A/D symmetry when facing straight
+        for (int a = straight ? 0: -1; a <= 0; a++) { // utilize A/D symmetry when facing straight
 
             // allow the extension of same movement key only when reaching max airtime int previous round
             if(prevT != node.airtime && w == prevW && a == prevA) continue;
@@ -181,7 +178,7 @@ IF::ForwardSeq IF::buildForward(const sequence& seq){
     }
         
 
-    return ForwardSeq{inputs, isJump, seq.airtime};
+    return ForwardSeq{inputs, isJump,padding, seq.airtime};
 }
 
 double IF::exeFwSeq(player p, const ForwardSeq& seq, double maxFw, double maxBw, double initVz, bool initAir){
@@ -190,7 +187,6 @@ double IF::exeFwSeq(player p, const ForwardSeq& seq, double maxFw, double maxBw,
     int airClock = 0;
 
     p.resetAll();
-    bool applyInitVz = false;
 
     for (const input& in : seq.inputs) {
         for (int i = 0; i < in.t; i++) {
@@ -204,9 +200,8 @@ double IF::exeFwSeq(player p, const ForwardSeq& seq, double maxFw, double maxBw,
             bool sprintQ = (in.w == 1);
             int movementType = 2 * sprintQ + (sprintQ && jumpQ);
 
-            if((in.w != 0 || in.a != 0) && !applyInitVz){
+            if(tick == seq.startTick){
                 p.setVz(initVz, initAir);
-                applyInitVz = true;
             }
 
             p.move(in.w, in.a, airborne, movementType, 1);

@@ -101,7 +101,6 @@ void player::resetAll()
     z = 0;
     vx = 0;
     vz = 0;
-    rotation = 0;
     prev_slip = -1;
     prev_sprint = false;
 }

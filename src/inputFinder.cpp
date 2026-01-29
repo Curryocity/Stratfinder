@@ -8,8 +8,8 @@
 
 using IF = inputFinder;
 
-IF::zCond IF::genZCondLBUB(double lb, double ub, double mm, bool allowStrafe, double maxXdev){
-    return zCond{(lb + ub)/2, std::abs((ub - lb)/2), mm, allowStrafe, maxXdev};
+IF::zCond IF::genZCondLBUB(double lb, double ub, double mm, bool allowStrafe){
+    return zCond{(lb + ub)/2, std::abs((ub - lb)/2), mm, allowStrafe};
 }
 
 std::vector<IF::ForwardSeq> IF::matchZSpeed(zCond cond, int airtime){
@@ -47,29 +47,33 @@ bool IF::inputDfsRec(zCond cond, int tick, int depth, int depthLimit, sequence& 
 
     if(tick > maxTicks) return true;
 
+    if(depth > depthLimit){
+        std::cout << "THIS SHOULDNT HAPPEN!\n";
+        return false;
+    }
+
     if (depth == depthLimit) {
         ForwardSeq fw = buildForward(node);
 
-        double vz = exeFwSeq(getDummy(), fw, cond.mm, cond.maxXdeviation);
+        double vz = exeFwSeq(getDummy(), fw, cond.mm);
 
         if(!std::isnan(vz) && std::abs(vz - cond.targetVz) <= cond.error){
             fw.finalVz = vz;
-            std::cout << "------------------------------------------------------------\n";
+            std::cout << "\n";
             std::cout << "Found Seqeunce: " << fwSeqToString(fw) << "\nt = " << tick << "(+" << node.airDebt << "), Vz: " << util::df(vz) << "\n";
             result.emplace_back(std::move(fw));
         }
 
-        return false;
     }
 
-    // prune
+
     if(tick > 0){
         ForwardSeq fw = buildForward(node);
 
         double maxInitVz = getTerminalSpeed(1, 0, 0);
         double minInitVz = getTerminalSpeed(-1, 0, 0);
-        double maxVz = exeFwSeq(getDummy(), fw, INFINITY, INFINITY, maxInitVz, true);
-        double minVz = exeFwSeq(getDummy(), fw, INFINITY, INFINITY, minInitVz, true);
+        double maxVz = exeFwSeq(getDummy(), fw, INFINITY, maxInitVz, true);
+        double minVz = exeFwSeq(getDummy(), fw, INFINITY, minInitVz, true);
 
         if(maxVz < (cond.targetVz - cond.error) || minVz > (cond.targetVz + cond.error)){
             return true;
@@ -101,11 +105,17 @@ bool IF::inputDfsRec(zCond cond, int tick, int depth, int depthLimit, sequence& 
 
             bool inputExtension = (prevT == node.airtime) && (w == prevW) && (a == prevA);
 
+            // only inputExtension is allowed at maxDepth
+            if(depth == depthLimit && !inputExtension) continue;
+
             // no reverse Jump
 
             int pruneR = node.airtime;
 
             for (int t = 1; t <= node.airtime; t++) {
+
+                // we want final airspeed
+                if(baseTick == 0 && speedAirQ) break;
 
                 node.inputs.push_back(IF::input{w, a, t});
 
@@ -127,7 +137,10 @@ bool IF::inputDfsRec(zCond cond, int tick, int depth, int depthLimit, sequence& 
 
             for(int r = std::max(0, node.airDebt); r < pruneR; r ++){
                 // Last tick must be grounded, cannot reverse jump on the ending tick.
-                if(baseTick + r == 0) continue;
+                if(baseTick + r == 0 && !speedAirQ) continue;
+                // we want final airspeed
+                if(baseTick == 0 && r > 0 && speedAirQ) break;
+                
                 for (int t = r + 1; t <= node.airtime; t++) {
 
                     node.revJumps.push_back(baseTick + r);
@@ -181,7 +194,7 @@ IF::ForwardSeq IF::buildForward(const sequence& seq){
     return ForwardSeq{inputs, isJump,padding, seq.airtime};
 }
 
-double IF::exeFwSeq(player p, const ForwardSeq& seq, double mm, double maxXdev, double initVz, bool initAir){
+double IF::exeFwSeq(player p, const ForwardSeq& seq, double mm, double initVz, bool initAir){
 
     int tick = 0;
     int airClock = 0;
@@ -217,7 +230,7 @@ double IF::exeFwSeq(player p, const ForwardSeq& seq, double mm, double maxXdev, 
             // Update mm used
             if(doMMCheck){
 
-                if(std::abs(p.X()) > maxXdev) return NAN;
+                if(std::abs(p.X()) > maxXdeviation) return NAN;
 
                 if(!airborne){
                     if(prevAirborne){
@@ -357,14 +370,20 @@ void IF::setEffect(int speed, int slowness){
     std::cout << "(speed, slow) = (" << speed << ", " << slowness << ")\n";
 }
 
-void IF::changeSettings(int maxDepth, int maxTicks){
+void IF::setSpeedType(bool airborne){
+    this->speedAirQ = airborne;
+    std::cout << "speedAirQ set to " << airborne << "\n";
+}
+
+void IF::changeSettings(int maxDepth, int maxTicks, double maxXdeviation){
     this->maxDepth = maxDepth;
     this->maxTicks = maxTicks;
+    this->maxXdeviation = maxXdeviation;
 }
 
 void IF::printSettings(){
     std::cout << "Input Finder Settings: \n";
-    std::cout << "maxDepth = " << maxDepth << ", maxTicks = " << maxTicks << "\n";
+    std::cout << "maxDepth = " << maxDepth << ", maxTicks = " << maxTicks << ", maxXdeviation = " << maxXdeviation << "\n";
 }
 
 player IF::getDummy(){

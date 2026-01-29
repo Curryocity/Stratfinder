@@ -20,7 +20,7 @@ class inputFinder {
         std::vector<input> inputs;
         std::vector<uint8_t> isJump;
         int startTick = 0;
-        int airtime = 12;
+        int airtime;
         double finalVz = 0;
     };
 
@@ -29,7 +29,7 @@ class inputFinder {
         // Reverse jump: time travel airtime ticks in the past to jump so you are landing this tick
         std::vector<int> revJumps;
         int airDebt = 0;
-        int airtime = 12;
+        int airtime;
     };
 
     struct zCond{
@@ -37,10 +37,9 @@ class inputFinder {
         double error = 1e-4;
         double mm = -65536;
         bool allowStrafe = true;
-        double maxXdeviation = INFINITY;
     };
 
-    static zCond genZCondLBUB(double lb, double ub, double mm, bool allowStrafe = true, double maxXdev = INFINITY);
+    static zCond genZCondLBUB(double lb, double ub, double mm, bool allowStrafe = true);
 
     // Depth means how many inputs to try before
     std::vector<ForwardSeq> matchZSpeed(zCond cond, int airtime);
@@ -49,7 +48,7 @@ class inputFinder {
     bool inputDfsRec(zCond cond, int tick, int depth, int depthLimit, sequence& node, std::vector<ForwardSeq>& result);
 
     // Output the velocity after executing the sequence, if the used mm exceed maxFw. maxBw then output NaN.
-    double exeFwSeq(player p, const ForwardSeq& seq, double mm, double maxXdev, double initVz = 0, bool initAir = false);
+    double exeFwSeq(player p, const ForwardSeq& seq, double mm, double initVz = 0, bool initAir = false);
 
     ForwardSeq buildForward(const sequence& seq);
     std::string fwSeqToString(const ForwardSeq& seq);
@@ -58,7 +57,8 @@ class inputFinder {
 
     void setEffect(int speed, int slowness);
     void setRotation(double rot);
-    void changeSettings(int maxDepth, int maxTicks = 40);
+    void setSpeedType(bool airborne);
+    void changeSettings(int maxDepth, int maxTicks = 40, double maxXdeviation = INFINITY);
     void printSettings();
     player getDummy();
 
@@ -72,8 +72,9 @@ class inputFinder {
     int slowness = 0;
     player dummy;
 
-    bool sprintOn = true;
     int maxDepth = 3;
     int maxTicks = 40;
+    bool speedAirQ = false;
+    double maxXdeviation = INFINITY;
     
 };

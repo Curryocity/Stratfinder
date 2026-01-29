@@ -1082,7 +1082,6 @@ bool ZS::equalJumpListCheck(int t_mm, int maxt, fullStrat strat1, fullStrat stra
 }
 
 
-
 void ZS::setEffect(int speed, int slowness){
     this->speed = speed;
     this->slowness = slowness;

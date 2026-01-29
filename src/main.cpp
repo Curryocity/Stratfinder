@@ -1,6 +1,7 @@
 #include <cmath>
 #include <iostream>
 #include <optional>
+#include <string>
 #include <vector>
 #include "zEngine.hpp"
 #include "zSolver.hpp"
@@ -52,55 +53,71 @@ int main() {
         }
         s.toggleLog(true);
     }
-    
-    if(false){
-        player p(28,5);
-        p.setF(48.465f);
-        p.s(1,0,1);
-        p.setF(45.01f);
-        p.s(1,1,4);
-        for(int i = 0; i < 8; i++){
-            p.setF(0);
-            p.sj(1, 0,1);
-            p.setF(45.01f);
-            p.sa(1,1,11);
-        }
-        p.s(1,1,1);
-        std::cout << util::df( 39.875 - p.Z()) << "\n";
-
-        p.setZ(zSolver::normal - 0.001);
-
-        p.setF(0);
-        p.sj(1, 0,1);
-        p.setF(45.01f);
-        p.sa(1,1,104);
-
-        std::cout << util::df( p.Z() - 32.875);
-    }
 
     if(false){
-        s.setEffect(0, 4);
-        s.poss( 4, 11, 50, 1e-2, false, content, zSolver::normal);
+        s.setEffect(34, 6);
+        s.poss( 5.6875, 11, 50, 1e-6, false, content, zSolver::ladder);
         s.printLog();
         std::cout << content;
     }
 
-    if(true){
+    if(false){
+        zEngine e(0, 4);
+
+        auto sampler1 = [](zEngine& e){
+            e.chained_sj45(11, 2);
+            return e.Z();
+        };
+
+        auto sampler2 = [](zEngine& e){
+            e.chained_sj45(11, 2);
+            e.setZ(0);
+            e.sj45(21);
+            return e.Z();
+        };
+
+        double minVz = s.inv(e, 4 + zSolver::normal, sampler1, false);
+        double maxVz = s.inv(e, 7 - zSolver::normal, sampler2, false);
+
+        std::cout << "minVz = " << util::df(minVz) << ", maxVz = " << util::df(maxVz) << "\n";
+    }
+
+    if(false){
         // Finding input for slowness I 1.5bm 6-1 to ladder (perfect double 45.01)
         inputFinder f;
         f.changeSettings(4, 40);
         f.printSettings();
         f.setEffect(0, 1);
-        inputFinder::zCond cond = inputFinder::genZCondLBUB(-0.1276844242999637, -0.1276846279184921, -1.5, false, 0.5);
+        inputFinder::zCond cond = inputFinder::genZCondLBUB(-0.1276844242999637, -0.1276846279184921, -1.5, false);
         double targetVz = cond.targetVz;
         double error = cond.error;
         double mm = cond.mm;
         double airtime = 12;
         bool hasStrafe = cond.allowStrafe;
-        double maxXdev = cond.maxXdeviation;
         std::cout << "------------------------------\n";
         std::cout << "Input Finder: \n";
-        std::cout << "targetVz: " << util::df(targetVz) << ", error: " << util::df(error) << ", mm: " << util::fmt(mm) << ", airtime: " << airtime << ", hasStrafe: " << hasStrafe <<  ", maxXdev: " << maxXdev << "\n";
+        std::cout << "targetVz: " << util::df(targetVz) << ", error: " << util::df(error) << ", mm: " << util::fmt(mm) << ", airtime: " << airtime << ", hasStrafe: " << hasStrafe << "\n";
+
+        f.matchZSpeed(cond, airtime);
+    }
+
+    if(true){
+        // Example of fw airSpeed(boomerang), note not all inputs works since the extra landing condition of boomerang
+        // True triple 45.01: Speed 34, slowness 6 3bcmm 5.6875bm 12.5b tier -23 to ladder
+        inputFinder f;
+        f.changeSettings(4, 40);
+        f.setSpeedType(true);
+        f.printSettings();
+        f.setEffect(34, 6);
+        inputFinder::zCond cond = inputFinder::genZCondLBUB(0.0820559651430301, 0.0820548593210486, -5.6875, false);
+        double targetVz = cond.targetVz;
+        double error = cond.error;
+        double mm = cond.mm;
+        double airtime = 11;
+        bool hasStrafe = cond.allowStrafe;
+        std::cout << "------------------------------\n";
+        std::cout << "Input Finder: \n";
+        std::cout << "targetVz: " << util::df(targetVz) << ", error: " << util::df(error) << ", mm: " << util::fmt(mm) << ", airtime: " << airtime << ", hasStrafe: " << hasStrafe << "\n";
 
         f.matchZSpeed(cond, airtime);
     }

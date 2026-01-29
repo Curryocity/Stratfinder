@@ -102,6 +102,19 @@ class zSolver{
     static constexpr double normal = 0.6000000238418579;
     bool equalJumpListCheck(int t_mm, int maxt, fullStrat strat1, fullStrat strat2, std::vector<double> shifts = { 0.0, ladder, normal });
 
+    template<typename movement>
+    double inv(zEngine& e, double targetZ, movement&& sampler, bool airspeed = false){
+        e.resetAll();
+        if(airspeed) e.setVzAir(0);
+        else e.setVz(0);
+        double z0 = sampler(e);
+        e.resetAll();
+        if(airspeed) e.setVzAir(1);
+        else e.setVz(1);
+        double z1 = sampler(e);
+        return (targetZ - z0)/(z1 - z0);
+    };
+
     void setEffect(int speed, int slowness);
     void clearEffects();
 

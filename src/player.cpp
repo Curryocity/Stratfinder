@@ -27,24 +27,26 @@ void player::move(float w, float a, bool airborne, int movementType, int repeat)
         }
 
         /* base movement */
-        float accel;
+        double accel;
         if(airborne){
             accel = 0.02f;
         } else{
             accel = 0.1f;
-            if (speed > 0)    accel *= 1.0f + 0.2f * (double) speed;
-            if (slowness > 0) accel *= 1.0f + (-0.15f) * (double) slowness;
+            if (speed > 0)    accel *= 1 + (double) 0.2f *  speed;
+            if (slowness > 0) accel *= 1 + (double) -0.15f *  slowness;
             if (accel < 0) accel = 0;
         }
 
         bool sprinting = movementType >= player::SPRINT;
         if( (sprinting && (!airborne || !sprint_delay) ) || (prev_sprint && sprint_delay && airborne) )
-            accel *= 1.0f + 0.3f;  // sprinting multiplier
+            accel *= 1.300000011920929;  // sprinting multiplier
+
+        float accelf = (float) accel;
 
         /* ground drag */
         if (!airborne) {
             float drag = 0.91f * slip;
-            accel *= 0.16277136f / (drag * drag * drag);
+            accelf *= 0.16277136f / (drag * drag * drag);
         }
 
         /* sprint-jump boost */
@@ -63,10 +65,10 @@ void player::move(float w, float a, bool airborne, int movementType, int repeat)
         strafe *= 0.98f;
 
         float dist = std::sqrtf(foward * foward + strafe * strafe);
-        if (dist > 1.0f) accel /= dist;
+        if (dist > 1.0f) accelf /= dist;
 
-        foward *= accel;
-        strafe *= accel;
+        foward *= accelf;
+        strafe *= accelf;
 
         /* apply motion */
         vx += strafe * util::cos(rotation) - foward * util::sin(rotation);

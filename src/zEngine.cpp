@@ -44,22 +44,24 @@ void zEngine::simMove(float moveVec, bool airborne, bool sprintJumpQ, int repeat
         }
 
         /* base movement(force sprinted) */
-        float accel;
+        double accel;
         if(airborne){
             accel = 0.02f;
         } else{
             accel = 0.1f;
-            if (speed > 0)    accel *= 1.0f + 0.2f * (double) speed;
-            if (slowness > 0) accel *= 1.0f + (-0.15f) * (double) slowness;
+            if (speed > 0)    accel *= 1 + (double) 0.2f * speed;
+            if (slowness > 0) accel *= 1 + (double) -0.15f * slowness;
             if (accel < 0) accel = 0;
         }
         
-        accel *= 1.0f + 0.3f;  // sprinting multiplier
+        accel *= 1.300000011920929;  // sprinting multiplier
+
+        float accelf = (float) accel;
 
         /* ground drag */
         if (!airborne) {
             float drag = 0.91f * slip;
-            accel *= 0.16277136f / (drag * drag * drag);
+            accelf *= 0.16277136f / (drag * drag * drag);
         }
 
         /* sprint-jump boost */
@@ -72,9 +74,9 @@ void zEngine::simMove(float moveVec, bool airborne, bool sprintJumpQ, int repeat
         /* normalize, no 45 on sprintjump tick */
         float dist = sprintJumpQ ? mu : std::sqrtf(mu * mu + mu * mu);
         if (dist > 1.0f)
-            accel /= dist;
+            accelf /= dist;
 
-        mu *= accel;
+        mu *= accelf;
 
         /* apply motion */
         vz += moveVec * (sprintJumpQ ? mu : (mu * cos45 + mu * sin45));

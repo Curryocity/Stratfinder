@@ -22,28 +22,30 @@ int main() {
     zSolver s;
 
     bool backwallq = false;
-    int max_t = 20;
-    double threshold = 1e-8;
+    int max_t = 116;
+    double threshold = 1e-10;
     std::string content;
     
     if(false){
         s.toggleLog(false);
-        for(int speed = 0; speed <= 60; speed ++){
+        for(int speed = 0; speed <= 255; speed ++){
             for(int slow = 0; slow <= 6; slow ++){
                 s.setEffect(speed, slow);
-                for(double t_mm = 11; t_mm <= 12; t_mm += 1){
+                for(double t_mm = 2; t_mm <= 12; t_mm += 1){
                     zSolver::fullStrat maxi = s.maxMMSolver(t_mm);
-                    for(double x = 0.125; x <= 50; x += 0.0625){
+                    for(double x = 0.125; x <= 50000; x += 0.0625){
                         zSolver::fullStrat strat = s.optimalSolver(x, t_mm);
-                        if(strat.delayTick == 1) {
-                            bool hasJump = s.poss(x, t_mm, max_t, threshold, backwallq, content, zSolver::normal, strat);
-                            if(hasJump) std::cout << content;
-                            hasJump = s.poss(x, t_mm, max_t, threshold, backwallq, content, zSolver::ladder, strat);
-                            if(hasJump) std::cout << content;
-                        }
+                        bool hasJump = s.poss(x, t_mm, max_t, threshold, backwallq, content, zSolver::normal, strat);
+                        if(hasJump) std::cout << content;
+                        hasJump = s.poss(x, t_mm, max_t, threshold, backwallq, content, zSolver::ladder, strat);
+                        if(hasJump) std::cout << content;
+                        hasJump = s.poss(x, t_mm, max_t, threshold, backwallq, content, zSolver::blockage, strat);
+                        if(hasJump) std::cout << content;
+                        hasJump = s.poss(x, t_mm, max_t, threshold, backwallq, content, zSolver::normal -0.001, strat);
+                        if(hasJump) std::cout << content;
 
                         if(maxi.delaySpeed - strat.delaySpeed < 1e-3){
-                            if(s.equalJumpListCheck(t_mm, max_t, strat, maxi, {zSolver::normal, zSolver::ladder})) break;
+                            if(s.equalJumpListCheck(t_mm, max_t, strat, maxi, {zSolver::normal, zSolver::ladder,zSolver::blockage, zSolver::normal -0.001})) break;
                         }
                     }
                     if(maxi.delayTick == -1) break;
@@ -81,7 +83,7 @@ int main() {
         std::cout << "minVz = " << util::df(minVz) << ", maxVz = " << util::df(maxVz) << "\n";
     }
 
-    if(false){
+    if(true){
         // Finding input for slowness I 1.5bm 6-1 to ladder (perfect double 45.01)
         inputFinder f;
         f.changeSettings(4, 40);
@@ -100,7 +102,7 @@ int main() {
         f.matchZSpeed(cond, airtime);
     }
 
-    if(true){
+    if(false){
         // Example of fw airSpeed(boomerang), note not all inputs works since the extra landing condition of boomerang
         // True triple 45.01: Speed 34, slowness 6 3bcmm 5.6875bm 12.5b tier -23 to ladder
         inputFinder f;

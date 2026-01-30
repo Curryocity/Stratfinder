@@ -15,6 +15,7 @@ IF::zCond IF::genZCondLBUB(double lb, double ub, double mm, bool allowStrafe){
 std::vector<IF::ForwardSeq> IF::matchZSpeed(zCond cond, int airtime){
 
     std::vector<IF::ForwardSeq> result;
+    calcInitVzLBUB();
 
     // find input sequence via iterative deepening dfs
     for(int limit = 1; limit <= maxDepth; limit ++){
@@ -69,11 +70,8 @@ bool IF::inputDfsRec(zCond cond, int tick, int depth, int depthLimit, sequence& 
 
     if(tick > 0){
         ForwardSeq fw = buildForward(node);
-
-        double maxInitVz = getTerminalSpeed(1, 0, 0);
-        double minInitVz = getTerminalSpeed(-1, 0, 0);
-        double maxVz = exeFwSeq(getDummy(), fw, INFINITY, maxInitVz, true);
-        double minVz = exeFwSeq(getDummy(), fw, INFINITY, minInitVz, true);
+        double maxVz = exeFwSeq(getDummy(), fw, INFINITY, this->initVzUB);
+        double minVz = exeFwSeq(getDummy(), fw, INFINITY, this->initVzLB);
 
         if(maxVz < (cond.targetVz - cond.error) || minVz > (cond.targetVz + cond.error)){
             return true;
@@ -194,7 +192,7 @@ IF::ForwardSeq IF::buildForward(const sequence& seq){
     return ForwardSeq{inputs, isJump,padding, seq.airtime};
 }
 
-double IF::exeFwSeq(player p, const ForwardSeq& seq, double mm, double initVz, bool initAir){
+double IF::exeFwSeq(player& p, const ForwardSeq& seq, double mm, double initVz){
 
     int tick = 0;
     int airClock = 0;
@@ -219,7 +217,7 @@ double IF::exeFwSeq(player p, const ForwardSeq& seq, double mm, double initVz, b
             int movementType = 2 * sprintQ + (sprintQ && jumpQ);
 
             if(tick == seq.startTick){
-                p.setVz(initVz, initAir);
+                p.setVz(initVz);
             }
 
             p.move(in.w, in.a, airborne, movementType, 1);
@@ -334,32 +332,55 @@ std::string IF::fwSeqToString(const ForwardSeq& seq) {
     return desc;
 }
 
-double IF::getTerminalSpeed(int w, int a, int runTick){
-
+void IF::calcInitVzLBUB(){
     getDummy();
 
-    if(runTick == -1){
-        dummy.resetAll();
-        int sprintQ = (w == 1);
-        dummy.move(w, a, false, 2*sprintQ, 1);
-        double groundTerminal = dummy.Vz()/(1.0 - 0.91f * 0.6f);
-        return groundTerminal;
+    int wLB, aLB, wUB, aUB;
+
+    double lb = 0, ub = 0;
+
+    for (int w = -1; w <= 1; w++) {
+        for (int a = -1; a <= 1; a++){
+            if(w == 0 && a == 0) continue;
+            dummy.resetAll();
+            int sprint = 2 *(w == 1);
+            dummy.move(w, a, false, sprint, 1);
+            double vz = dummy.Vz();
+            if(vz < lb)
+                wLB = w, aLB = a, lb = vz;
+            if(vz > ub)
+                wUB = w, aUB = a, ub = vz;
+        }
     }
 
+    // ground terminal
+    lb /= (1.0 - 0.6f * 0.91f);
+    ub /= (1.0 - 0.6f * 0.91f);
+
+    // air terminal
+    dummy.sprintDelay(false);
+
     dummy.resetAll();
-    int sprintQ = (w == 1);
-    dummy.move(w, a, true, 2*sprintQ, 1);
-    dummy.setVz(0, true);
-    dummy.move(w, a, true, 2*sprintQ, 1);
-    double airTerminal = dummy.Vz()/(1.0 - 0.91f);
+    dummy.move(wLB, aLB, true, 2*(wLB == 1), 1);
+    double airLb = dummy.Vz()/(1.0 - 0.91f);
 
-    if(runTick == 0)
-        return airTerminal;
+    dummy.resetAll();
+    dummy.move(wUB, aUB, true, 2*(wUB == 1), 1);
+    double airUb = dummy.Vz()/(1.0 - 0.91f);
 
-    dummy.move(w, a, false, 2*(w == 1), runTick);
+    // convert the speed to groundSpeed (so we can just dummy.setVz(vz, airborne = false) every time)
+    airLb /= 0.6f;
+    airUb /= 0.6f;
 
-    return dummy.Vz();
+    dummy.sprintDelay(true);
 
+    if(airUb > ub){
+        this->initVzUB = airUb;
+        this->initVzLB = airLb;
+    }else{
+        this->initVzUB = ub;
+        this->initVzLB = lb;
+    }
 }
 
 void IF::setRotation(double rot){ rotation = rot;}
@@ -386,7 +407,7 @@ void IF::printSettings(){
     std::cout << "maxDepth = " << maxDepth << ", maxTicks = " << maxTicks << ", maxXdeviation = " << maxXdeviation << "\n";
 }
 
-player IF::getDummy(){
+player& IF::getDummy(){
     dummy.resetAll();
     dummy.setEffect(speed, slowness);
     dummy.setF(rotation);

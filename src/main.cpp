@@ -22,8 +22,8 @@ int main() {
     zSolver s;
 
     bool backwallq = false;
-    int max_t = 30;
-    double threshold = 1e-5;
+    int max_t = 20;
+    double threshold = 1e-8;
     std::string content;
     
     if(false){
@@ -31,16 +31,15 @@ int main() {
         for(int speed = 0; speed <= 60; speed ++){
             for(int slow = 0; slow <= 6; slow ++){
                 s.setEffect(speed, slow);
-                for(double t_mm = 11; t_mm <= 11; t_mm += 1){
+                for(double t_mm = 11; t_mm <= 12; t_mm += 1){
                     zSolver::fullStrat maxi = s.maxMMSolver(t_mm);
-                    for(double x = 2.5; x <= 9; x += 0.0625){
+                    for(double x = 0.125; x <= 50; x += 0.0625){
                         zSolver::fullStrat strat = s.optimalSolver(x, t_mm);
-                        if(strat.delayTick == 1 && (strat.nondelayStrat == zSolver::SLINGSHOT || strat.nondelayStrat == zSolver::BOOMERANG) ) {
+                        if(strat.delayTick == 1) {
                             bool hasJump = s.poss(x, t_mm, max_t, threshold, backwallq, content, zSolver::normal, strat);
                             if(hasJump) std::cout << content;
                             hasJump = s.poss(x, t_mm, max_t, threshold, backwallq, content, zSolver::ladder, strat);
                             if(hasJump) std::cout << content;
-
                         }
 
                         if(maxi.delaySpeed - strat.delaySpeed < 1e-3){

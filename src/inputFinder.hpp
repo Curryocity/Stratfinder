@@ -48,29 +48,31 @@ class inputFinder {
     bool inputDfsRec(zCond cond, int tick, int depth, int depthLimit, sequence& node, std::vector<ForwardSeq>& result);
 
     // Output the velocity after executing the sequence, if the used mm exceed maxFw. maxBw then output NaN.
-    double exeFwSeq(player p, const ForwardSeq& seq, double mm, double initVz = 0, bool initAir = false);
+    double exeFwSeq(player& p, const ForwardSeq& seq, double mm, double initVz = 0);
 
     ForwardSeq buildForward(const sequence& seq);
     std::string fwSeqToString(const ForwardSeq& seq);
 
-    double getTerminalSpeed(int w, int a, int runTick);
+    void calcInitVzLBUB();
 
     void setEffect(int speed, int slowness);
     void setRotation(double rot);
     void setSpeedType(bool airborne);
     void changeSettings(int maxDepth, int maxTicks = 40, double maxXdeviation = INFINITY);
     void printSettings();
-    player getDummy();
+    player& getDummy();
 
     private:
 
     std::string log;
 
-    // Settings
     float rotation = 0.0f;
     int speed = 0;
     int slowness = 0;
+
     player dummy;
+    double initVzUB = 0;
+    double initVzLB = 0;
 
     int maxDepth = 3;
     int maxTicks = 40;

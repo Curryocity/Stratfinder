@@ -12,14 +12,14 @@ IF::zCond IF::genZCondLBUB(double lb, double ub, double mm, bool allowStrafe){
     return zCond{(lb + ub)/2, std::abs((ub - lb)/2), mm, allowStrafe};
 }
 
-std::vector<IF::ForwardSeq> IF::matchZSpeed(zCond cond, int airtime){
+std::vector<IF::sequence> IF::matchZSpeed(zCond cond, int airtime){
 
-    std::vector<IF::ForwardSeq> result;
+    std::vector<IF::sequence> result;
     calcInitVzLBUB();
 
     // find input sequence via iterative deepening dfs
     for(int limit = 1; limit <= maxDepth; limit ++){
-        std::vector<IF::ForwardSeq> partialResult = inputDfs(cond, airtime, limit);
+        std::vector<IF::sequence> partialResult = inputDfs(cond, airtime, limit);
         result.reserve(result.size() + partialResult.size());
         result.insert(result.end(), partialResult.begin(), partialResult.end());
     }
@@ -28,25 +28,25 @@ std::vector<IF::ForwardSeq> IF::matchZSpeed(zCond cond, int airtime){
 
 }
 
-std::vector<IF::ForwardSeq> IF::inputDfs(zCond cond, int airtime, int depthLimit){
+std::vector<IF::sequence> IF::inputDfs(zCond cond, int airtime, int depthLimit){
     std::cout << "-------------------------------------------------\n";
     std::cout << "Try searching depth = " << depthLimit << " inputs\n";
-    std::vector<IF::ForwardSeq> result;
+    std::vector<IF::sequence> result;
     sequence node;
     node.inputs = std::vector<input>();
     node.revJumps = std::vector<int>();
     node.airtime = airtime;
+    node.T = 0;
     
-
-    inputDfsRec(cond, 0, 0, depthLimit, node, result);
+    inputDfsRec(cond, 0, depthLimit, node, result);
 
     return result;
 }
 
 // return true for hardPrune, false for softPrune
-bool IF::inputDfsRec(zCond cond, int tick, int depth, int depthLimit, sequence& node, std::vector<ForwardSeq>& result) {
+bool IF::inputDfsRec(zCond cond, int depth, int depthLimit, sequence& node, std::vector<sequence>& result) {
 
-    if(tick > maxTicks) return true;
+    if(node.T > maxTicks) return true;
 
     if(depth > depthLimit){
         std::cout << "THIS SHOULDNT HAPPEN!\n";
@@ -54,31 +54,27 @@ bool IF::inputDfsRec(zCond cond, int tick, int depth, int depthLimit, sequence& 
     }
 
     if (depth == depthLimit) {
-        ForwardSeq fw = buildForward(node);
 
-        double vz = exeFwSeq(getDummy(), fw, cond.mm);
+        double vz = exeSeq(getDummy(), node, cond.mm);
 
         if(!std::isnan(vz) && std::abs(vz - cond.targetVz) <= cond.error){
-            fw.finalVz = vz;
+            node.finalVz = vz;
             std::cout << "\n";
-            std::cout << "Found Seqeunce: " << fwSeqToString(fw) << "\nt = " << tick << "(+" << node.airDebt << "), Vz: " << util::df(vz) << "\n";
-            result.emplace_back(std::move(fw));
+            std::cout << "Found Seqeunce: " << seqToString(node) << "\nt = " << node.T << "(+" << node.airDebt << "), Vz: " << util::df(vz) << "\n";
+            result.push_back(node);
         }
 
     }
 
+    if(node.T > 0){
+        double minVz = exeSeq(getDummy(), node, INFINITY, this->initVzLB);
+        if(minVz > (cond.targetVz + cond.error)) return true;
 
-    if(tick > 0){
-        ForwardSeq fw = buildForward(node);
-        double maxVz = exeFwSeq(getDummy(), fw, INFINITY, this->initVzUB);
-        double minVz = exeFwSeq(getDummy(), fw, INFINITY, this->initVzLB);
-
-        if(maxVz < (cond.targetVz - cond.error) || minVz > (cond.targetVz + cond.error)){
-            return true;
-        } 
+        double maxVz = exeSeq(getDummy(), node, INFINITY, this->initVzUB);
+        if(maxVz < (cond.targetVz - cond.error)) return true;
     }
     
-    int baseTick = tick;
+    int baseTick = node.T;
     bool straight = rotation == 0.0f || rotation == 180.0f;
 
     int prevW = 69, prevA = 69, prevT = 0;
@@ -120,7 +116,9 @@ bool IF::inputDfsRec(zCond cond, int tick, int depth, int depthLimit, sequence& 
                 int airDebtCache = node.airDebt;
                 
                 node.airDebt = std::max(0, node.airDebt - t);
-                bool hardPrune = inputDfsRec(cond, baseTick + t, depth + 1 - inputExtension, depthLimit, node, result);
+                node.T = baseTick + t;
+                bool hardPrune = inputDfsRec(cond, depth + 1 - inputExtension, depthLimit, node, result);
+                node.T = baseTick;
                 node.airDebt = airDebtCache;
 
                 node.inputs.pop_back();
@@ -147,7 +145,9 @@ bool IF::inputDfsRec(zCond cond, int tick, int depth, int depthLimit, sequence& 
                     node.inputs.push_back(IF::input{w, a, t});
 
                     node.airDebt = std::max(0, node.airtime - (t - r));
-                    bool hardPrune = inputDfsRec(cond, baseTick + t, depth + 1 - inputExtension, depthLimit, node, result);
+                    node.T = baseTick + t;
+                    bool hardPrune = inputDfsRec(cond, depth + 1 - inputExtension, depthLimit, node, result);
+                    node.T = baseTick;
                     node.airDebt = airDebtCache;
 
                     node.inputs.pop_back();
@@ -163,71 +163,45 @@ bool IF::inputDfsRec(zCond cond, int tick, int depth, int depthLimit, sequence& 
     return false;
 }
 
-IF::ForwardSeq IF::buildForward(const sequence& seq){
-    // Build forward inputs
-    std::vector<input> inputs = seq.inputs;
+double IF::exeSeq(player& p, const sequence& seq, double mm, double initVz){
 
-    int T = 0;
-    for(const input& in : inputs){
-        T += in.t;
-    }
-    int padding = seq.airtime;
-
-    if(padding > 0)
-        inputs.push_back({0,0,padding});
-    T += padding;
-
-    std::reverse(inputs.begin(), inputs.end());
-
-    std::vector<uint8_t> isJump(T, 0);
-    for (int j : seq.revJumps){
-        int idx = T - j - seq.airtime;
-        if(idx >= 0 && idx < T)
-            isJump[idx] = 1;
-        else
-            std::cout << "error!!";
-    }
-        
-
-    return ForwardSeq{inputs, isJump,padding, seq.airtime};
-}
-
-double IF::exeFwSeq(player& p, const ForwardSeq& seq, double mm, double initVz){
-
-    int tick = 0;
-    int airClock = 0;
-
-    double zMax = 0, zMin = 0;
+    int tick = seq.T;
+    int airClock = (seq.airDebt == 0)? 0 : seq.airtime - seq.airDebt;
+    int rjIdx = seq.revJumps.size() - 1 - (airClock > 0);
 
     const bool doMMCheck = !std::isinf(mm);
+    double zMax = 0, zMin = 0;
     bool prevAirborne = true;
     double preZ = 0;
 
     p.resetAll();
 
-    for (const input& in : seq.inputs) {
-        for (int i = 0; i < in.t; i++) {
+    int n = seq.inputs.size();
+    for (int i = n - 1; i >= 0; i--) {
+        const input in = seq.inputs[i];
 
-            bool jumpQ = seq.isJump[tick];
+        for (int j = 0; j < in.t; j++) {
 
-            if (airClock > 0) airClock--;
+            bool jumpQ = false;
+            if(rjIdx >= 0 && !seq.revJumps.empty() && (tick - seq.airtime) == seq.revJumps[rjIdx]){
+                jumpQ = true;
+                rjIdx --;
+            }
 
             bool airborne = airClock > 0;
             bool sprintQ = (in.w == 1);
             int movementType = 2 * sprintQ + (sprintQ && jumpQ);
 
-            if(tick == seq.startTick){
+            if(tick == seq.T){
                 p.setVz(initVz);
             }
 
             p.move(in.w, in.a, airborne, movementType, 1);
 
-            if (jumpQ)
-                airClock = seq.airtime;
+            if (jumpQ) airClock = seq.airtime;
 
             // Update mm used
             if(doMMCheck){
-
                 if(std::abs(p.X()) > maxXdeviation) return NAN;
 
                 if(!airborne){
@@ -251,7 +225,9 @@ double IF::exeFwSeq(player& p, const ForwardSeq& seq, double mm, double initVz){
                 if(zMax - zMin > std::abs(mm) + 0.6f) return NAN;
             }
 
-            tick++;
+            if (airClock > 0) airClock--;
+
+            tick--;
         }
     }
 
@@ -262,13 +238,14 @@ double IF::exeFwSeq(player& p, const ForwardSeq& seq, double mm, double initVz){
     return p.Vz();
 }
 
-std::string IF::fwSeqToString(const ForwardSeq& seq) {
+std::string IF::seqToString(const sequence& seq) {
     std::string desc;
 
-    int tick = 0;
-    int airClock = 0;
+    int tick = seq.T;
+    int airClock = (seq.airDebt == 0)? 0 : seq.airtime - seq.airDebt;
+    int rjIdx = seq.revJumps.size() - 1 - (airClock > 0);
 
-    bool streakFromJump = (seq.isJump.empty() ? false : (seq.isJump[0] != 0));
+    bool streakFromJump = false;
     int streak = 0;
 
     int prevW = 0;
@@ -299,12 +276,17 @@ std::string IF::fwSeqToString(const ForwardSeq& seq) {
         }
     };
 
-    for (const IF::input& in : seq.inputs) {
-        for (int i = 0; i < in.t; i++) {
-            const bool jumpQ = (tick < (int)seq.isJump.size() && seq.isJump[tick] != 0);
-            tick++;
+    int n = seq.inputs.size();
+    for (int i = n - 1; i >= 0; i--) {
+        const input in = seq.inputs[i];
+        for (int j = 0; j < in.t; j++) {
+            bool jumpQ = false;
+            if(rjIdx >= 0 && (tick - seq.airtime) == seq.revJumps[rjIdx]){
+                jumpQ = true;
+                rjIdx --;
+            }
 
-            if (airClock > 0) airClock--;
+            
             int gaj = (airClock > 0) ? 1 : 0;
             if (jumpQ) gaj = 2;
 
@@ -325,6 +307,9 @@ std::string IF::fwSeqToString(const ForwardSeq& seq) {
             prevW = in.w;
             prevA = in.a;
             prevGAJ = gaj;
+
+            if (airClock > 0) airClock--;
+            tick --;
         }
     }
 

@@ -83,22 +83,6 @@ int main() {
         std::cout << "minVz = " << util::df(minVz) << ", maxVz = " << util::df(maxVz) << "\n";
     }
 
-    if(false){
-        inputFinder f;
-        f.setEffect(0, 1);
-        inputFinder::zCond cond = inputFinder::genZCondLBUB(0.0787500268143987 - 1e-9, 0.0787500268143987 , 1, true);
-        double targetVz = cond.targetVz;
-        double error = cond.error;
-        double mm = cond.mm;
-        double airtime = 12;
-        bool hasStrafe = cond.allowStrafe;
-        inputFinder::sequence seq = inputFinder::sequence{std::vector<inputFinder::input>{{0,0,3},{-1,0,12},{-1, 0, 6},{0, 0, 5},{1, 0 ,8}}, std::vector<int>{1, 13, 33}, 11 , 12, 34};
-        double vz = f.exeSeq(f.getDummy(), seq, -1.5);
-        std::cout << f.seqToString(seq) << "\n";
-        std::cout << "vz: " << vz << "\n";
-
-    }
-
     if(true){
         inputFinder f;
         f.setRotation(32.965);

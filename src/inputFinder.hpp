@@ -23,6 +23,9 @@ class inputFinder {
         int airDebt = 0;
         int airtime;
         int T = 0;
+        double alpha = 1;
+        double beta = 0;
+        bool airLast = false;
         double finalVz = 0;
     };
 
@@ -43,6 +46,9 @@ class inputFinder {
 
     // Output the velocity after executing the sequence, if the used mm exceed maxFw. maxBw then output NaN.
     double exeSeq(player& p, const sequence& seq, double mm, double initVz = 0);
+
+    void alphaBetaUpdate(player& p, sequence& seq);
+    double estimateSpeed(sequence& seq, double initVz = 0);
 
     std::string seqToString(const sequence& seq);
 
@@ -71,5 +77,7 @@ class inputFinder {
     int maxTicks = 40;
     bool speedAirQ = false;
     double maxXdeviation = INFINITY;
+    double float_Error = 1e-6;
+    double inertia_Error = 5e-3;
     
 };

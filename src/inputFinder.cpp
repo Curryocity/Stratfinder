@@ -48,29 +48,31 @@ bool IF::inputDfsRec(zCond cond, int depth, int depthLimit, sequence& node, std:
 
     if(node.T > maxTicks) return true;
 
-    if(depth > depthLimit){
-        std::cout << "THIS SHOULDNT HAPPEN!\n";
-        return false;
-    }
+    alphaBetaUpdate(getDummy(), node);
 
     if (depth == depthLimit) {
 
-        double vz = exeSeq(getDummy(), node, cond.mm);
+        double estimateVz = estimateSpeed(node);
 
-        if(!std::isnan(vz) && std::abs(vz - cond.targetVz) <= cond.error){
-            node.finalVz = vz;
-            std::cout << "\n";
-            std::cout << "Found Seqeunce: " << seqToString(node) << "\nt = " << node.T << "(+" << node.airDebt << "), Vz: " << util::df(vz) << "\n";
-            result.push_back(node);
+        if(std::abs(estimateVz - cond.targetVz) <= cond.error + inertia_Error){
+            double vz = exeSeq(getDummy(), node, cond.mm);
+
+            if(!std::isnan(vz) && std::abs(vz - cond.targetVz) <= cond.error){
+                node.finalVz = vz;
+                std::cout << "\n";
+                std::cout << "Found Seqeunce: " << seqToString(node) << "\nt = " << node.T << "(+" << node.airDebt << "), Vz: " << util::df(vz) << "\n";
+                // std::cout << "Estimate Speed: " << util::df(estimateVz) << ", Alpha: " << util::df(node.alpha) << ", Beta: " << util::df(node.beta) << "\n";
+                result.push_back(node);
+            }
         }
 
     }
 
     if(node.T > 0){
-        double minVz = exeSeq(getDummy(), node, INFINITY, this->initVzLB);
+        double minVz = estimateSpeed(node, this->initVzLB) - float_Error;
         if(minVz > (cond.targetVz + cond.error)) return true;
 
-        double maxVz = exeSeq(getDummy(), node, INFINITY, this->initVzUB);
+        double maxVz = estimateSpeed(node, this->initVzUB) + float_Error;
         if(maxVz < (cond.targetVz - cond.error)) return true;
     }
     
@@ -114,12 +116,19 @@ bool IF::inputDfsRec(zCond cond, int depth, int depthLimit, sequence& node, std:
                 node.inputs.push_back(IF::input{w, a, t});
 
                 int airDebtCache = node.airDebt;
+                double alphaCache = node.alpha;
+                double betaCache = node.beta;
+                bool salCache = node.airLast;
                 
                 node.airDebt = std::max(0, node.airDebt - t);
                 node.T = baseTick + t;
                 bool hardPrune = inputDfsRec(cond, depth + 1 - inputExtension, depthLimit, node, result);
+
                 node.T = baseTick;
                 node.airDebt = airDebtCache;
+                node.alpha = alphaCache;
+                node.beta = betaCache;
+                node.airLast = salCache;
 
                 node.inputs.pop_back();
 
@@ -139,16 +148,24 @@ bool IF::inputDfsRec(zCond cond, int depth, int depthLimit, sequence& node, std:
                 
                 for (int t = r + 1; t <= node.airtime; t++) {
 
-                    node.revJumps.push_back(baseTick + r);
-                    int airDebtCache = node.airDebt;
-
                     node.inputs.push_back(IF::input{w, a, t});
+                    node.revJumps.push_back(baseTick + r);
+
+                    int airDebtCache = node.airDebt;
+                    double alphaCache = node.alpha;
+                    double betaCache = node.beta;
+                    bool salCache = node.airLast;
 
                     node.airDebt = std::max(0, node.airtime - (t - r));
                     node.T = baseTick + t;
+
                     bool hardPrune = inputDfsRec(cond, depth + 1 - inputExtension, depthLimit, node, result);
+
                     node.T = baseTick;
                     node.airDebt = airDebtCache;
+                    node.alpha = alphaCache;
+                    node.beta = betaCache;
+                    node.airLast = salCache;
 
                     node.inputs.pop_back();
                     node.revJumps.pop_back();
@@ -175,6 +192,7 @@ double IF::exeSeq(player& p, const sequence& seq, double mm, double initVz){
     double preZ = 0;
 
     p.resetAll();
+    p.setVz(initVz);
 
     int n = seq.inputs.size();
     for (int i = n - 1; i >= 0; i--) {
@@ -191,10 +209,6 @@ double IF::exeSeq(player& p, const sequence& seq, double mm, double initVz){
             bool airborne = airClock > 0;
             bool sprintQ = (in.w == 1);
             int movementType = 2 * sprintQ + (sprintQ && jumpQ);
-
-            if(tick == seq.T){
-                p.setVz(initVz);
-            }
 
             p.move(in.w, in.a, airborne, movementType, 1);
 
@@ -236,6 +250,85 @@ double IF::exeSeq(player& p, const sequence& seq, double mm, double initVz){
         return NAN;
 
     return p.Vz();
+}
+
+void IF::alphaBetaUpdate(player& p, sequence& seq){
+
+    if(seq.inputs.empty()) return;
+    p.toggleInertia(false);
+
+    auto fastSamp = [&](double initVz){
+        int tick = seq.T;
+        int airClock = (seq.airDebt == 0)? 0 : seq.airtime - seq.airDebt;
+        int rjIdx = seq.revJumps.size() - 1 - (airClock > 0);
+        bool airborne = false;
+
+        p.resetAll();
+        p.setVz(initVz);
+
+        const input lastInput = seq.inputs.back();
+        const bool sprintQ = (lastInput.w == 1);
+
+        for (int j = 0; j < lastInput.t; j++) {
+
+            bool jumpQ = false;
+            if(rjIdx >= 0 && !seq.revJumps.empty() && (tick - seq.airtime) == seq.revJumps[rjIdx]){
+                jumpQ = true;
+                rjIdx --;
+            }
+
+            airborne = airClock > 0;
+            
+            int movementType = 2 * sprintQ + (sprintQ && jumpQ);
+
+            p.move(lastInput.w, lastInput.a, airborne, movementType, 1);
+
+            if(j == 0 && airborne) p.setVz(initVz);
+
+            if (jumpQ) airClock = seq.airtime;
+
+            if (airClock > 0) airClock--;
+            tick--;
+        }
+
+
+        int n = seq.inputs.size();
+        if(seq.airLast && n >= 2){
+            const input prevInput = seq.inputs[n - 2];
+            p.sa(prevInput.w, prevInput.a, 1);
+            airborne = true;
+        }
+
+        // force ground speed format
+        double vz = p.Vz();
+        if(airborne) vz /= 0.6f;
+
+        return seq.alpha * vz + seq.beta;
+    };
+
+
+    double v0 = fastSamp(0);
+    double v1 = fastSamp(1);
+
+    seq.alpha = v1 - v0;
+    seq.beta = v0;
+
+    input prevInput = seq.inputs.back();
+    seq.airLast = seq.airDebt > 0;
+
+    p.toggleInertia(true);
+
+}
+
+double IF::estimateSpeed(sequence& seq, double initVz){
+    if(initVz == 0 && seq.airLast){
+        getDummy();
+        input lastInput = seq.inputs.back();
+        dummy.sa(lastInput.w, lastInput.a, 1);
+        initVz = dummy.Vz() / 0.6f;
+    }
+
+    return seq.alpha * initVz + seq.beta;
 }
 
 std::string IF::seqToString(const sequence& seq) {

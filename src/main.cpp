@@ -84,6 +84,7 @@ int main() {
     }
 
     if(true){
+        // extremely optimal fwmm for f32.965 1bm bwmm
         inputFinder f;
         f.setRotation(32.965);
         f.changeSettings(4, 40, 1.6);

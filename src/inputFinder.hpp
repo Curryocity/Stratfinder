@@ -52,7 +52,7 @@ class inputFinder {
 
     std::string seqToString(const sequence& seq);
 
-    void calcInitVzLBUB();
+    void calcInitVzLBUB(int airtime, double distance);
 
     void setEffect(int speed, int slowness);
     void setRotation(double rot);

@@ -15,7 +15,7 @@ IF::zCond IF::genZCondLBUB(double lb, double ub, double mm, bool allowStrafe){
 std::vector<IF::sequence> IF::matchZSpeed(zCond cond, int airtime){
 
     std::vector<IF::sequence> result;
-    calcInitVzLBUB();
+    calcInitVzLBUB(airtime, std::abs(cond.mm) + 0.6);
 
     // find input sequence via iterative deepening dfs
     for(int limit = 1; limit <= maxDepth; limit ++){
@@ -410,12 +410,13 @@ std::string IF::seqToString(const sequence& seq) {
     return desc;
 }
 
-void IF::calcInitVzLBUB(){
+// heuristics
+void IF::calcInitVzLBUB(int airtime, double distance){
+
     getDummy();
 
     int wLB, aLB, wUB, aUB;
-
-    double lb = 0, ub = 0;
+    double groundLb = 0, groundUb = 0;
 
     for (int w = -1; w <= 1; w++) {
         for (int a = -1; a <= 1; a++){
@@ -424,41 +425,71 @@ void IF::calcInitVzLBUB(){
             int sprint = 2 *(w == 1);
             dummy.move(w, a, false, sprint, 1);
             double vz = dummy.Vz();
-            if(vz < lb)
-                wLB = w, aLB = a, lb = vz;
-            if(vz > ub)
-                wUB = w, aUB = a, ub = vz;
+            if(vz < groundLb)
+                wLB = w, aLB = a, groundLb = vz;
+            if(vz > groundUb)
+                wUB = w, aUB = a, groundUb = vz;
         }
     }
 
-    // ground terminal
-    lb /= (1.0 - 0.6f * 0.91f);
-    ub /= (1.0 - 0.6f * 0.91f);
+    // running
+    groundLb /= (1.0 - 0.6f * 0.91f);
+    groundUb /= (1.0 - 0.6f * 0.91f);
 
-    // air terminal
-    dummy.sprintDelay(false);
+    // jumping
+    auto getJumpVel = [&](int w, int a){
+        int jumps = 0;
+        double vz = 0;
+        dummy.resetAll();
+        while (std::abs(dummy.Z()) < distance && jumps < 3) {
+            dummy.move(w, a, false, 2*(w == 1), 1);
+            dummy.move(w, a, true, 2*(w == 1), airtime - 1);
+            vz = dummy.Vz();
+            jumps ++;
+        }
 
-    dummy.resetAll();
-    dummy.move(wLB, aLB, true, 2*(wLB == 1), 1);
-    double airLb = dummy.Vz()/(1.0 - 0.91f);
+        double jumpVel;
+        if(jumps <= 3){
+            jumpVel = vz;
 
-    dummy.resetAll();
-    dummy.move(wUB, aUB, true, 2*(wUB == 1), 1);
-    double airUb = dummy.Vz()/(1.0 - 0.91f);
+            // trying to bargain with a random bwmm into jump
+            dummy.resetAll();
+            dummy.setVz(-vz);
+            while (jumps --) {
+                dummy.move(w, a, false, 2*(w == 1), 1);
+                dummy.move(w, a, true, 2*(w == 1), airtime - 1);
+            }
 
-    // convert the speed to groundSpeed (so we can just dummy.setVz(vz, airborne = false) every time)
-    airLb /= 0.6f;
-    airUb /= 0.6f;
+            if(std::abs(dummy.Z()) > distance) jumpVel = dummy.Vz();
 
-    dummy.sprintDelay(true);
+        } else{ // jumps = inf
+            dummy.setVz(0, true);
+            dummy.move(w, a, false, 2*(w == 1), 1);
+            dummy.move(w, a, true, 2*(w == 1), airtime - 1);
+            double v0 = dummy.Vz();
 
-    if(airUb > ub){
-        this->initVzUB = airUb;
-        this->initVzLB = airLb;
+            dummy.setVz(1, true);
+            dummy.move(w, a, false, 2*(w == 1), 1);
+            dummy.move(w, a, true, 2*(w == 1), airtime - 1);
+            double v1 = dummy.Vz();
+            jumpVel = - v0/(v1 - v0 - 1.0);
+        }
+
+        // convert the speed to groundSpeed (so we can just dummy.setVz(vz, airborne = false) every time)
+        return jumpVel / 0.6f;
+    };
+
+    double jumpLb = getJumpVel(wLB, aLB);
+    double jumpUb = getJumpVel(wUB, aUB);
+
+    if(jumpUb > groundUb){
+        this->initVzUB = jumpUb;
+        this->initVzLB = jumpLb;
     }else{
-        this->initVzUB = ub;
-        this->initVzLB = lb;
+        this->initVzUB = groundUb;
+        this->initVzLB = groundLb;
     }
+
 }
 
 void IF::setRotation(double rot){ rotation = rot;}

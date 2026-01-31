@@ -125,6 +125,9 @@ void player::toggleInertia(bool on){
     inertia_on = on;
 }
 
+void player::setPrevSprint(bool value){
+    prev_sprint = value;
+}
 
 void player::sprintDelay(bool delayQ){
     sprint_delay = delayQ;

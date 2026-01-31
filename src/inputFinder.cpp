@@ -1,5 +1,6 @@
 #include "inputFinder.hpp"
 #include "util.hpp"
+#include "zEngine.hpp"
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
@@ -15,7 +16,7 @@ IF::zCond IF::genZCondLBUB(double lb, double ub, double mm, bool allowStrafe){
 std::vector<IF::sequence> IF::matchZSpeed(zCond cond, int airtime){
 
     std::vector<IF::sequence> result;
-    calcInitVzLBUB(airtime, std::abs(cond.mm) + 0.6);
+    initHeuristics(airtime, std::abs(cond.mm) + 0.6);
 
     // find input sequence via iterative deepening dfs
     for(int limit = 1; limit <= maxDepth; limit ++){
@@ -54,14 +55,17 @@ bool IF::inputDfsRec(zCond cond, int depth, int depthLimit, sequence& node, std:
 
         double estimateVz = estimateSpeed(node);
 
-        if(std::abs(estimateVz - cond.targetVz) <= cond.error + inertia_Error){
-            double vz = exeSeq(getDummy(), node, cond.mm);
+        node.error = std::abs(estimateVz - cond.targetVz) - cond.error - inertia_Error;
 
+        if(node.error <= 0){
+            node.error = 0;
+
+            double vz = exeSeq(getDummy(), node, cond.mm);
+            
             if(!std::isnan(vz) && std::abs(vz - cond.targetVz) <= cond.error){
                 node.finalVz = vz;
                 std::cout << "\n";
                 std::cout << "Found Seqeunce: " << seqToString(node) << "\nt = " << node.T << "(+" << node.airDebt << "), Vz: " << util::df(vz) << "\n";
-                // std::cout << "Estimate Speed: " << util::df(estimateVz) << ", Alpha: " << util::df(node.alpha) << ", Beta: " << util::df(node.beta) << "\n";
                 result.push_back(node);
             }
         }
@@ -76,8 +80,8 @@ bool IF::inputDfsRec(zCond cond, int depth, int depthLimit, sequence& node, std:
         if(maxVz < (cond.targetVz - cond.error)) return true;
     }
     
-    int baseTick = node.T;
-    bool straight = rotation == 0.0f || rotation == 180.0f;
+    const int baseTick = node.T;
+    const bool straight = rotation == 0.0f || rotation == 180.0f;
 
     int prevW = 69, prevA = 69, prevT = 0;
     input prevInput;
@@ -92,22 +96,35 @@ bool IF::inputDfsRec(zCond cond, int depth, int depthLimit, sequence& node, std:
         for (int a = straight ? 0: -1; a <= 1; a++) { // utilize A/D symmetry when facing straight
 
             if(!cond.allowStrafe && a != 0) continue;
+
             // allow the extension of same movement key only when reaching max airtime int previous round
             if(prevT != node.airtime && w == prevW && a == prevA) continue;
+
             // pressing A/D without W/S gains same Vz as holding nothing when straight
             if(straight && w == 0 && a != 0) continue;
-            // the initial input cannot be blank
-            if((depth == depthLimit - 1) && w == 0 && a == 0) continue;
-
+            
             bool inputExtension = (prevT == node.airtime) && (w == prevW) && (a == prevA);
-
             // only inputExtension is allowed at maxDepth
             if(depth == depthLimit && !inputExtension) continue;
 
-            // no reverse Jump
+            
+            if(depth >= depthLimit - 1){
+                // the initial input cannot be blank
+                if(w == 0 && a == 0) continue;
+                double estimateVz = estimateSpeed(node);
+                double termSpeed = terminalToSeq(w, a, node);
+
+                if((estimateVz < cond.targetVz - cond.error - inertia_Error && termSpeed < cond.targetVz - cond.error)
+                 || (estimateVz > cond.targetVz + cond.error + inertia_Error && termSpeed > cond.targetVz + cond.error))
+                 continue;
+
+                errorRecorder[0] = std::max(0.0, std::abs(estimateVz - cond.targetVz) - cond.error - inertia_Error);
+            }
 
             int pruneR = node.airtime;
+            double lastError = errorRecorder[0];
 
+            // no reverse Jump
             for (int t = 1; t <= node.airtime; t++) {
 
                 // we want final airspeed
@@ -124,6 +141,8 @@ bool IF::inputDfsRec(zCond cond, int depth, int depthLimit, sequence& node, std:
                 node.T = baseTick + t;
                 bool hardPrune = inputDfsRec(cond, depth + 1 - inputExtension, depthLimit, node, result);
 
+                errorRecorder[t] = node.error;
+
                 node.T = baseTick;
                 node.airDebt = airDebtCache;
                 node.alpha = alphaCache;
@@ -132,20 +151,25 @@ bool IF::inputDfsRec(zCond cond, int depth, int depthLimit, sequence& node, std:
 
                 node.inputs.pop_back();
 
-
-                if(hardPrune){
+                if(hardPrune || ((depth >= depthLimit - 1) && (node.error > lastError)) ) {
                     pruneR = std::min(node.airtime, t + 1);
                     break;
                 } 
 
+                lastError = node.error;
             }
 
             for(int r = std::max(0, node.airDebt); r < pruneR; r ++){
-                // Last tick must be grounded, cannot reverse jump on the ending tick.
-                if(baseTick + r == 0 && !speedAirQ) continue;
-                // we want final airspeed
-                if(baseTick == 0 && r > 0 && speedAirQ) break;
+
+                if(speedAirQ){
+                    // Last tick must be air
+                    if(baseTick == 0 && r > 0) break;
+                }else{
+                    // Last tick must be grounded, cannot reverse jump on the ending tick.
+                    if(baseTick + r == 0) continue;
+                }
                 
+                lastError = errorRecorder[r];
                 for (int t = r + 1; t <= node.airtime; t++) {
 
                     node.inputs.push_back(IF::input{w, a, t});
@@ -170,7 +194,9 @@ bool IF::inputDfsRec(zCond cond, int depth, int depthLimit, sequence& node, std:
                     node.inputs.pop_back();
                     node.revJumps.pop_back();
 
-                    if(hardPrune) break;
+                    if(hardPrune || ((depth >= depthLimit - 1) && (node.error > lastError))) break;
+
+                    lastError = node.error;
                 }
             }
 
@@ -245,8 +271,8 @@ double IF::exeSeq(player& p, const sequence& seq, double mm, double initVz){
         }
     }
 
-    
-    if (doMMCheck && (mm * p.Z() < 0))
+    // The starting position of the input is invalid
+    if (doMMCheck && ((mm > 0 && zMax > p.Z()) || (mm < 0 && zMin < p.Z())) )
         return NAN;
 
     return p.Vz();
@@ -328,7 +354,26 @@ double IF::estimateSpeed(sequence& seq, double initVz){
         initVz = dummy.Vz() / 0.6f;
     }
 
-    return seq.alpha * initVz + seq.beta;
+    double temp = seq.alpha * initVz + seq.beta;
+    if(speedAirQ) temp *= 0.6f;
+
+    return temp;
+}
+
+double IF::terminalToSeq(int w, int a, sequence& seq){
+    double initVz = wasdTerminalVel[3*(a+1) + (w+1)];
+    getDummy();
+    dummy.setPrevSprint(w == 1);
+    dummy.setVz(initVz);
+    if(seq.airLast){
+        dummy.sa(w, a, 1);
+    }
+
+    initVz = dummy.Vz();
+    double temp = seq.alpha * initVz + seq.beta;
+    if(speedAirQ) temp *= 0.6f;
+
+    return temp;
 }
 
 std::string IF::seqToString(const sequence& seq) {
@@ -411,7 +456,18 @@ std::string IF::seqToString(const sequence& seq) {
 }
 
 // heuristics
-void IF::calcInitVzLBUB(int airtime, double distance){
+void IF::initHeuristics(int airtime, double distance){
+
+    errorRecorder = std::vector<double>(airtime + 1);
+
+    zEngine e(speed, slowness);
+
+    e.s45(1);
+    double gTerm = e.Vz()/(1.0 - 0.6f * 0.91f);
+    e.setVz(0);
+    e.sa45(1);
+    double aTerm = e.Vz()/(1.0 - 0.91f)/0.6f;
+    bool groundBetter = gTerm > aTerm;
 
     getDummy();
 
@@ -425,10 +481,20 @@ void IF::calcInitVzLBUB(int airtime, double distance){
             int sprint = 2 *(w == 1);
             dummy.move(w, a, false, sprint, 1);
             double vz = dummy.Vz();
+            
             if(vz < groundLb)
                 wLB = w, aLB = a, groundLb = vz;
             if(vz > groundUb)
                 wUB = w, aUB = a, groundUb = vz;
+
+            if(groundBetter){
+                wasdTerminalVel[3*(a+1) + (w+1)] = vz/(1.0 - 0.6f * 0.91f);
+            }else{
+                dummy.setVz(0);
+                dummy.setPrevSprint(true);
+                dummy.move(w, a, true, sprint, 1);
+                wasdTerminalVel[3*(a+1) + (w+1)] = dummy.Vz()/(1.0 - 0.91f)/0.6f;;
+            }
         }
     }
 
@@ -509,6 +575,11 @@ void IF::changeSettings(int maxDepth, int maxTicks, double maxXdeviation){
     this->maxDepth = maxDepth;
     this->maxTicks = maxTicks;
     this->maxXdeviation = maxXdeviation;
+}
+
+void IF::dontCareInertia(bool yes){
+    if(yes) inertia_Error = float_Error;
+    else inertia_Error = 3e-3;
 }
 
 void IF::printSettings(){

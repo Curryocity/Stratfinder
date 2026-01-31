@@ -26,6 +26,7 @@ class inputFinder {
         double alpha = 1;
         double beta = 0;
         bool airLast = false;
+        double error = 65536;
         double finalVz = 0;
     };
 
@@ -49,35 +50,42 @@ class inputFinder {
 
     void alphaBetaUpdate(player& p, sequence& seq);
     double estimateSpeed(sequence& seq, double initVz = 0);
+    double terminalToSeq(int w, int a, sequence& seq);
 
     std::string seqToString(const sequence& seq);
 
-    void calcInitVzLBUB(int airtime, double distance);
+    void initHeuristics(int airtime, double distance);
 
     void setEffect(int speed, int slowness);
     void setRotation(double rot);
     void setSpeedType(bool airborne);
     void changeSettings(int maxDepth, int maxTicks = 40, double maxXdeviation = INFINITY);
+    void dontCareInertia(bool yes); // It is a lot faster if you don't care inertia
     void printSettings();
     player& getDummy();
 
     private:
 
-    std::string log;
-
+    // player setting
+    player dummy;
     float rotation = 0.0f;
     int speed = 0;
     int slowness = 0;
 
-    player dummy;
+    // heuristics/pruning stuffs
     double initVzUB = 0;
     double initVzLB = 0;
+    std::vector<double> errorRecorder;
+    std::vector<double> wasdTerminalVel =  std::vector<double>(9); // index: 3*(a+1) + (w+1)
 
+    // engine settings
     int maxDepth = 3;
     int maxTicks = 40;
     bool speedAirQ = false;
     double maxXdeviation = INFINITY;
-    double float_Error = 1e-6;
-    double inertia_Error = 5e-3;
+
+    // constants
+    const double float_Error = 1e-6;
+    double inertia_Error = 3e-3;
     
 };

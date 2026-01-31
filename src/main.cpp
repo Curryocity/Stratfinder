@@ -1,4 +1,3 @@
-#include <cmath>
 #include <iostream>
 #include <optional>
 #include <string>
@@ -83,14 +82,18 @@ int main() {
         std::cout << "minVz = " << util::df(minVz) << ", maxVz = " << util::df(maxVz) << "\n";
     }
 
-    if(true){
-        // extremely optimal fwmm for f32.965 1bm bwmm
+    // set dontCareInertia to true makes it SUPER fast
+    // but inputs that requires inertia is likely missed cuz it is harder to predict 
+
+    if(false){
+        // extremely optimal fwmm for f32.965 1bm bwmm with 45.01 strafe
         inputFinder f;
         f.setRotation(32.965);
-        f.changeSettings(4, 40, 1.6);
+        f.dontCareInertia(true);
+        f.changeSettings(5, 40, 1.6);
         f.printSettings();
         f.setEffect(0, 0);
-        inputFinder::zCond cond = inputFinder::genZCondLBUB(0.0787500268143987 - 1e-8, 0.0787500268143987 , 1, true);
+        inputFinder::zCond cond = inputFinder::genZCondLBUB(0.078749642090044 - 5e-9, 0.078749642090044 , 1, true);
         double targetVz = cond.targetVz;
         double error = cond.error;
         double mm = cond.mm;
@@ -103,10 +106,11 @@ int main() {
         f.matchZSpeed(cond, airtime);
     }
 
-    if(false){
+    if(true){
         // Finding input for slowness I 1.5bm 6-1 to ladder (perfect double 45.01)
         inputFinder f;
         f.changeSettings(4, 40);
+        f.dontCareInertia(true);
         f.printSettings();
         f.setEffect(0, 1);
         inputFinder::zCond cond = inputFinder::genZCondLBUB(-0.1276844242999637, -0.1276846279184921, -1.5, false);
@@ -127,6 +131,7 @@ int main() {
         // True triple 45.01: Speed 34, slowness 6 3bcmm 5.6875bm 12.5b tier -23 to ladder
         inputFinder f;
         f.changeSettings(4, 40);
+        f.dontCareInertia(true);
         f.setSpeedType(true);
         f.printSettings();
         f.setEffect(34, 6);

@@ -90,6 +90,7 @@ public:
 
     void toggleInertia(bool on);
     void forceInertiaNext();
+    void setPrevSprint(bool value);
     void sprintDelay(bool delayQ);
     void setEffect(int speed, int slowness);
     void clearEffects();

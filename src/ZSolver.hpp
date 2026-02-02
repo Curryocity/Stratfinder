@@ -98,8 +98,8 @@ class zSolver{
 
     bool poss(double mm, int t_mm, int maxt, double threshold, bool backwallQ, std::string& content, double shift = normal, std::optional<fullStrat> provideStrat = std::nullopt);
     static constexpr double blockage = 0;
-    static constexpr double ladder = 0.30000001192092896;
-    static constexpr double normal = 0.6000000238418579;
+    static constexpr double ladder = 0.30000001192092896f;
+    static constexpr double normal = 0.6000000238418579f;
     bool equalJumpListCheck(int t_mm, int maxt, fullStrat strat1, fullStrat strat2, std::vector<double> shifts = { 0.0, ladder, normal });
 
     template<typename movement>

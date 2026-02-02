@@ -10,7 +10,6 @@
 
 void init(){
     util::init();
-    zEngine::init();
 }
 
 int main() {
@@ -20,20 +19,21 @@ int main() {
     init();
     zSolver s;
 
-    bool backwallq = false;
-    int max_t = 116;
-    double threshold = 1e-10;
+    const bool backwallq = true;
+    const int max_t = 116;
+    const double threshold = 1e-9;
     std::string content;
     
     if(false){
+        zEngine::set45Type(zEngine::F4501);
         s.toggleLog(false);
         for(int speed = 0; speed <= 255; speed ++){
             for(int slow = 0; slow <= 6; slow ++){
                 s.setEffect(speed, slow);
-                for(double t_mm = 2; t_mm <= 12; t_mm += 1){
+                for(double t_mm = 2; t_mm <= 14; t_mm += 1){
                     zSolver::fullStrat maxi = s.maxMMSolver(t_mm);
                     for(double x = 0.125; x <= 50000; x += 0.0625){
-                        zSolver::fullStrat strat = s.optimalSolver(x, t_mm);
+                        zSolver::fullStrat strat = backwallq? s.backwallSolver(x, t_mm) : s.optimalSolver(x, t_mm);
                         bool hasJump = s.poss(x, t_mm, max_t, threshold, backwallq, content, zSolver::normal, strat);
                         if(hasJump) std::cout << content;
                         hasJump = s.poss(x, t_mm, max_t, threshold, backwallq, content, zSolver::ladder, strat);
@@ -54,50 +54,80 @@ int main() {
         s.toggleLog(true);
     }
 
-    if(false){
-        s.setEffect(34, 6);
-        s.poss( 5.6875, 11, 50, 1e-6, false, content, zSolver::ladder);
+    if(true){
+        zEngine::set45Type(zEngine::LARGE_HA);
+        s.setEffect(32, 6);
+        s.poss( 4.75 - zSolver::normal, 4, 116, 1e-6, false, content, -zSolver::normal);
         s.printLog();
         std::cout << content;
     }
 
-    if(false){
-        zEngine e(0, 4);
+    if(true){
+        zEngine e(32, 6);
+        zEngine::set45Type(zEngine::LARGE_HA);
 
         auto sampler1 = [](zEngine& e){
-            e.chained_sj45(11, 2);
+            e.chained_sj45(4, 4);
             return e.Z();
         };
 
         auto sampler2 = [](zEngine& e){
-            e.chained_sj45(11, 2);
-            e.setZ(0);
-            e.sj45(21);
+            e.chained_sj45(4, 4);
+            e.setZ(-zSolver::normal);
+            e.sj45(103);
             return e.Z();
         };
 
-        double minVz = s.inv(e, 4 + zSolver::normal, sampler1, false);
-        double maxVz = s.inv(e, 7 - zSolver::normal, sampler2, false);
+        double minVz = s.inv(e, 4.75, sampler1, false);
+        double maxVz = s.inv(e, 30.3125, sampler2, false);
 
         std::cout << "minVz = " << util::df(minVz) << ", maxVz = " << util::df(maxVz) << "\n";
+    }
+
+    if(false){
+        player p(32, 6);
+        // s.w(1) w.s(3) st(1) stj(4) stj(2) wa.s(2) w.s(1) wj.s(2) sta(2) st(2) w.s(2) wj.s(4) w.s(3) st(1)
+        p.s(1, 0, 1);
+        p.w(-1, 0, 3);
+        p.w(0,0,1);
+        p.wj(0, 0, 4);
+        p.wj(0, 0, 2);
+        p.wa(-1,0,2);
+        p.w(-1,0,1);
+        p.wj(-1, 0, 2);
+        p.wa(0,0,2);
+        p.w(0,0,2);
+        p.w(-1,0,2);
+        p.wj(-1, 0, 4);
+        p.w(-1,0,3);
+        p.w(0,0,1);
+        std::cout << util::df(p.Vz()) << "\n";
+        for(int i = 0; i < 4; i++){
+            p.setF(0.0f);
+            p.sj(1, 0, 1);
+            p.setF(5898195.0f);
+            p.sa(1, -1, 3);
+        }
+        std::cout << util::df(p.Vz()) << "\n";
+        std::cout << util::df(p.Z()) << "\n";
+        std::cout << util::df(p.X()) << "\n";
     }
 
     // set dontCareInertia to true makes it SUPER fast
     // but inputs that requires inertia is likely missed cuz it is harder to predict 
 
     if(false){
-        // extremely optimal fwmm for f32.965 1bm bwmm with 45.01 strafe
         inputFinder f;
-        f.setRotation(32.965);
+        f.setRotation(0);
         f.dontCareInertia(true);
         f.changeSettings(5, 40, 1.6);
         f.printSettings();
-        f.setEffect(0, 0);
-        inputFinder::zCond cond = inputFinder::genZCondLBUB(0.078749642090044 - 5e-9, 0.078749642090044 , 1, true);
+        f.setEffect(32, 6);
+        inputFinder::zCond cond = inputFinder::genZCondLBUB( -0.0903412476753692, -0.0903412476512782 , -4.15, true);
         double targetVz = cond.targetVz;
         double error = cond.error;
         double mm = cond.mm;
-        double airtime = 12;
+        double airtime = 4;
         bool hasStrafe = cond.allowStrafe;
         std::cout << "------------------------------\n";
         std::cout << "Input Finder: \n";
@@ -106,7 +136,7 @@ int main() {
         f.matchZSpeed(cond, airtime);
     }
 
-    if(true){
+    if(false){
         // Finding input for slowness I 1.5bm 6-1 to ladder (perfect double 45.01)
         inputFinder f;
         f.changeSettings(4, 40);

@@ -20,20 +20,13 @@ public:
     static constexpr float GROUND_SLIP = 0.6f;
     static constexpr double DEFAULT_INERTIA = 0.005;
 
-    /* trig */
-    static float sin45;
-    static float cos45;
-
-    /* MUST be called once before simulation */
-    static void init();
-
     zEngine(int speed = 0, int slowness = 0);
 
-    void simMove(float moveVec, bool airborne, bool sprintJumpQ,  int repeat);
+    void simMove(double moveVec, bool airborne, bool sprintJumpQ,  int repeat);
 
-    void sj45(float moveVec, int duration);
-    void sa45(float moveVec, int duration);
-    void s45(float moveVec, int duration);
+    void sj45(double moveVec, int duration);
+    void sa45(double moveVec, int duration);
+    void s45(double moveVec, int duration);
 
     void sj45(int duration);
     void sa45(int duration);
@@ -64,6 +57,12 @@ public:
     int lastInertia();
     bool hitVelNeg();
 
+    enum F45Type { F45,  F4501, SMALL_HA, LARGE_HA }; // Angle: 45, 45.01, 134.9835, 5898195
+    static void set45Type(F45Type type);
+    static float sin45;
+    static float cos45;
+    // It is bad practice to make it global variable, but I don't see a problem yet + lazy
+
 private:
 
     double z = 0.0;
@@ -82,4 +81,6 @@ private:
     int slowness = 0;
 
     State savestate;
+
+    
 };

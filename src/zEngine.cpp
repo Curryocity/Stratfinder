@@ -2,25 +2,16 @@
 #include "zEngine.hpp"
 #include "util.hpp"
 
-float zEngine::sin45 = 0.0f;
-float zEngine::cos45 = 0.0f;
-
-inline float fl(double x) {
-    return static_cast<float>(x);
-}
-
-/* Precompute sine table */
-void zEngine::init() {
-    sin45 = util::sin(45.01f);
-    cos45 = util::cos(45.01f);
-}
+// default to f45.01
+float zEngine::sin45 = 0.7071745709502395f;
+float zEngine::cos45 = 0.707038984923282f;
 
 zEngine::zEngine(int speed, int slowness) : speed(speed), slowness(slowness){}
 
 /*
  * Used for zSolver, sprinted 45 zAxis movement only
  */
-void zEngine::simMove(float moveVec, bool airborne, bool sprintJumpQ, int repeat) {
+void zEngine::simMove(double moveVec, bool airborne, bool sprintJumpQ, int repeat) {
     while (repeat--) {
 
         float slip = airborne ? 1.0f : GROUND_SLIP;
@@ -170,16 +161,16 @@ void zEngine::loadState(){
     prev_slip = savestate.prev_slip;
 }
 
-void zEngine::sj45(float moveVec, int duration){
+void zEngine::sj45(double moveVec, int duration){
     simMove(moveVec, GROUND, true, 1);
     simMove(moveVec, AIR, false, duration - 1);
 }
 
-void zEngine::sa45(float moveVec, int duration){
+void zEngine::sa45(double moveVec, int duration){
     simMove(moveVec, AIR, false, duration);
 }
 
-void zEngine::s45(float moveVec, int duration){
+void zEngine::s45(double moveVec, int duration){
     simMove(moveVec, GROUND, false, duration);
 }
 
@@ -192,3 +183,17 @@ void zEngine::chained_sj45(int airtime, int repeat){
         sj45(airtime);
 }
 
+void zEngine::set45Type(F45Type type){
+    float angle = 0.0f;
+
+    switch(type){
+        case F45:       angle = 45.0f;       break;
+        case F4501:     angle = 45.01f;      break;
+        case SMALL_HA:  angle = 134.9835f;   break;
+        case LARGE_HA:  angle = 5898195.0f; break;
+        default:        return;
+    }
+
+    zEngine::sin45 = std::abs(util::sin(angle));
+    zEngine::cos45 = std::abs(util::cos(angle));
+}

@@ -96,6 +96,11 @@ void player::setVz(double value, bool airborne){
     vz = value;
     prev_slip = airborne? 1.0f: GROUND_SLIP;
 }
+void player::setVel(double xValue, double zValue, bool airborne){
+    vx = xValue;
+    vz = zValue;
+    prev_slip = airborne? 1.0f: GROUND_SLIP;
+}
 
 void player::resetAll(){
     x = 0;
@@ -136,11 +141,6 @@ void player::sprintDelay(bool delayQ){
 void player::setEffect(int speed, int slowness){
     this->speed = speed;
     this->slowness = slowness;
-}
-
-void player::clearEffects(){
-    speed = 0;
-    slowness = 0;
 }
 
 void player::loadState(){

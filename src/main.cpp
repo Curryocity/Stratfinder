@@ -2,11 +2,12 @@
 #include <optional>
 #include <string>
 #include <vector>
+#include "inputFinder.hpp"
 #include "zEngine.hpp"
 #include "zSolver.hpp"
 #include "util.hpp"
 #include "player.hpp"
-#include "inputFinder.hpp"
+#include "zInputFinder.hpp"
 
 void init(){
     util::init();
@@ -54,7 +55,7 @@ int main() {
         s.toggleLog(true);
     }
 
-    if(true){
+    if(false){
         zEngine::set45Type(zEngine::LARGE_HA);
         s.setEffect(32, 6);
         s.poss( 4.75 - zSolver::normal, 4, 116, 1e-6, false, content, -zSolver::normal);
@@ -62,7 +63,7 @@ int main() {
         std::cout << content;
     }
 
-    if(true){
+    if(false){
         zEngine e(32, 6);
         zEngine::set45Type(zEngine::LARGE_HA);
 
@@ -117,13 +118,13 @@ int main() {
     // but inputs that requires inertia is likely missed cuz it is harder to predict 
 
     if(false){
-        inputFinder f;
+        zInputFinder f;
         f.setRotation(0);
         f.dontCareInertia(true);
         f.changeSettings(5, 40, 1.6);
         f.printSettings();
         f.setEffect(32, 6);
-        inputFinder::zCond cond = inputFinder::genZCondLBUB( -0.0903412476753692, -0.0903412476512782 , -4.15, true);
+        zInputFinder::zCond cond = zInputFinder::genZCondLBUB( -0.0903412476753692, -0.0903412476512782 , -4.15, true);
         double targetVz = cond.targetVz;
         double error = cond.error;
         double mm = cond.mm;
@@ -136,14 +137,38 @@ int main() {
         f.matchZSpeed(cond, airtime);
     }
 
+
+
+    if(false){
+        // Example of fw airSpeed(boomerang), note not all inputs works since the extra landing condition of boomerang
+        // True triple 45.01: Speed 34, slowness 6 3bcmm 5.6875bm 12.5b tier -23 to ladder
+        zInputFinder f;
+        f.changeSettings(4, 40);
+        f.dontCareInertia(true);
+        f.setSpeedType(true);
+        f.printSettings();
+        f.setEffect(34, 6);
+        zInputFinder::zCond cond = zInputFinder::genZCondLBUB(0.0820559651430301, 0.0820548593210486, -5.6875, false);
+        double targetVz = cond.targetVz;
+        double error = cond.error;
+        double mm = cond.mm;
+        double airtime = 11;
+        bool hasStrafe = cond.allowStrafe;
+        std::cout << "------------------------------\n";
+        std::cout << "Input Finder: \n";
+        std::cout << "targetVz: " << util::df(targetVz) << ", error: " << util::df(error) << ", mm: " << util::fmt(mm) << ", airtime: " << airtime << ", hasStrafe: " << hasStrafe << "\n";
+
+        f.matchZSpeed(cond, airtime);
+    }
+
     if(false){
         // Finding input for slowness I 1.5bm 6-1 to ladder (perfect double 45.01)
-        inputFinder f;
+        zInputFinder f;
         f.changeSettings(4, 40);
         f.dontCareInertia(true);
         f.printSettings();
         f.setEffect(0, 1);
-        inputFinder::zCond cond = inputFinder::genZCondLBUB(-0.1276844242999637, -0.1276846279184921, -1.5, false);
+        zInputFinder::zCond cond = zInputFinder::genZCondLBUB(-0.1276844242999637, -0.1276846279184921, -1.5, false);
         double targetVz = cond.targetVz;
         double error = cond.error;
         double mm = cond.mm;
@@ -156,26 +181,30 @@ int main() {
         f.matchZSpeed(cond, airtime);
     }
 
-    if(false){
-        // Example of fw airSpeed(boomerang), note not all inputs works since the extra landing condition of boomerang
-        // True triple 45.01: Speed 34, slowness 6 3bcmm 5.6875bm 12.5b tier -23 to ladder
+    // use new inputFinder
+    if(true){
+        // Finding input for slowness I 1.5bm 6-1 to ladder (perfect double 45.01)
         inputFinder f;
         f.changeSettings(4, 40);
-        f.dontCareInertia(true);
-        f.setSpeedType(true);
+        f.riskyPrune(true);
         f.printSettings();
-        f.setEffect(34, 6);
-        inputFinder::zCond cond = inputFinder::genZCondLBUB(0.0820559651430301, 0.0820548593210486, -5.6875, false);
-        double targetVz = cond.targetVz;
-        double error = cond.error;
-        double mm = cond.mm;
-        double airtime = 11;
+        f.setEffect(0, 1);
+        inputFinder::condition cond;
+        cond.z.enabled = true;
+        cond.z.mm = -1.5;
+        cond.allowStrafe = false;
+        cond.sideDev = -1;
+        f.setCondWithBound(cond.z, -0.1276844242999637, -0.1276846279184921);
+        double targetVz = cond.z.vel;
+        double error = cond.z.tolerance;
+        double mm = cond.z.mm;
+        double airtime = 12;
         bool hasStrafe = cond.allowStrafe;
         std::cout << "------------------------------\n";
         std::cout << "Input Finder: \n";
-        std::cout << "targetVz: " << util::df(targetVz) << ", error: " << util::df(error) << ", mm: " << util::fmt(mm) << ", airtime: " << airtime << ", hasStrafe: " << hasStrafe << "\n";
+        std::cout << "targetVz: " << util::df(targetVz) << ", error: " << util::df(error) << ", mm: " << util::fmt(mm) << ", airtime: " << airtime << ", allowStrafe: " << hasStrafe << "\n";
 
-        f.matchZSpeed(cond, airtime);
+        f.matchSpeed(cond, airtime);
     }
 
     return 0;

@@ -8,6 +8,8 @@
 class util{
     public:
 
+    struct vec2D{double x = 0; double z = 0;};
+
     static constexpr float PIf = 3.14159265358979323846f;
     static constexpr double PId = 3.14159265358979323846264338327950288;
 

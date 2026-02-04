@@ -77,11 +77,12 @@ public:
     double Vx();
     double Vz();
 
-    void setF(float rot);
-    void setX(double x);
-    void setZ(double z);
-    void setVx(double vx, bool airborne = false);
-    void setVz(double vz, bool airborne = false);
+    void setF(float rot = 0);
+    void setX(double x = 0);
+    void setZ(double z = 0);
+    void setVx(double vx = 0, bool airborne = false);
+    void setVz(double vz = 0, bool airborne = false);
+    void setVel(double vx = 0, double vz = 0, bool airborne = false);
 
     void saveState();
     State getState();
@@ -92,8 +93,7 @@ public:
     void forceInertiaNext();
     void setPrevSprint(bool value);
     void sprintDelay(bool delayQ);
-    void setEffect(int speed, int slowness);
-    void clearEffects();
+    void setEffect(int speed = 0, int slowness = 0);
 
     void resetAll();
 

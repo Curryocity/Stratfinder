@@ -186,10 +186,12 @@ int main() {
         // Finding input for slowness I 1.5bm 6-1 to ladder (perfect double 45.01)
         inputFinder f;
         f.changeSettings(4, 40);
-        f.riskyPrune(true);
+        f.riskyPrune(false);
         f.printSettings();
         f.setEffect(0, 1);
         inputFinder::condition cond;
+        cond.endedAirborne = false;
+        cond.x.enabled = false;
         cond.z.enabled = true;
         cond.z.mm = -1.5;
         cond.allowStrafe = false;

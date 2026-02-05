@@ -491,9 +491,9 @@ void IF::initHeuristics(int airtime, double distance){
                 wasdTerminalVel[3*(a+1) + (w+1)] = vz/(1.0 - 0.6f * 0.91f);
             }else{
                 dummy.setVz(0);
-                dummy.setPrevSprint(true);
+                dummy.setPrevSprint(w==1);
                 dummy.move(w, a, true, sprint, 1);
-                wasdTerminalVel[3*(a+1) + (w+1)] = dummy.Vz()/(1.0 - 0.91f)/0.6f;;
+                wasdTerminalVel[3*(a+1) + (w+1)] = dummy.Vz()/(1.0 - 0.91f)/0.6f;
             }
         }
     }

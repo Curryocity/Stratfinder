@@ -19,8 +19,8 @@ void IF::setCondWithBound(axisCond& cond, double bound1, double bound2){
 void IF::initHeuristics(int airtime, double zDis, double xDis){
 
     // initialize errRec
-    zErrRec = std::vector<double>(airtime + 1);  
-    xErrRec = std::vector<double>(airtime + 1);
+    zErrRec = std::vector<double>(airtime + 1, 0);  
+    xErrRec = std::vector<double>(airtime + 1, 0);
 
     zEngine e(speed, slowness);
     e.s45(1);
@@ -28,48 +28,51 @@ void IF::initHeuristics(int airtime, double zDis, double xDis){
     e.setVz(0);
     e.sa45(1);
     double aTerm = e.Vz()/(1.0 - 0.91f)/0.6f;
-
-    bool groundBetter = gTerm > aTerm;
+    const bool groundBetter = gTerm > aTerm;
     // this holds for every keystroke and axis
 
     getDummy();
 
-    auto getZ = [&](player p){ return p.Z();};
-    auto getX = [&](player p){ return p.X();};
-    auto getVz = [&](player p){ return p.Vz();};
-    auto getVx = [&](player p){ return p.Vx();};
+    auto getZ = [&](player& p){ return p.Z();};
+    auto getX = [&](player& p){ return p.X();};
+    auto getVz = [&](player& p){ return p.Vz();};
+    auto getVx = [&](player& p){ return p.Vx();};
 
     auto getVelUbLb = [&](player& p, std::vector<double>& terminalRecorder, auto& getVel, auto& getPos, double dis){
 
         int wLB = 0, aLB = 0, wUB = 0, aUB = 0;
-        double noJumpLb = 0, noJumpUb = 0;
+        double groundLb = 0, groundUb = 0;
 
         for (int w = -1; w <= 1; w++) {
             for (int a = -1; a <= 1; a++){
                 if(w == 0 && a == 0) continue;
-                p.setVel();
-                p.setPrevSprint((w == 1));
+                p.resetAll();
                 int sprint = 2 *(w == 1);
-                p.move(w, a, !groundBetter, sprint, 1);
+                p.move(w, a, false, sprint, 1);
                 double v = getVel(p);
                 
-                if(v < noJumpLb)
-                    wLB = w, aLB = a, noJumpLb = v;
-                if(v > noJumpUb)
-                    wUB = w, aUB = a, noJumpUb = v;
+                if(v < groundLb)
+                    wLB = w, aLB = a, groundLb = v;
+                if(v > groundUb)
+                    wUB = w, aUB = a, groundUb = v;
 
-                if(groundBetter)
+                if(groundBetter){
                     terminalRecorder[3*(a+1) + (w+1)] = v/(1.0 - 0.6f * 0.91f);
-                else
+                }else{
+                    p.setVel(0, 0);
+                    p.setPrevSprint(w==1);
+                    p.move(w, a, true, sprint, 1);
                     terminalRecorder[3*(a+1) + (w+1)] = getVel(p)/(1.0 - 0.91f)/0.6f;
+                }
             }
         }
 
-        noJumpLb = terminalRecorder[3*(aLB+1) + (wLB+1)];
-        noJumpUb = terminalRecorder[3*(aUB+1) + (wUB+1)];
+        // running
+        groundLb /= (1.0 - 0.6f * 0.91f);
+        groundUb /= (1.0 - 0.6f * 0.91f);
 
         // Return running terminal speed, since jumpingSpeed < airSpeed when ground is better
-        if(groundBetter) return std::array<double, 2>{ noJumpLb, noJumpUb};
+        if(groundBetter) return std::array<double, 2>{ groundLb, groundUb};
 
         // jumping
         auto getJumpVel = [&](int w, int a){
@@ -97,7 +100,7 @@ void IF::initHeuristics(int airtime, double zDis, double xDis){
                     p.move(w, a, true, sprint, airtime - 1);
                 }
 
-                if(std::abs(getPos(p)) > zDis) jumpVel = getVel(p);
+                if(std::abs(getPos(p)) > dis) jumpVel = getVel(p);
 
             } else{ // approximate many jumps by terminal speed
                 p.setVel(0,0, true);
@@ -119,8 +122,8 @@ void IF::initHeuristics(int airtime, double zDis, double xDis){
         double jumpLb = getJumpVel(wLB, aLB);
         double jumpUb = getJumpVel(wUB, aUB);
 
-        double velLb = (jumpUb > noJumpUb)? jumpLb : noJumpLb;
-        double velUb = (jumpUb > noJumpUb)? jumpUb : noJumpUb;
+        double velLb = (jumpUb > groundUb)? jumpLb : groundLb;
+        double velUb = (jumpUb > groundUb)? jumpUb : groundUb;
 
         return std::array<double, 2>{ velLb, velUb};
     };
@@ -184,29 +187,34 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
 
     if (depth == depthLimit) {
 
-        util::vec2D speedVec = estimateSpeed(node, cond.endedAirborne);
+        exeSeq(dummy, node, cond, 0, 0, true);
+        // std::cout << seq2Mothball(node) << ", Vz: " + util::df(dummy.Vz()) << "\n" ;
 
-        node.lerpX.error = careX? std::abs(speedVec.x - cond.x.vel) - cond.x.tolerance - inertiaErr : 0;
-        node.lerpZ.error = careZ? std::abs(speedVec.z - cond.z.vel) - cond.z.tolerance - inertiaErr : 0;
+        util::vec2D estSpeed = estimateSpeed(node, cond.endedAirborne, 0,0);
+
+        node.lerpX.error = careX? std::abs(estSpeed.x - cond.x.vel) - cond.x.tolerance - inertiaErr : 0;
+        node.lerpZ.error = careZ? std::abs(estSpeed.z - cond.z.vel) - cond.z.tolerance - inertiaErr : 0;
         
-        if(node.lerpX.error <= 0 && node.lerpZ.error <= 0){
+        if(node.lerpX.error <= 0) node.lerpX.error = 0;
+        if(node.lerpZ.error <= 0) node.lerpZ.error = 0;
 
-            node.lerpX.error = 0, node.lerpZ.error = 0;
+        if(node.lerpX.error == 0 && node.lerpZ.error == 0){
 
-            bool valid = exeSeq(dummy, node, cond);
+            bool valid = exeSeq(dummy, node, cond, 0, 0, true);
             double vx = dummy.Vx(), vz = dummy.Vz();
+            // std::cout << vx << " " << vz << "\n";
 
             bool xSat = (!careX) || (std::abs(vx - cond.x.vel) <= cond.x.tolerance);
             bool zSat = (!careZ) || (std::abs(vz - cond.z.vel) <= cond.z.tolerance);
 
             
-            if(valid && xSat && zSat){
+            if(valid && xSat && zSat){ 
                 node.finalVx = vx, node.finalVz = vz;
                 std::string vxStr = careX? (", Vx: " + util::df(vx)) : "";
                 std::string vzStr = careZ? (", Vz: " + util::df(vz)) : "";
                 std::cout << "\n";
                 std::cout << "Found Seqeunce: " << seq2Mothball(node) 
-                << "\nt = " << node.T << "(+" << std::max(0,node.airDebt) << ")" << ", Vz: " << util::df(vz) << ", Vx: " << util::df(vx) << "\n";
+                << "\nt = " << node.T << "(+" << std::max(0,node.airDebt) << ")" << vxStr << vzStr << "\n";
                 result.push_back(node);
             }
         }
@@ -228,7 +236,7 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
     }
     
     const int baseTick = node.T;
-    const bool biSymmetric = rotation == 0.0f || rotation == 180.0f || !careX;
+    const bool biSymmetric = rotation == 0.0f || rotation == 180.0f || (!careX);
 
     int prevW = 69, prevA = 69, prevT = 0;
     input prevInput;
@@ -273,15 +281,18 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                 double tVx = tV.x;
                 double tVz = tV.z;
 
-                bool zFail = careZ &&
-                            ((eVz < cond.z.vel - cond.z.tolerance - inertiaErr) && (tVz < cond.z.vel - cond.z.tolerance)) ||
-                            ((eVz > cond.z.vel + cond.z.tolerance + inertiaErr) && (tVz > cond.z.vel + cond.z.tolerance));
+                if(careZ){
+                    if(((eVz < cond.z.vel - cond.z.tolerance - inertiaErr) && (tVz < cond.z.vel - cond.z.tolerance)) 
+                    || ((eVz > cond.z.vel + cond.z.tolerance + inertiaErr) && (tVz > cond.z.vel + cond.z.tolerance)))
+                        continue;
+                }
 
-                bool xFail = careX &&
-                            ((eVx < cond.x.vel - cond.x.tolerance - inertiaErr) && (tVx < cond.x.vel - cond.x.tolerance)) ||
-                            ((eVx > cond.x.vel + cond.x.tolerance + inertiaErr) && (tVx > cond.x.vel + cond.x.tolerance));
+                if(careX){
+                    if( ((eVx < cond.x.vel - cond.x.tolerance - inertiaErr) && (tVx < cond.x.vel - cond.x.tolerance))
+                    || ((eVx > cond.x.vel + cond.x.tolerance + inertiaErr) && (tVx > cond.x.vel + cond.x.tolerance)))
+                        continue;
 
-                if(zFail || xFail) continue;
+                }
 
                 xErrRec[0] = std::max(0.0, std::abs(eVx - cond.x.vel) - cond.x.tolerance - inertiaErr);
                 zErrRec[0] = std::max(0.0, std::abs(eVz - cond.z.vel) - cond.z.tolerance - inertiaErr);
@@ -343,6 +354,7 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                     if(baseTick + r == 0) continue;
                 }
                 
+                lastErrX = xErrRec[r];
                 lastErrZ = zErrRec[r];
                 for (int t = r + 1; t <= node.airtime; t++) {
 
@@ -401,27 +413,24 @@ bool IF::exeSeq(player& p, const sequence& seq, const condition& cond, double in
     double zMin = 0, zMax = 0, xMin = 0, xMax = 0;
     double preZ = 0, preX = 0;
     bool prevAirborne = true;
-    bool airborne;
+    bool airborne = airClock > 0;
 
     // return true if there is violate of mm rule
     auto mmViolation = [&](const double mm, double& minPos, double& maxPos, double& prevPos, const double curPos){
 
-        if(!airborne){
-            if(prevAirborne){
-                if(prevPos > maxPos) maxPos = prevPos;
-                if(prevPos < minPos) minPos = prevPos;
-            }else{
-                bool preVzPos = (curPos - prevPos) > 0;
-                if(preVzPos && prevPos > maxPos) maxPos = prevPos;
-                if(!preVzPos && curPos > maxPos) maxPos = curPos;
+        if(prevAirborne){
+            if(prevPos > maxPos) maxPos = prevPos;
+            if(prevPos < minPos) minPos = prevPos;
+        }else{
+            bool preVzPos = (curPos - prevPos) > 0;
+            if(preVzPos && prevPos > maxPos) maxPos = prevPos;
+            if(!preVzPos && curPos > maxPos) maxPos = curPos;
 
-                if(!preVzPos && prevPos < minPos) minPos = prevPos;
-                if(preVzPos && curPos < minPos) minPos = curPos;
-            }
+            if(!preVzPos && prevPos < minPos) minPos = prevPos;
+            if(preVzPos && curPos < minPos) minPos = curPos;
         }
 
-        prevPos = curPos;
-        return (maxPos - minPos) <= (std::abs(mm) + 0.6f);
+        return (maxPos - minPos) > (std::abs(mm) + 0.6f);
     };
 
     p.resetAll();
@@ -446,8 +455,8 @@ bool IF::exeSeq(player& p, const sequence& seq, const condition& cond, double in
 
             if (jumpQ) airClock = seq.airtime;
 
-            // Update mm used
-            if(mmCheck){
+            // Update mm used when grounded
+            if(mmCheck && !airborne){
 
                 if(cond.sideDev >= 0){
                     if(zMMCheck && !xMMCheck && std::abs(p.X()) > cond.sideDev) return false;
@@ -458,10 +467,12 @@ bool IF::exeSeq(player& p, const sequence& seq, const condition& cond, double in
                     if(mmViolation(zmm, zMin, zMax, preZ, p.Z())) return false;
                 if(xMMCheck)
                     if(mmViolation(xmm, xMin, xMax, preX, p.X())) return false;
-
                 
-                prevAirborne = airborne;
             }
+
+            preX = p.X();
+            preZ = p.Z();
+            prevAirborne = airborne;
 
             if (airClock > 0) airClock--;
             tick--;
@@ -479,12 +490,13 @@ bool IF::exeSeq(player& p, const sequence& seq, const condition& cond, double in
     return true;
 }
 
+// v_end = alpha * v_init + beta (assuming v were ground speed)
 void IF::alphaBetaUpdate(player& p, sequence& seq, const bool careX, const bool careZ){
 
     if(seq.inputs.empty()) return;
     p.toggleInertia(false);
 
-    auto fastSamp = [&](double initVx = 0, double initVz = 0){
+    auto fastSamp = [&](double initVx, double initVz){
         int tick = seq.T;
         int airClock = (seq.airDebt == 0)? 0 : seq.airtime - seq.airDebt;
         int rjIdx = seq.revJumps.size() - 1 - (airClock > 0);
@@ -539,20 +551,14 @@ void IF::alphaBetaUpdate(player& p, sequence& seq, const bool careX, const bool 
         return speedVec;
     };
 
-
     util::vec2D vec0 = fastSamp(0, 0);
     util::vec2D vec1 = fastSamp(1, 1);
 
-    if(careX){
-        seq.lerpX.alpha = vec1.x - vec0.x;
-        seq.lerpX.beta = vec0.x;
-    }
+    seq.lerpX.alpha = vec1.x - vec0.x;
+    seq.lerpX.beta = vec0.x;
     
-    if(careZ){
-        seq.lerpZ.alpha = vec1.z - vec0.z;
-        seq.lerpZ.beta = vec0.z;
-    }
-    
+    seq.lerpZ.alpha = vec1.z - vec0.z;
+    seq.lerpZ.beta = vec0.z;
 
     seq.airLast = seq.airDebt > 0;
 
@@ -561,10 +567,11 @@ void IF::alphaBetaUpdate(player& p, sequence& seq, const bool careX, const bool 
 }
 
 util::vec2D IF::estimateSpeed(sequence& seq, bool endedAirborne, double initVx, double initVz){
-    if(initVz == 0 && initVx == 0 && seq.airLast){ // airlast?
+    if(initVz == 0 && initVx == 0 && seq.airLast){ 
         getDummy();
         input lastInput = seq.inputs.back();
         dummy.sa(lastInput.w, lastInput.a, 1);
+        // force ground speed format
         initVx = dummy.Vx() / 0.6f;
         initVz = dummy.Vz() / 0.6f;
     }
@@ -572,6 +579,7 @@ util::vec2D IF::estimateSpeed(sequence& seq, bool endedAirborne, double initVx, 
     double vx = seq.lerpX.alpha * initVx + seq.lerpX.beta;
     double vz = seq.lerpZ.alpha * initVz + seq.lerpZ.beta;
 
+    // get actual speed (ground format to air)
     if(endedAirborne) vx *= 0.6f, vz *= 0.6f;
 
     return util::vec2D{vx, vz};
@@ -591,6 +599,7 @@ util::vec2D IF::terminalToSeq(int w, int a, sequence& seq, bool endedAirborne){
     double vx = seq.lerpX.alpha * initVx + seq.lerpX.beta;
     double vz = seq.lerpZ.alpha * initVz + seq.lerpZ.beta;
 
+    // get actual speed (ground format to air)
     if(endedAirborne) vx *= 0.6f, vz *= 0.6f;
 
     return util::vec2D{vx, vz};

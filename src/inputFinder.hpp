@@ -1,5 +1,4 @@
 #pragma once
-#include <cmath>
 #include <vector>
 #include <string>
 #include "util.hpp"
@@ -93,8 +92,8 @@ class inputFinder {
     double vzLB = 0, vzUB = 0;
     double vxLB = 0, vxUB = 0;
     std::vector<double> zErrRec, xErrRec;
-    std::vector<double> wasdTerminalVz =  std::vector<double>(9); // index: 3*(a+1) + (w+1)
-    std::vector<double> wasdTerminalVx =  std::vector<double>(9); 
+    std::vector<double> wasdTerminalVz =  std::vector<double>(9, 0); // index: 3*(a+1) + (w+1)
+    std::vector<double> wasdTerminalVx =  std::vector<double>(9, 0); 
 
     // engine settings
     int maxDepth = 3;

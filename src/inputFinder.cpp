@@ -18,10 +18,6 @@ void IF::setCondWithBound(axisCond& cond, double bound1, double bound2){
 // heuristics
 void IF::initHeuristics(int airtime, double zDis, double xDis){
 
-    // initialize errRec
-    zErrRec = std::vector<double>(airtime + 1, 0);  
-    xErrRec = std::vector<double>(airtime + 1, 0);
-
     zEngine e(speed, slowness);
     e.s45(1);
     double gTerm = e.Vz()/(1.0 - 0.6f * 0.91f);
@@ -269,6 +265,7 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
 
             const bool endingDepth = (depth >= depthLimit - 1);
 
+            
             if(endingDepth){
                 // the initial input cannot be blank
                 if(w == 0 && a == 0) continue;
@@ -294,13 +291,11 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
 
                 }
 
-                xErrRec[0] = std::max(0.0, std::abs(eVx - cond.x.vel) - cond.x.tolerance - inertiaErr);
-                zErrRec[0] = std::max(0.0, std::abs(eVz - cond.z.vel) - cond.z.tolerance - inertiaErr);
             }
 
             int pruneR = node.airtime;
-            double lastErrX = xErrRec[0];
-            double lastErrZ = zErrRec[0];
+            double lastErrX = INFINITY;
+            double lastErrZ = INFINITY;
 
             // no reverse Jump
             for (int t = 1; t <= node.airtime; t++) {
@@ -321,9 +316,6 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                 // inputExtension does not cost depth
                 bool hardPrune = dfsRecursive(depth + 1 - inputExtension, depthLimit, node, cond,  result);
 
-                xErrRec[t] = node.lerpX.error;
-                zErrRec[t] = node.lerpZ.error;
-
                 node.T = baseTick;
                 node.airDebt = airDebtCache;
                 node.lerpX = lerpX;
@@ -337,6 +329,7 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
 
                 if(hardPrune || (endingDepth && (zErrIncrease || xErrIncrease)) ) {
                     pruneR = std::min(node.airtime, t + 1);
+                    // std::cout << seq2Mothball(node) << "thisd: " << depth << ", hardPrune: " << hardPrune << ", w:" << w << ", a:" << a <<", t:" << t << "\n";
                     break;
                 } 
 
@@ -354,8 +347,8 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                     if(baseTick + r == 0) continue;
                 }
                 
-                lastErrX = xErrRec[r];
-                lastErrZ = zErrRec[r];
+                lastErrX = INFINITY;
+                lastErrZ = INFINITY;
                 for (int t = r + 1; t <= node.airtime; t++) {
 
                     node.inputs.push_back(IF::input{w, a, t});
@@ -384,7 +377,10 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                     bool zErrIncrease = careZ && (node.lerpZ.error > lastErrZ);
                     bool xErrIncrease = careX && (node.lerpX.error > lastErrX);
 
-                    if(hardPrune || (endingDepth && (zErrIncrease || xErrIncrease))) break;
+                    if(hardPrune || (endingDepth && (zErrIncrease || xErrIncrease))){
+                        // std::cout << seq2Mothball(node) << "thisd: " << depth << ", hardPrune: " << hardPrune << ", w:" << w << ", a:" << a <<", t:" << t << "\n";
+                        break;
+                    } 
 
                     lastErrX = node.lerpX.error;
                     lastErrZ = node.lerpZ.error;

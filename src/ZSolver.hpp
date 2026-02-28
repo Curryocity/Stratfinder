@@ -2,6 +2,7 @@
 #include <optional>
 #include <string>
 #include <vector>
+#include "util.hpp"
 #include "zEngine.hpp"
 
 class zSolver{
@@ -123,6 +124,5 @@ class zSolver{
     
     int speed = 0;
     int slowness = 0;
-    std::string log;
-    bool logOn = true;
+    Logger logger;
 };

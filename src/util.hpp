@@ -2,8 +2,41 @@
 
 #include <cmath>
 #include <iomanip>
+#include <iostream>
 #include <string>
 #include <sstream>
+
+class Logger {
+    public:
+    void write(const std::string& str) {
+        if(enabled) log += str;
+    }
+
+    void print() const {
+        std::cout << "LOG ----------------------- \n";
+        std::cout << log;
+    }
+
+    void clear() {
+        log = "";
+    }
+
+    void toggle(bool on) {
+        enabled = on;
+    }
+
+    const std::string& str() const {
+        return log;
+    }
+
+    bool isEnabled() const {
+        return enabled;
+    }
+
+    private:
+    std::string log;
+    bool enabled = true;
+};
 
 class util{
     public:

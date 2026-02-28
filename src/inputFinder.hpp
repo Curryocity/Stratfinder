@@ -32,7 +32,7 @@ class inputFinder {
     struct condition{
         axisCond z;
         axisCond x;
-        bool endedAirborne = false;
+        bool endAirborne = false;
         bool allowStrafe = true;
         double sideDev = -1; // only work on non-negative number
     };
@@ -77,8 +77,13 @@ class inputFinder {
     void riskyPrune(bool riskIt); 
     // Faster when on, it may skip inputs that requires inertia
 
-    void printSettings();
+    void logSettings();
     player& getDummy();
+
+    void writeLog(std::string str);
+    void printLog();
+    void clearLog();
+    void toggleLog(bool on);
 
     private:
 
@@ -101,5 +106,7 @@ class inputFinder {
     // constants to account movement approximation error using lerp
     const double floatErr = 1e-6;
     double inertiaErr = 3e-3;
+
+    Logger logger;
     
 };

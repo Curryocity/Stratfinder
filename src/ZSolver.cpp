@@ -947,20 +947,19 @@ std::string ZS::strat2string(int stratType) {
 }
 
 void ZS::writeLog(std::string str){
-    if(logOn) log += str;
+    logger.write(str);
 }
 
 void ZS::printLog(){
-    std::cout << "LOG ----------------------- \n";
-    std::cout << log;
+    logger.print();
 }
 
 void ZS::clearLog(){
-    log = "";
+    logger.clear();
 }
 
 void ZS::toggleLog(bool on){
-    logOn = on;
+    logger.toggle(on);
 }
 
 bool ZS::poss(double mm, int t_mm, int max_t, double threshold, bool backwallQ, std::string& content, double shift, std::optional<fullStrat> provideStrat){
@@ -1093,4 +1092,3 @@ void ZS::clearEffects(){
     slowness = 0;
     std::cout << "Cleared all effects";
 }
-

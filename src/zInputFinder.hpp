@@ -2,6 +2,7 @@
 #include <cmath>
 #include <vector>
 #include <string>
+#include "util.hpp"
 #include "player.hpp"
 
 class zInputFinder {
@@ -34,6 +35,8 @@ class zInputFinder {
         double error = 1e-4;
         double mm = -65536;
         bool allowStrafe = true;
+        bool endAirborn = false;
+        double sideDev = -1;
     };
 
     static zCond genZCondLBUB(double lb, double ub, double mm, bool allowStrafe = true);
@@ -45,11 +48,11 @@ class zInputFinder {
     bool inputDfsRec(zCond cond, int depth, int depthLimit, sequence& node, std::vector<sequence>& result);
 
     // Output the velocity after executing the sequence, if the used mm exceed maxFw. maxBw then output NaN.
-    double exeSeq(player& p, const sequence& seq, double mm, double initVz = 0);
+    double exeSeq(player& p, const sequence& seq, zCond cond, double initVz = 0);
 
     void alphaBetaUpdate(player& p, sequence& seq);
-    double estimateSpeed(sequence& seq, double initVz = 0);
-    double terminalToSeq(int w, int a, sequence& seq);
+    double estimateSpeed(sequence& seq, bool endAirborn, double initVz = 0);
+    double terminalToSeq(int w, int a, sequence& seq, bool endAirborn);
 
     std::string seqToString(const sequence& seq);
 
@@ -57,11 +60,16 @@ class zInputFinder {
 
     void setEffect(int speed, int slowness);
     void setRotation(double rot);
-    void setSpeedType(bool airborne);
-    void changeSettings(int maxDepth, int maxTicks = 40, double maxXdeviation = INFINITY);
+    void changeSettings(int maxDepth, int maxTicks = 40);
     void dontCareInertia(bool yes); // It is a lot faster if you don't care inertia
-    void printSettings();
+    void logSettings();
     player& getDummy();
+
+    void writeLog(std::string str);
+    void printLog();
+    void clearLog();
+    void toggleLog(bool on);
+    std::string getLog() const;
 
     private:
 
@@ -80,11 +88,11 @@ class zInputFinder {
     // engine settings
     int maxDepth = 3;
     int maxTicks = 40;
-    bool speedAirQ = false;
-    double maxXdeviation = INFINITY;
 
     // constants
     const double float_Error = 1e-6;
     double inertia_Error = 3e-3;
+
+    Logger logger;
     
 };

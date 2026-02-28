@@ -1,14 +1,36 @@
 #include "inputFinder.hpp"
 #include "util.hpp"
 #include "zEngine.hpp"
+#include "zInputFinder.hpp"
 #include <array>
 #include <cmath>
 #include <cstdlib>
-#include <iostream>
 #include <string>
 #include <vector>
 
 using IF = inputFinder;
+
+namespace {
+inputFinder::sequence adaptZSequence(const zInputFinder::sequence& src) {
+    inputFinder::sequence dst;
+    dst.airtime = src.airtime;
+    dst.T = src.T;
+    dst.airDebt = src.airDebt;
+    dst.airLast = src.airLast;
+    dst.revJumps = src.revJumps;
+    dst.lerpZ.alpha = src.alpha;
+    dst.lerpZ.beta = src.beta;
+    dst.lerpZ.error = src.error;
+    dst.finalVz = src.finalVz;
+
+    dst.inputs.reserve(src.inputs.size());
+    for (const zInputFinder::input& in : src.inputs) {
+        dst.inputs.push_back(inputFinder::input{in.w, in.a, in.t});
+    }
+
+    return dst;
+}
+}
 
 void IF::setCondWithBound(axisCond& cond, double bound1, double bound2){
     cond.vel = (bound1 + bound2)/2;
@@ -137,10 +159,40 @@ void IF::initHeuristics(int airtime, double zDis, double xDis){
 std::vector<IF::sequence> IF::matchSpeed(const condition& cond, int airtime){
 
     if( (!cond.x.enabled) && (!cond.z.enabled) ){
-        std::cout << "Exception: None of the conditions were enabled\n";
-        std::cout << "------EXIT------\n";
+        writeLog("Exception: None of the conditions were enabled\n");
+        writeLog("------EXIT------\n");
         return {};
     } 
+
+    const bool zAccelerate = cond.z.enabled && !cond.x.enabled;
+
+    if(zAccelerate){
+        zInputFinder zFinder;
+        zFinder.toggleLog(logger.isEnabled());
+        zFinder.changeSettings(maxDepth, maxTicks);
+        zFinder.dontCareInertia(inertiaErr == floatErr);
+        zFinder.setEffect(speed, slowness);
+        zFinder.setRotation(rotation);
+        zFinder.clearLog();
+
+        zInputFinder::zCond zCond;
+        zCond.targetVz = cond.z.vel;
+        zCond.error = cond.z.tolerance;
+        zCond.mm = cond.z.mm;
+        zCond.allowStrafe = cond.allowStrafe;
+        zCond.endAirborn = cond.endAirborne;
+        zCond.sideDev = cond.sideDev;
+
+        std::vector<zInputFinder::sequence> zResult = zFinder.matchZSpeed(zCond, airtime);
+        writeLog(zFinder.getLog());
+
+        std::vector<sequence> result;
+        result.reserve(zResult.size());
+        for (const zInputFinder::sequence& seq : zResult) {
+            result.push_back(adaptZSequence(seq));
+        }
+        return result;
+    }
 
     std::vector<IF::sequence> result;
     initHeuristics(airtime, std::abs(cond.z.mm) + 0.6f, std::abs(cond.x.mm) + 0.6f);
@@ -157,8 +209,8 @@ std::vector<IF::sequence> IF::matchSpeed(const condition& cond, int airtime){
 }
 
 std::vector<IF::sequence> IF::dfsEntry(const condition& cond, int airtime, int depthLimit){
-    std::cout << "-------------------------------------------------\n";
-    std::cout << "Try searching depth = " << depthLimit << " inputs\n";
+    writeLog("-------------------------------------------------\n");
+    writeLog("Try searching depth = " + std::to_string(depthLimit) + " inputs\n");
     std::vector<IF::sequence> result;
     sequence node;
     node.inputs = std::vector<input>();
@@ -186,7 +238,7 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
         exeSeq(dummy, node, cond, 0, 0, true);
         // std::cout << seq2Mothball(node) << ", Vz: " + util::df(dummy.Vz()) << "\n" ;
 
-        util::vec2D estSpeed = estimateSpeed(node, cond.endedAirborne, 0,0);
+        util::vec2D estSpeed = estimateSpeed(node, cond.endAirborne, 0,0);
 
         node.lerpX.error = careX? std::abs(estSpeed.x - cond.x.vel) - cond.x.tolerance - inertiaErr : 0;
         node.lerpZ.error = careZ? std::abs(estSpeed.z - cond.z.vel) - cond.z.tolerance - inertiaErr : 0;
@@ -208,9 +260,9 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                 node.finalVx = vx, node.finalVz = vz;
                 std::string vxStr = careX? (", Vx: " + util::df(vx)) : "";
                 std::string vzStr = careZ? (", Vz: " + util::df(vz)) : "";
-                std::cout << "\n";
-                std::cout << "Found Seqeunce: " << seq2Mothball(node) 
-                << "\nt = " << node.T << "(+" << std::max(0,node.airDebt) << ")" << vxStr << vzStr << "\n";
+                writeLog("\n");
+                writeLog("Found Seqeunce: " + seq2Mothball(node) 
+                + "\nt = " + std::to_string(node.T) + "(+" + std::to_string(std::max(0, node.airDebt)) + ")" + vxStr + vzStr + "\n");
                 result.push_back(node);
             }
         }
@@ -218,13 +270,13 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
     }
 
     if(node.T > 0){
-        util::vec2D minV = estimateSpeed(node, cond.endedAirborne,this->vxLB, this->vzLB);
+        util::vec2D minV = estimateSpeed(node, cond.endAirborne,this->vxLB, this->vzLB);
         double minVx = minV.x - floatErr;
         double minVz = minV.z - floatErr;
         if(careX && (minVx > (cond.x.vel + cond.x.tolerance))) return true;
         if(careZ && (minVz > (cond.z.vel + cond.z.tolerance))) return true;
 
-        util::vec2D maxV = estimateSpeed(node, cond.endedAirborne,this->vxUB, this->vzUB);
+        util::vec2D maxV = estimateSpeed(node, cond.endAirborne,this->vxUB, this->vzUB);
         double maxVx = maxV.x + floatErr;
         double maxVz = maxV.z + floatErr;
         if(careX && (maxVx < (cond.x.vel - cond.x.tolerance))) return true;
@@ -270,11 +322,11 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                 // the initial input cannot be blank
                 if(w == 0 && a == 0) continue;
 
-                util::vec2D eV = estimateSpeed(node, cond.endedAirborne);
+                util::vec2D eV = estimateSpeed(node, cond.endAirborne);
                 double eVx = eV.x;
                 double eVz = eV.z;
 
-                util::vec2D tV = terminalToSeq(w, a, node, cond.endedAirborne);
+                util::vec2D tV = terminalToSeq(w, a, node, cond.endAirborne);
                 double tVx = tV.x;
                 double tVz = tV.z;
 
@@ -301,7 +353,7 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
             for (int t = 1; t <= node.airtime; t++) {
 
                 // Final airspeed must be air
-                if(baseTick == 0 && cond.endedAirborne) break;
+                if(baseTick == 0 && cond.endAirborne) break;
 
                 node.inputs.push_back(IF::input{w, a, t});
 
@@ -339,7 +391,7 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
 
             for(int r = std::max(0, node.airDebt); r < pruneR; r ++){
 
-                if(cond.endedAirborne){
+                if(cond.endAirborne){
                     // Last tick must be air
                     if(baseTick == 0 && r > 0) break;
                 }else{
@@ -685,7 +737,7 @@ void IF::setRotation(double rot){ rotation = rot;}
 void IF::setEffect(int speed, int slowness){
     this->speed = speed;
     this->slowness = slowness;
-    std::cout << "(speed, slow) = (" << speed << ", " << slowness << ")\n";
+    writeLog("(speed, slow) = (" + std::to_string(speed) + ", " + std::to_string(slowness) + ")\n");
 }
 
 void IF::changeSettings(int maxDepth, int maxTicks){
@@ -698,9 +750,9 @@ void IF::riskyPrune(bool yes){
     else inertiaErr = 3e-3;
 }
 
-void IF::printSettings(){
-    std::cout << "Input Finder Settings: \n";
-    std::cout << "maxDepth = " << maxDepth << ", maxTicks = " << maxTicks << "\n";
+void IF::logSettings(){
+    writeLog("Input Finder Settings: \n");
+    writeLog("maxDepth = " + std::to_string(maxDepth) + ", maxTicks = " + std::to_string(maxTicks) + "\n");
 }
 
 player& IF::getDummy(){
@@ -708,4 +760,20 @@ player& IF::getDummy(){
     dummy.setEffect(speed, slowness);
     dummy.setF(rotation);
     return dummy;
+}
+
+void IF::writeLog(std::string str){
+    logger.write(str);
+}
+
+void IF::printLog(){
+    logger.print();
+}
+
+void IF::clearLog(){
+    logger.clear();
+}
+
+void IF::toggleLog(bool on){
+    logger.toggle(on);
 }

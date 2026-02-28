@@ -31,8 +31,8 @@ std::vector<IF::sequence> IF::matchZSpeed(zCond cond, int airtime){
 }
 
 std::vector<IF::sequence> IF::inputDfs(zCond cond, int airtime, int depthLimit){
-    std::cout << "-------------------------------------------------\n";
-    std::cout << "Try searching depth = " << depthLimit << " inputs\n";
+    writeLog("-------------------------------------------------\n");
+    writeLog("Try searching depth = " + std::to_string(depthLimit) + " inputs\n");
     std::vector<IF::sequence> result;
     sequence node;
     node.inputs = std::vector<input>();
@@ -54,19 +54,19 @@ bool IF::inputDfsRec(zCond cond, int depth, int depthLimit, sequence& node, std:
 
     if (depth == depthLimit) {
 
-        double estimateVz = estimateSpeed(node);
+        double estimateVz = estimateSpeed(node, cond.endAirborn);
 
         node.error = std::abs(estimateVz - cond.targetVz) - cond.error - inertia_Error;
 
         if(node.error <= 0){
             node.error = 0;
 
-            double vz = exeSeq(getDummy(), node, cond.mm);
+            double vz = exeSeq(getDummy(), node, cond);
             
             if(!std::isnan(vz) && std::abs(vz - cond.targetVz) <= cond.error){
                 node.finalVz = vz;
-                std::cout << "\n";
-                std::cout << "Found Seqeunce: " << seqToString(node) << "\nt = " << node.T << "(+" << node.airDebt << "), Vz: " << util::df(vz) << "\n";
+                writeLog("\n");
+                writeLog("Found Seqeunce: " + seqToString(node) + "\nt = " + std::to_string(node.T) + "(+" + std::to_string(node.airDebt) + "), Vz: " + util::df(vz) + "\n");
                 result.push_back(node);
             }
         }
@@ -74,10 +74,10 @@ bool IF::inputDfsRec(zCond cond, int depth, int depthLimit, sequence& node, std:
     }
 
     if(node.T > 0){
-        double minVz = estimateSpeed(node, this->initVzLB) - float_Error;
+        double minVz = estimateSpeed(node, cond.endAirborn, this->initVzLB) - float_Error;
         if(minVz > (cond.targetVz + cond.error)) return true;
 
-        double maxVz = estimateSpeed(node, this->initVzUB) + float_Error;
+        double maxVz = estimateSpeed(node, cond.endAirborn, this->initVzUB) + float_Error;
         if(maxVz < (cond.targetVz - cond.error)) return true;
     }
     
@@ -112,8 +112,8 @@ bool IF::inputDfsRec(zCond cond, int depth, int depthLimit, sequence& node, std:
             if(depth >= depthLimit - 1){
                 // the initial input cannot be blank
                 if(w == 0 && a == 0) continue;
-                double estimateVz = estimateSpeed(node);
-                double termSpeed = terminalToSeq(w, a, node);
+                double estimateVz = estimateSpeed(node, cond.endAirborn);
+                double termSpeed = terminalToSeq(w, a, node, cond.endAirborn);
 
                 if((estimateVz < cond.targetVz - cond.error - inertia_Error && termSpeed < cond.targetVz - cond.error)
                  || (estimateVz > cond.targetVz + cond.error + inertia_Error && termSpeed > cond.targetVz + cond.error))
@@ -129,7 +129,7 @@ bool IF::inputDfsRec(zCond cond, int depth, int depthLimit, sequence& node, std:
             for (int t = 1; t <= node.airtime; t++) {
 
                 // we want final airspeed
-                if(baseTick == 0 && speedAirQ) break;
+                if(baseTick == 0 && cond.endAirborn) break;
 
                 node.inputs.push_back(IF::input{w, a, t});
 
@@ -162,7 +162,7 @@ bool IF::inputDfsRec(zCond cond, int depth, int depthLimit, sequence& node, std:
 
             for(int r = std::max(0, node.airDebt); r < pruneR; r ++){
 
-                if(speedAirQ){
+                if(cond.endAirborn){
                     // Last tick must be air
                     if(baseTick == 0 && r > 0) break;
                 }else{
@@ -207,13 +207,13 @@ bool IF::inputDfsRec(zCond cond, int depth, int depthLimit, sequence& node, std:
     return false;
 }
 
-double IF::exeSeq(player& p, const sequence& seq, double mm, double initVz){
+double IF::exeSeq(player& p, const sequence& seq, zCond cond, double initVz){
 
     int tick = seq.T;
     int airClock = (seq.airDebt == 0)? 0 : seq.airtime - seq.airDebt;
     int rjIdx = seq.revJumps.size() - 1 - (airClock > 0);
 
-    const bool doMMCheck = !std::isinf(mm);
+    const bool doMMCheck = !std::isinf(cond.mm);
     double zMax = 0, zMin = 0;
     bool prevAirborne = true;
     double preZ = 0;
@@ -243,7 +243,7 @@ double IF::exeSeq(player& p, const sequence& seq, double mm, double initVz){
 
             // Update mm used
             if(doMMCheck){
-                if(std::abs(p.X()) > maxXdeviation) return NAN;
+                if(cond.sideDev >= 0 && std::abs(p.X()) > cond.sideDev) return NAN;
 
                 if(!airborne){
                     if(prevAirborne){
@@ -263,7 +263,7 @@ double IF::exeSeq(player& p, const sequence& seq, double mm, double initVz){
                 preZ = p.Z();
                 prevAirborne = airborne;
 
-                if(zMax - zMin > std::abs(mm) + 0.6f) return NAN;
+                if(zMax - zMin > std::abs(cond.mm) + 0.6f) return NAN;
             }
 
             if (airClock > 0) airClock--;
@@ -273,7 +273,7 @@ double IF::exeSeq(player& p, const sequence& seq, double mm, double initVz){
     }
 
     // The starting position of the input is invalid
-    if (doMMCheck && ((mm > 0 && zMax > p.Z()) || (mm < 0 && zMin < p.Z())) )
+    if (doMMCheck && ((cond.mm > 0 && zMax > p.Z()) || (cond.mm < 0 && zMin < p.Z())) )
         return NAN;
 
     return p.Vz();
@@ -346,7 +346,7 @@ void IF::alphaBetaUpdate(player& p, sequence& seq){
 
 }
 
-double IF::estimateSpeed(sequence& seq, double initVz){
+double IF::estimateSpeed(sequence& seq, bool endAirborn, double initVz){
     if(initVz == 0 && seq.airLast){
         getDummy();
         input lastInput = seq.inputs.back();
@@ -355,12 +355,12 @@ double IF::estimateSpeed(sequence& seq, double initVz){
     }
 
     double temp = seq.alpha * initVz + seq.beta;
-    if(speedAirQ) temp *= 0.6f;
+    if(endAirborn) temp *= 0.6f;
 
     return temp;
 }
 
-double IF::terminalToSeq(int w, int a, sequence& seq){
+double IF::terminalToSeq(int w, int a, sequence& seq, bool endAirborn){
     double initVz = wasdTerminalVel[3*(a+1) + (w+1)];
     getDummy();
     dummy.setPrevSprint(w == 1);
@@ -371,7 +371,7 @@ double IF::terminalToSeq(int w, int a, sequence& seq){
 
     initVz = dummy.Vz();
     double temp = seq.alpha * initVz + seq.beta;
-    if(speedAirQ) temp *= 0.6f;
+    if(endAirborn) temp *= 0.6f;
 
     return temp;
 }
@@ -563,18 +563,12 @@ void IF::setRotation(double rot){ rotation = rot;}
 void IF::setEffect(int speed, int slowness){
     this->speed = speed;
     this->slowness = slowness;
-    std::cout << "(speed, slow) = (" << speed << ", " << slowness << ")\n";
+    writeLog("(speed, slow) = (" + std::to_string(speed) + ", " + std::to_string(slowness) + ")\n");
 }
 
-void IF::setSpeedType(bool airborne){
-    this->speedAirQ = airborne;
-    std::cout << "speedAirQ set to " << airborne << "\n";
-}
-
-void IF::changeSettings(int maxDepth, int maxTicks, double maxXdeviation){
+void IF::changeSettings(int maxDepth, int maxTicks){
     this->maxDepth = maxDepth;
     this->maxTicks = maxTicks;
-    this->maxXdeviation = maxXdeviation;
 }
 
 void IF::dontCareInertia(bool yes){
@@ -582,9 +576,9 @@ void IF::dontCareInertia(bool yes){
     else inertia_Error = 3e-3;
 }
 
-void IF::printSettings(){
-    std::cout << "Input Finder Settings: \n";
-    std::cout << "maxDepth = " << maxDepth << ", maxTicks = " << maxTicks << ", maxXdeviation = " << maxXdeviation << "\n";
+void IF::logSettings(){
+    writeLog("Input Finder Settings: \n");
+    writeLog("maxDepth = " + std::to_string(maxDepth) + ", maxTicks = " + std::to_string(maxTicks) + "\n");
 }
 
 player& IF::getDummy(){
@@ -592,4 +586,24 @@ player& IF::getDummy(){
     dummy.setEffect(speed, slowness);
     dummy.setF(rotation);
     return dummy;
+}
+
+void IF::writeLog(std::string str){
+    logger.write(str);
+}
+
+void IF::printLog(){
+    logger.print();
+}
+
+void IF::clearLog(){
+    logger.clear();
+}
+
+void IF::toggleLog(bool on){
+    logger.toggle(on);
+}
+
+std::string IF::getLog() const{
+    return logger.str();
 }

@@ -56,38 +56,9 @@ int main() {
 
     if(true){
         // Finding input for slowness I 1.5bm 6-1 to ladder (perfect double 45.01)
-        // use zInputFinder
-        auto testZinputFinder = [](bool riskIt, int runs){
-            zInputFinder f;
-            f.toggleLog(false);
-            f.changeSettings(4, 40);
-            f.dontCareInertia(riskIt);
-            f.setEffect(0, 1);
-            zInputFinder::zCond cond = zInputFinder::genZCondLBUB(-0.1276844242999637, -0.1276846279184921, -1.5, false);
-            cond.endAirborn = false;
-            cond.sideDev = -1;
-            double targetVz = cond.targetVz;
-            double error = cond.error;
-            double mm = cond.mm;
-            double airtime = 12;
-            bool hasStrafe = cond.allowStrafe;
-            std::cout << "------------------------------\n";
-            std::cout << "zInputFinder: \n";
-            std::cout << "targetVz: " << util::df(targetVz) << ", error: " << util::df(error) << ", mm: " << util::fmt(mm) << ", airtime: " << airtime << ", hasStrafe: " << hasStrafe << "\n";
-            std::cout << "riskyPrune? " << riskIt << "\n";
-
-            BenchmarkStats stats = benchmarkUs([&]() {
-                return f.matchZSpeed(cond, airtime);
-            }, runs);
-
-            printBenchMark(stats);
-        };
 
         int runs = 50;
-        testZinputFinder(false, runs);
-        testZinputFinder(true, runs);
 
-        // use new inputFinder
         auto testInputFinder = [](bool riskIt, int runs){
             inputFinder f;
             f.toggleLog(false);

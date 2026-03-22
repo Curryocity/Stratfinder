@@ -16,8 +16,23 @@ struct BenchmarkStats {
     inputFinder::SearchStats searchStats;
 };
 
-template<typename Func>
-BenchmarkStats benchmarkUs(Func func, int runs = 50) {
+void accumulateSearchStats(inputFinder::SearchStats& dst, const inputFinder::SearchStats& src) {
+    dst.inputDfsRecCalls += src.inputDfsRecCalls;
+    dst.alphaBetaUpdateCalls += src.alphaBetaUpdateCalls;
+    dst.estimateSpeedCalls += src.estimateSpeedCalls;
+    dst.exeSeqCalls += src.exeSeqCalls;
+    dst.maxTickPrunes += src.maxTickPrunes;
+    dst.minBoundPrunes += src.minBoundPrunes;
+    dst.maxBoundPrunes += src.maxBoundPrunes;
+    dst.endDepthRejects += src.endDepthRejects;
+    dst.childHardPrunesNoRJ += src.childHardPrunesNoRJ;
+    dst.childHardPrunesRJ += src.childHardPrunesRJ;
+    dst.monotonicPrunesNoRJ += src.monotonicPrunesNoRJ;
+    dst.monotonicPrunesRJ += src.monotonicPrunesRJ;
+}
+
+template<typename Func, typename StatsFunc>
+BenchmarkStats benchmarkUs(Func func, StatsFunc statsFunc, int runs = 50) {
     BenchmarkStats stats;
     stats.runs = runs;
     stats.resultCount = func().size();
@@ -36,6 +51,7 @@ BenchmarkStats benchmarkUs(Func func, int runs = 50) {
         stats.minUs = std::min(stats.minUs, elapsedUs);
         stats.maxUs = std::max(stats.maxUs, elapsedUs);
         stats.resultCount = result.size();
+        accumulateSearchStats(stats.searchStats, statsFunc());
     }
 
     stats.avgUs = totalUs / runs;
@@ -67,7 +83,7 @@ int main() {
 
     const int depth = 4;
     const int airtime = 12;
-    const int runs = 50;
+    const int runs = 100;
     const bool allowStrafe = false;
 
     inputFinder::condition cond;
@@ -95,10 +111,15 @@ int main() {
         f.riskyPrune(riskIt);
         f.setEffect(0, 1);
 
-        BenchmarkStats inputStats = benchmarkUs([&]() {
-            return f.matchSpeed(cond, airtime);
-        }, runs);
-        inputStats.searchStats = f.getSearchStats();
+        BenchmarkStats inputStats = benchmarkUs(
+            [&]() {
+                return f.matchSpeed(cond, airtime);
+            },
+            [&]() {
+                return f.getSearchStats();
+            },
+            runs
+        );
 
         printHeader(riskIt);
         std::cout << "InputFinder:\n";

@@ -200,11 +200,9 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
 
             bool valid = exeSeq(dummy, node, cond, 0, 0, true);
             double vx = dummy.Vx(), vz = dummy.Vz();
-            // std::cout << vx << " " << vz << "\n";
 
             bool xSat = (!careX) || (std::abs(vx - cond.x.vel) <= cond.x.tolerance);
             bool zSat = (!careZ) || (std::abs(vz - cond.z.vel) <= cond.z.tolerance);
-
             
             if(valid && xSat && zSat){ 
                 node.finalVx = vx, node.finalVz = vz;
@@ -257,6 +255,20 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
         prevT = prevInput.t;
     }
 
+    // Must do it after the hardPrune section
+    // Early return: InputExtension is only viable when t is maximized on previous round, and maxDepth must be an inputExtension
+    if(depth == depthLimit && prevT != node.airtime) return false;
+
+    const bool endingDepth = (depth >= depthLimit - 1);
+
+    util::vec2D eV;
+    if(endingDepth){
+        eV = estimateSpeed(node, cond.endAirborne);
+        errorRecorderX[0] = careX? std::max(0.0, std::abs(eV.x - cond.x.vel) - cond.x.tolerance - inertiaErr) : 0;
+        errorRecorderZ[0] = careZ? std::max(0.0, std::abs(eV.z - cond.z.vel) - cond.z.tolerance - inertiaErr) : 0;
+    }
+
+
     for (int w = -1; w <= 1; w++) {
         for (int a = -1; a <= 1; a++) { 
 
@@ -277,41 +289,29 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
             // only inputExtension is allowed at maxDepth
             if(depth == depthLimit && !inputExtension) continue;
 
-            const bool endingDepth = (depth >= depthLimit - 1);
-
             
             if(endingDepth){
                 // the initial input cannot be blank
                 if(w == 0 && a == 0) continue;
 
-                util::vec2D eV = estimateSpeed(node, cond.endAirborne);
-                double eVx = eV.x;
-                double eVz = eV.z;
-
                 util::vec2D tV = terminalToSeq(w, a, node, cond.endAirborne);
-                double tVx = tV.x;
-                double tVz = tV.z;
 
                 if(careZ){
-                    if(((eVz < cond.z.vel - cond.z.tolerance - inertiaErr) && (tVz < cond.z.vel - cond.z.tolerance)) 
-                    || ((eVz > cond.z.vel + cond.z.tolerance + inertiaErr) && (tVz > cond.z.vel + cond.z.tolerance))) {
+                    if(((eV.z < cond.z.vel - cond.z.tolerance - inertiaErr) && (tV.z < cond.z.vel - cond.z.tolerance)) 
+                    || ((eV.z > cond.z.vel + cond.z.tolerance + inertiaErr) && (tV.z > cond.z.vel + cond.z.tolerance))) {
                         searchStats.endDepthRejects++;
                         continue;
                     }
                 }
 
                 if(careX){
-                    if( ((eVx < cond.x.vel - cond.x.tolerance - inertiaErr) && (tVx < cond.x.vel - cond.x.tolerance))
-                    || ((eVx > cond.x.vel + cond.x.tolerance + inertiaErr) && (tVx > cond.x.vel + cond.x.tolerance))) {
+                    if( ((eV.x < cond.x.vel - cond.x.tolerance - inertiaErr) && (tV.x < cond.x.vel - cond.x.tolerance))
+                    || ((eV.x > cond.x.vel + cond.x.tolerance + inertiaErr) && (tV.x > cond.x.vel + cond.x.tolerance))) {
                         searchStats.endDepthRejects++;
                         continue;
                     }
 
                 }
-
-                errorRecorderX[0] = careX? std::max(0.0, std::abs(eVx - cond.x.vel) - cond.x.tolerance - inertiaErr) : 0;
-                errorRecorderZ[0] = careZ? std::max(0.0, std::abs(eVz - cond.z.vel) - cond.z.tolerance - inertiaErr) : 0;
-
             }
 
             int pruneR = node.airtime;

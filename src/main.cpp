@@ -16,26 +16,17 @@ struct BenchmarkStats {
     inputFinder::SearchStats searchStats;
 };
 
-void accumulateSearchStats(inputFinder::SearchStats& dst, const inputFinder::SearchStats& src) {
-    dst.inputDfsRecCalls += src.inputDfsRecCalls;
-    dst.alphaBetaUpdateCalls += src.alphaBetaUpdateCalls;
-    dst.estimateSpeedCalls += src.estimateSpeedCalls;
-    dst.exeSeqCalls += src.exeSeqCalls;
-    dst.maxTickPrunes += src.maxTickPrunes;
-    dst.minBoundPrunes += src.minBoundPrunes;
-    dst.maxBoundPrunes += src.maxBoundPrunes;
-    dst.endDepthRejects += src.endDepthRejects;
-    dst.childHardPrunesNoRJ += src.childHardPrunesNoRJ;
-    dst.childHardPrunesRJ += src.childHardPrunesRJ;
-    dst.monotonicPrunesNoRJ += src.monotonicPrunesNoRJ;
-    dst.monotonicPrunesRJ += src.monotonicPrunesRJ;
-}
-
 template<typename Func, typename StatsFunc>
 BenchmarkStats benchmarkUs(Func func, StatsFunc statsFunc, int runs = 50) {
     BenchmarkStats stats;
     stats.runs = runs;
-    stats.resultCount = func().size();
+
+    // Warmup run to stabilize caches and branch predictors.
+    func();
+
+    auto measuredResult = func();
+    stats.resultCount = measuredResult.size();
+    stats.searchStats = statsFunc();
 
     double totalUs = 0;
     stats.minUs = INFINITY;
@@ -51,7 +42,6 @@ BenchmarkStats benchmarkUs(Func func, StatsFunc statsFunc, int runs = 50) {
         stats.minUs = std::min(stats.minUs, elapsedUs);
         stats.maxUs = std::max(stats.maxUs, elapsedUs);
         stats.resultCount = result.size();
-        accumulateSearchStats(stats.searchStats, statsFunc());
     }
 
     stats.avgUs = totalUs / runs;
@@ -63,19 +53,18 @@ void printBenchMark(const BenchmarkStats& stats){
     std::cout << "Avg time: " << stats.avgUs << " us\n";
     std::cout << "Min time: " << stats.minUs << " us\n";
     std::cout << "Max time: " << stats.maxUs << " us\n";
-    const double runs = static_cast<double>(stats.runs);
-    std::cout << "Avg inputDfsRec calls: " << (stats.searchStats.inputDfsRecCalls / runs) << "\n";
-    std::cout << "Avg alphaBetaUpdate calls: " << (stats.searchStats.alphaBetaUpdateCalls / runs) << "\n";
-    std::cout << "Avg estimateSpeed calls: " << (stats.searchStats.estimateSpeedCalls / runs) << "\n";
-    std::cout << "Avg exeSeq calls: " << (stats.searchStats.exeSeqCalls / runs) << "\n";
-    std::cout << "Avg maxTick prunes: " << (stats.searchStats.maxTickPrunes / runs) << "\n";
-    std::cout << "Avg minBound prunes: " << (stats.searchStats.minBoundPrunes / runs) << "\n";
-    std::cout << "Avg maxBound prunes: " << (stats.searchStats.maxBoundPrunes / runs) << "\n";
-    std::cout << "Avg endDepth rejects: " << (stats.searchStats.endDepthRejects / runs) << "\n";
-    std::cout << "Avg childHard prunes (no RJ): " << (stats.searchStats.childHardPrunesNoRJ / runs) << "\n";
-    std::cout << "Avg childHard prunes (RJ): " << (stats.searchStats.childHardPrunesRJ / runs) << "\n";
-    std::cout << "Avg monotonic prunes (no RJ): " << (stats.searchStats.monotonicPrunesNoRJ / runs) << "\n";
-    std::cout << "Avg monotonic prunes (RJ): " << (stats.searchStats.monotonicPrunesRJ / runs) << "\n";
+    std::cout << "Per-run inputDfsRec calls: " << stats.searchStats.inputDfsRecCalls << "\n";
+    std::cout << "Per-run alphaBetaUpdate calls: " << stats.searchStats.alphaBetaUpdateCalls << "\n";
+    std::cout << "Per-run estimateSpeed calls: " << stats.searchStats.estimateSpeedCalls << "\n";
+    std::cout << "Per-run exeSeq calls: " << stats.searchStats.exeSeqCalls << "\n";
+    std::cout << "Per-run maxTick prunes: " << stats.searchStats.maxTickPrunes << "\n";
+    std::cout << "Per-run minBound prunes: " << stats.searchStats.minBoundPrunes << "\n";
+    std::cout << "Per-run maxBound prunes: " << stats.searchStats.maxBoundPrunes << "\n";
+    std::cout << "Per-run endDepth rejects: " << stats.searchStats.endDepthRejects << "\n";
+    std::cout << "Per-run childHard prunes (no RJ): " << stats.searchStats.childHardPrunesNoRJ << "\n";
+    std::cout << "Per-run childHard prunes (RJ): " << stats.searchStats.childHardPrunesRJ << "\n";
+    std::cout << "Per-run monotonic prunes (no RJ): " << stats.searchStats.monotonicPrunesNoRJ << "\n";
+    std::cout << "Per-run monotonic prunes (RJ): " << stats.searchStats.monotonicPrunesRJ << "\n";
 }
 
 int main() {

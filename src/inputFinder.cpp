@@ -1,7 +1,6 @@
 #include "inputFinder.hpp"
 #include "util.hpp"
 #include "zEngine.hpp"
-#include "zInputFinder.hpp"
 #include <array>
 #include <cmath>
 #include <cstdlib>
@@ -10,28 +9,6 @@
 
 using IF = inputFinder;
 
-namespace {
-inputFinder::sequence adaptZSequence(const zInputFinder::sequence& src) {
-    inputFinder::sequence dst;
-    dst.airtime = src.airtime;
-    dst.T = src.T;
-    dst.airDebt = src.airDebt;
-    dst.airLast = src.airLast;
-    dst.revJumps = src.revJumps;
-    dst.lerpZ.alpha = src.alpha;
-    dst.lerpZ.beta = src.beta;
-    dst.lerpZ.error = src.error;
-    dst.finalVz = src.finalVz;
-
-    dst.inputs.reserve(src.inputs.size());
-    for (const zInputFinder::input& in : src.inputs) {
-        dst.inputs.push_back(inputFinder::input{in.w, in.a, in.t});
-    }
-
-    return dst;
-}
-}
-
 void IF::setCondWithBound(axisCond& cond, double bound1, double bound2){
     cond.vel = (bound1 + bound2)/2;
     cond.tolerance = std::abs((bound1 - bound2)/2);
@@ -39,6 +16,8 @@ void IF::setCondWithBound(axisCond& cond, double bound1, double bound2){
 
 // heuristics
 void IF::initHeuristics(int airtime, double zDis, double xDis){
+    errorRecorderX = std::vector<double>(airtime + 1, 0);
+    errorRecorderZ = std::vector<double>(airtime + 1, 0);
 
     zEngine e(speed, slowness);
     e.s45(1);
@@ -157,42 +136,13 @@ void IF::initHeuristics(int airtime, double zDis, double xDis){
 }
 
 std::vector<IF::sequence> IF::matchSpeed(const condition& cond, int airtime){
+    searchStats = {};
 
     if( (!cond.x.enabled) && (!cond.z.enabled) ){
         writeLog("Exception: None of the conditions were enabled\n");
         writeLog("------EXIT------\n");
         return {};
     } 
-
-    const bool zAccelerate = cond.z.enabled && !cond.x.enabled;
-
-    if(zAccelerate){
-        zInputFinder zFinder;
-        zFinder.toggleLog(logger.isEnabled());
-        zFinder.changeSettings(maxDepth, maxTicks);
-        zFinder.dontCareInertia(inertiaErr == floatErr);
-        zFinder.setEffect(speed, slowness);
-        zFinder.setRotation(rotation);
-        zFinder.clearLog();
-
-        zInputFinder::zCond zCond;
-        zCond.targetVz = cond.z.vel;
-        zCond.error = cond.z.tolerance;
-        zCond.mm = cond.z.mm;
-        zCond.allowStrafe = cond.allowStrafe;
-        zCond.endAirborn = cond.endAirborne;
-        zCond.sideDev = cond.sideDev;
-
-        std::vector<zInputFinder::sequence> zResult = zFinder.matchZSpeed(zCond, airtime);
-        writeLog(zFinder.getLog());
-
-        std::vector<sequence> result;
-        result.reserve(zResult.size());
-        for (const zInputFinder::sequence& seq : zResult) {
-            result.push_back(adaptZSequence(seq));
-        }
-        return result;
-    }
 
     std::vector<IF::sequence> result;
     initHeuristics(airtime, std::abs(cond.z.mm) + 0.6f, std::abs(cond.x.mm) + 0.6f);
@@ -213,8 +163,8 @@ std::vector<IF::sequence> IF::dfsEntry(const condition& cond, int airtime, int d
     writeLog("Try searching depth = " + std::to_string(depthLimit) + " inputs\n");
     std::vector<IF::sequence> result;
     sequence node;
-    node.inputs = std::vector<input>();
-    node.revJumps = std::vector<int>();
+    node.inputs.reserve(depthLimit);
+    node.revJumps.reserve(depthLimit);
     node.airtime = airtime;
     node.T = 0;
     
@@ -225,8 +175,12 @@ std::vector<IF::sequence> IF::dfsEntry(const condition& cond, int airtime, int d
 
 // return true for hardPrune, false for softPrune
 bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition& cond, std::vector<sequence>& result) {
+    searchStats.inputDfsRecCalls++;
 
-    if(node.T > maxTicks) return true;
+    if(node.T > maxTicks) {
+        searchStats.maxTickPrunes++;
+        return true;
+    }
 
     const bool careZ = cond.z.enabled;
     const bool careX = cond.x.enabled;
@@ -234,10 +188,6 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
     alphaBetaUpdate(getDummy(), node, careX, careZ);
 
     if (depth == depthLimit) {
-
-        exeSeq(dummy, node, cond, 0, 0, true);
-        // std::cout << seq2Mothball(node) << ", Vz: " + util::df(dummy.Vz()) << "\n" ;
-
         util::vec2D estSpeed = estimateSpeed(node, cond.endAirborne, 0,0);
 
         node.lerpX.error = careX? std::abs(estSpeed.x - cond.x.vel) - cond.x.tolerance - inertiaErr : 0;
@@ -273,14 +223,26 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
         util::vec2D minV = estimateSpeed(node, cond.endAirborne,this->vxLB, this->vzLB);
         double minVx = minV.x - floatErr;
         double minVz = minV.z - floatErr;
-        if(careX && (minVx > (cond.x.vel + cond.x.tolerance))) return true;
-        if(careZ && (minVz > (cond.z.vel + cond.z.tolerance))) return true;
+        if(careX && (minVx > (cond.x.vel + cond.x.tolerance))) {
+            searchStats.minBoundPrunes++;
+            return true;
+        }
+        if(careZ && (minVz > (cond.z.vel + cond.z.tolerance))) {
+            searchStats.minBoundPrunes++;
+            return true;
+        }
 
         util::vec2D maxV = estimateSpeed(node, cond.endAirborne,this->vxUB, this->vzUB);
         double maxVx = maxV.x + floatErr;
         double maxVz = maxV.z + floatErr;
-        if(careX && (maxVx < (cond.x.vel - cond.x.tolerance))) return true;
-        if(careZ && (maxVz < (cond.z.vel - cond.z.tolerance))) return true;
+        if(careX && (maxVx < (cond.x.vel - cond.x.tolerance))) {
+            searchStats.maxBoundPrunes++;
+            return true;
+        }
+        if(careZ && (maxVz < (cond.z.vel - cond.z.tolerance))) {
+            searchStats.maxBoundPrunes++;
+            return true;
+        }
     }
     
     const int baseTick = node.T;
@@ -332,22 +294,29 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
 
                 if(careZ){
                     if(((eVz < cond.z.vel - cond.z.tolerance - inertiaErr) && (tVz < cond.z.vel - cond.z.tolerance)) 
-                    || ((eVz > cond.z.vel + cond.z.tolerance + inertiaErr) && (tVz > cond.z.vel + cond.z.tolerance)))
+                    || ((eVz > cond.z.vel + cond.z.tolerance + inertiaErr) && (tVz > cond.z.vel + cond.z.tolerance))) {
+                        searchStats.endDepthRejects++;
                         continue;
+                    }
                 }
 
                 if(careX){
                     if( ((eVx < cond.x.vel - cond.x.tolerance - inertiaErr) && (tVx < cond.x.vel - cond.x.tolerance))
-                    || ((eVx > cond.x.vel + cond.x.tolerance + inertiaErr) && (tVx > cond.x.vel + cond.x.tolerance)))
+                    || ((eVx > cond.x.vel + cond.x.tolerance + inertiaErr) && (tVx > cond.x.vel + cond.x.tolerance))) {
+                        searchStats.endDepthRejects++;
                         continue;
+                    }
 
                 }
+
+                errorRecorderX[0] = careX? std::max(0.0, std::abs(eVx - cond.x.vel) - cond.x.tolerance - inertiaErr) : 0;
+                errorRecorderZ[0] = careZ? std::max(0.0, std::abs(eVz - cond.z.vel) - cond.z.tolerance - inertiaErr) : 0;
 
             }
 
             int pruneR = node.airtime;
-            double lastErrX = INFINITY;
-            double lastErrZ = INFINITY;
+            double lastErrX = endingDepth ? errorRecorderX[0] : INFINITY;
+            double lastErrZ = endingDepth ? errorRecorderZ[0] : INFINITY;
 
             // no reverse Jump
             for (int t = 1; t <= node.airtime; t++) {
@@ -367,6 +336,12 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
 
                 // inputExtension does not cost depth
                 bool hardPrune = dfsRecursive(depth + 1 - inputExtension, depthLimit, node, cond,  result);
+                const double childErrX = node.lerpX.error;
+                const double childErrZ = node.lerpZ.error;
+                if(endingDepth){
+                    errorRecorderX[t] = childErrX;
+                    errorRecorderZ[t] = childErrZ;
+                }
 
                 node.T = baseTick;
                 node.airDebt = airDebtCache;
@@ -376,17 +351,20 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
 
                 node.inputs.pop_back();
 
-                bool zErrIncrease = careZ && (node.lerpZ.error > lastErrZ);
-                bool xErrIncrease = careX && (node.lerpX.error > lastErrX);
+                bool zErrIncrease = careZ && (childErrZ > lastErrZ);
+                bool xErrIncrease = careX && (childErrX > lastErrX);
+                const bool monotonicPrune = endingDepth && (zErrIncrease || xErrIncrease);
 
-                if(hardPrune || (endingDepth && (zErrIncrease || xErrIncrease)) ) {
+                if(hardPrune || monotonicPrune ) {
+                    if(hardPrune) searchStats.childHardPrunesNoRJ++;
+                    else searchStats.monotonicPrunesNoRJ++;
                     pruneR = std::min(node.airtime, t + 1);
                     // std::cout << seq2Mothball(node) << "thisd: " << depth << ", hardPrune: " << hardPrune << ", w:" << w << ", a:" << a <<", t:" << t << "\n";
                     break;
                 } 
 
-                lastErrX = node.lerpX.error;
-                lastErrZ = node.lerpZ.error;
+                lastErrX = childErrX;
+                lastErrZ = childErrZ;
             }
 
             for(int r = std::max(0, node.airDebt); r < pruneR; r ++){
@@ -399,8 +377,8 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                     if(baseTick + r == 0) continue;
                 }
                 
-                lastErrX = INFINITY;
-                lastErrZ = INFINITY;
+                lastErrX = endingDepth ? errorRecorderX[r] : INFINITY;
+                lastErrZ = endingDepth ? errorRecorderZ[r] : INFINITY;
                 for (int t = r + 1; t <= node.airtime; t++) {
 
                     node.inputs.push_back(IF::input{w, a, t});
@@ -415,6 +393,8 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                     node.T = baseTick + t;
 
                     bool hardPrune = dfsRecursive( depth + 1 - inputExtension, depthLimit, node, cond, result);
+                    const double childErrX = node.lerpX.error;
+                    const double childErrZ = node.lerpZ.error;
 
                     node.T = baseTick;
                     node.airDebt = airDebtCache;
@@ -426,16 +406,19 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                     node.inputs.pop_back();
                     node.revJumps.pop_back();
 
-                    bool zErrIncrease = careZ && (node.lerpZ.error > lastErrZ);
-                    bool xErrIncrease = careX && (node.lerpX.error > lastErrX);
+                    bool zErrIncrease = careZ && (childErrZ > lastErrZ);
+                    bool xErrIncrease = careX && (childErrX > lastErrX);
+                    const bool monotonicPrune = endingDepth && (zErrIncrease || xErrIncrease);
 
-                    if(hardPrune || (endingDepth && (zErrIncrease || xErrIncrease))){
+                    if(hardPrune || monotonicPrune){
+                        if(hardPrune) searchStats.childHardPrunesRJ++;
+                        else searchStats.monotonicPrunesRJ++;
                         // std::cout << seq2Mothball(node) << "thisd: " << depth << ", hardPrune: " << hardPrune << ", w:" << w << ", a:" << a <<", t:" << t << "\n";
                         break;
                     } 
 
-                    lastErrX = node.lerpX.error;
-                    lastErrZ = node.lerpZ.error;
+                    lastErrX = childErrX;
+                    lastErrZ = childErrZ;
                 }
             }
 
@@ -448,6 +431,7 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
 // Output false if condition is not satisfied
 // The final velocity is stored in player& p
 bool IF::exeSeq(player& p, const sequence& seq, const condition& cond, double initVx, double initVz, const bool mmCheck){
+    searchStats.exeSeqCalls++;
 
     int tick = seq.T;
     int airClock = (seq.airDebt == 0)? 0 : seq.airtime - seq.airDebt;
@@ -540,6 +524,7 @@ bool IF::exeSeq(player& p, const sequence& seq, const condition& cond, double in
 
 // v_end = alpha * v_init + beta (assuming v were ground speed)
 void IF::alphaBetaUpdate(player& p, sequence& seq, const bool careX, const bool careZ){
+    searchStats.alphaBetaUpdateCalls++;
 
     if(seq.inputs.empty()) return;
     p.toggleInertia(false);
@@ -615,6 +600,8 @@ void IF::alphaBetaUpdate(player& p, sequence& seq, const bool careX, const bool 
 }
 
 util::vec2D IF::estimateSpeed(sequence& seq, bool endedAirborne, double initVx, double initVz){
+    searchStats.estimateSpeedCalls++;
+
     if(initVz == 0 && initVx == 0 && seq.airLast){ 
         getDummy();
         input lastInput = seq.inputs.back();
@@ -776,4 +763,8 @@ void IF::clearLog(){
 
 void IF::toggleLog(bool on){
     logger.toggle(on);
+}
+
+IF::SearchStats IF::getSearchStats() const{
+    return searchStats;
 }

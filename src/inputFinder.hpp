@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include <vector>
 #include <string>
 #include "util.hpp"
@@ -51,6 +52,21 @@ class inputFinder {
         double finalVz = 0;
     };
 
+    struct SearchStats {
+        std::uint64_t inputDfsRecCalls = 0;
+        std::uint64_t alphaBetaUpdateCalls = 0;
+        std::uint64_t estimateSpeedCalls = 0;
+        std::uint64_t exeSeqCalls = 0;
+        std::uint64_t maxTickPrunes = 0;
+        std::uint64_t minBoundPrunes = 0;
+        std::uint64_t maxBoundPrunes = 0;
+        std::uint64_t endDepthRejects = 0;
+        std::uint64_t childHardPrunesNoRJ = 0;
+        std::uint64_t childHardPrunesRJ = 0;
+        std::uint64_t monotonicPrunesNoRJ = 0;
+        std::uint64_t monotonicPrunesRJ = 0;
+    };
+
     static void setCondWithBound(axisCond& cond, double bound1, double bound2);
 
     void initHeuristics(int airtime, double zDis, double xDis);
@@ -84,6 +100,7 @@ class inputFinder {
     void printLog();
     void clearLog();
     void toggleLog(bool on);
+    SearchStats getSearchStats() const;
 
     private:
 
@@ -98,6 +115,8 @@ class inputFinder {
     double vxLB = 0, vxUB = 0;
     std::vector<double> wasdTerminalVz =  std::vector<double>(9, 0); // index: 3*(a+1) + (w+1)
     std::vector<double> wasdTerminalVx =  std::vector<double>(9, 0); 
+    std::vector<double> errorRecorderX;
+    std::vector<double> errorRecorderZ;
 
     // engine settings
     int maxDepth = 3;
@@ -106,6 +125,7 @@ class inputFinder {
     // constants to account movement approximation error using lerp
     const double floatErr = 1e-6;
     double inertiaErr = 3e-3;
+    SearchStats searchStats;
 
     Logger logger;
     

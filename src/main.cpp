@@ -1,9 +1,7 @@
 #include <chrono>
 #include <iostream>
 #include "inputFinder.hpp"
-
 #include "util.hpp"
-#include "zInputFinder.hpp"
 
 void init(){
     util::init();
@@ -14,11 +12,14 @@ struct BenchmarkStats {
     double minUs = 0;
     double maxUs = 0;
     std::size_t resultCount = 0;
+    int runs = 0;
+    inputFinder::SearchStats searchStats;
 };
 
 template<typename Func>
 BenchmarkStats benchmarkUs(Func func, int runs = 50) {
     BenchmarkStats stats;
+    stats.runs = runs;
     stats.resultCount = func().size();
 
     double totalUs = 0;
@@ -46,53 +47,62 @@ void printBenchMark(const BenchmarkStats& stats){
     std::cout << "Avg time: " << stats.avgUs << " us\n";
     std::cout << "Min time: " << stats.minUs << " us\n";
     std::cout << "Max time: " << stats.maxUs << " us\n";
+    const double runs = static_cast<double>(stats.runs);
+    std::cout << "Avg inputDfsRec calls: " << (stats.searchStats.inputDfsRecCalls / runs) << "\n";
+    std::cout << "Avg alphaBetaUpdate calls: " << (stats.searchStats.alphaBetaUpdateCalls / runs) << "\n";
+    std::cout << "Avg estimateSpeed calls: " << (stats.searchStats.estimateSpeedCalls / runs) << "\n";
+    std::cout << "Avg exeSeq calls: " << (stats.searchStats.exeSeqCalls / runs) << "\n";
+    std::cout << "Avg maxTick prunes: " << (stats.searchStats.maxTickPrunes / runs) << "\n";
+    std::cout << "Avg minBound prunes: " << (stats.searchStats.minBoundPrunes / runs) << "\n";
+    std::cout << "Avg maxBound prunes: " << (stats.searchStats.maxBoundPrunes / runs) << "\n";
+    std::cout << "Avg endDepth rejects: " << (stats.searchStats.endDepthRejects / runs) << "\n";
+    std::cout << "Avg childHard prunes (no RJ): " << (stats.searchStats.childHardPrunesNoRJ / runs) << "\n";
+    std::cout << "Avg childHard prunes (RJ): " << (stats.searchStats.childHardPrunesRJ / runs) << "\n";
+    std::cout << "Avg monotonic prunes (no RJ): " << (stats.searchStats.monotonicPrunesNoRJ / runs) << "\n";
+    std::cout << "Avg monotonic prunes (RJ): " << (stats.searchStats.monotonicPrunesRJ / runs) << "\n";
 }
 
 int main() {
-
-    // We don't have GUI yet ;(
-
     init();
 
-    if(true){
-        // Finding input for slowness I 1.5bm 6-1 to ladder (perfect double 45.01)
+    const int depth = 4;
+    const int airtime = 12;
+    const int runs = 50;
+    const bool allowStrafe = false;
 
-        int runs = 50;
+    inputFinder::condition cond;
+    cond.endAirborne = false;
+    cond.x.enabled = false;
+    cond.z.enabled = true;
+    cond.z.mm = -1.5;
+    cond.allowStrafe = allowStrafe;
+    cond.sideDev = 0.5;
+    inputFinder::setCondWithBound(cond.z, -0.1276844242999637, -0.1276846279184921);
 
-        auto testInputFinder = [](bool riskIt, int runs){
-            inputFinder f;
-            f.toggleLog(false);
-            f.changeSettings(4, 40);
-            f.riskyPrune(riskIt);
-            f.logSettings();
-            f.setEffect(0, 1);
-            inputFinder::condition cond;
-            cond.endAirborne = false;
-            cond.x.enabled = false;
-            cond.z.enabled = true;
-            cond.z.mm = -1.5;
-            cond.allowStrafe = false;
-            cond.sideDev = -1;
-            f.setCondWithBound(cond.z, -0.1276844242999637, -0.1276846279184921);
-            double targetVz = cond.z.vel;
-            double error = cond.z.tolerance;
-            double mm = cond.z.mm;
-            double airtime = 12;
-            bool hasStrafe = cond.allowStrafe;
-            std::cout << "------------------------------\n";
-            std::cout << "InputFinder: \n";
-            std::cout << "targetVz: " << util::df(targetVz) << ", error: " << util::df(error) << ", mm: " << util::fmt(mm) << ", airtime: " << airtime << ", allowStrafe: " << hasStrafe << "\n";
-            std::cout << "riskyPrune? " << riskIt << "\n";
+    auto printHeader = [&](bool riskIt) {
+        std::cout << "------------------------------\n";
+        std::cout << "depth: " << depth << ", airtime: " << airtime << ", runs: " << runs << "\n";
+        std::cout << "allowStrafe: " << allowStrafe << ", riskyPrune: " << riskIt << "\n";
+        std::cout << "targetVz: " << util::df(cond.z.vel)
+                  << ", error: " << util::df(cond.z.tolerance)
+                  << ", mm: " << util::fmt(cond.z.mm) << "\n";
+    };
 
-            BenchmarkStats stats = benchmarkUs([&]() {
-                return f.matchSpeed(cond, airtime);
-            }, runs);
+    for (bool riskIt : {false, true}) {
+        inputFinder f;
+        f.toggleLog(false);
+        f.changeSettings(depth, 40);
+        f.riskyPrune(riskIt);
+        f.setEffect(0, 1);
 
-            printBenchMark(stats);
-        };
+        BenchmarkStats inputStats = benchmarkUs([&]() {
+            return f.matchSpeed(cond, airtime);
+        }, runs);
+        inputStats.searchStats = f.getSearchStats();
 
-        testInputFinder(false, runs);
-        testInputFinder(true, runs);
+        printHeader(riskIt);
+        std::cout << "InputFinder:\n";
+        printBenchMark(inputStats);
     }
 
     return 0;

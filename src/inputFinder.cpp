@@ -359,7 +359,6 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                     if(hardPrune) searchStats.childHardPrunesNoRJ++;
                     else searchStats.monotonicPrunesNoRJ++;
                     pruneR = std::min(node.airtime, t + 1);
-                    // std::cout << seq2Mothball(node) << "thisd: " << depth << ", hardPrune: " << hardPrune << ", w:" << w << ", a:" << a <<", t:" << t << "\n";
                     break;
                 } 
 
@@ -413,7 +412,6 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                     if(hardPrune || monotonicPrune){
                         if(hardPrune) searchStats.childHardPrunesRJ++;
                         else searchStats.monotonicPrunesRJ++;
-                        // std::cout << seq2Mothball(node) << "thisd: " << depth << ", hardPrune: " << hardPrune << ", w:" << w << ", a:" << a <<", t:" << t << "\n";
                         break;
                     } 
 

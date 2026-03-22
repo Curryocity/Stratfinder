@@ -17,7 +17,7 @@ struct BenchmarkStats {
 };
 
 template<typename Func, typename StatsFunc>
-BenchmarkStats benchmarkUs(Func func, StatsFunc statsFunc, int runs = 50) {
+BenchmarkStats benchmarkUs(Func func, StatsFunc statsFunc, int runs = 100) {
     BenchmarkStats stats;
     stats.runs = runs;
 

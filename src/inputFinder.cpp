@@ -182,10 +182,10 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
         return true;
     }
 
+    alphaBetaUpdate(getDummy(), node);
+
     const bool careZ = cond.z.enabled;
     const bool careX = cond.x.enabled;
-
-    alphaBetaUpdate(getDummy(), node, careX, careZ);
 
     // Hardprune section on top to maximize effectiveness
     if(node.T > 0){
@@ -219,8 +219,8 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
     if (lastDepth) {
         eV = estimateSpeed(node, cond.endAirborne);
 
-        node.lerpX.error = careX? std::abs(eV.x - cond.x.vel) - cond.x.tolerance - inertiaErr : 0;
-        node.lerpZ.error = careZ? std::abs(eV.z - cond.z.vel) - cond.z.tolerance - inertiaErr : 0;
+        node.lerpX.error = careX? std::abs(eV.x - cond.x.vel) - cond.x.tolerance - approxErr : 0;
+        node.lerpZ.error = careZ? std::abs(eV.z - cond.z.vel) - cond.z.tolerance - approxErr : 0;
         
         if(node.lerpX.error <= 0) node.lerpX.error = 0;
         if(node.lerpZ.error <= 0) node.lerpZ.error = 0;
@@ -260,15 +260,17 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
 
     // Must be after the hardPrune section
     // Early return: InputExtension is only viable when t is maximized on previous round, and maxDepth must be an inputExtension
-    if(depth == depthLimit && prevT != node.airtime) return false;
+    if(lastDepth && prevT != node.airtime) return false;
 
     const bool endingDepth = (depth >= depthLimit - 1);
+    const bool penultimateDepth = (depth == depthLimit - 1);
+    const bool monoCheck = endingDepth;
     
-    if(endingDepth){
+    if(monoCheck){
         // We compute eV on lastDepth already
-        if(!lastDepth) eV = estimateSpeed(node, cond.endAirborne);
-        errorRecorderX[0] = careX? std::max(0.0, std::abs(eV.x - cond.x.vel) - cond.x.tolerance - inertiaErr) : 0;
-        errorRecorderZ[0] = careZ? std::max(0.0, std::abs(eV.z - cond.z.vel) - cond.z.tolerance - inertiaErr) : 0;
+        if(penultimateDepth) eV = estimateSpeed(node, cond.endAirborne);
+        errorRecorderX[0] = careX? std::max(0.0, std::abs(eV.x - cond.x.vel) - cond.x.tolerance - approxErr) : 0;
+        errorRecorderZ[0] = careZ? std::max(0.0, std::abs(eV.z - cond.z.vel) - cond.z.tolerance - approxErr) : 0;
     }
 
 
@@ -290,26 +292,26 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
             }
 
             // only inputExtension is allowed at maxDepth
-            if(depth == depthLimit && !inputExtension) continue;
+            if(lastDepth && !inputExtension) continue;
 
             
-            if(endingDepth){
+            if(monoCheck){
                 // the initial input cannot be blank
                 if(w == 0 && a == 0) continue;
 
                 util::vec2D tV = terminalToSeq(w, a, node, cond.endAirborne);
 
                 if(careZ){
-                    if(((eV.z < cond.z.vel - cond.z.tolerance - inertiaErr) && (tV.z < cond.z.vel - cond.z.tolerance)) 
-                    || ((eV.z > cond.z.vel + cond.z.tolerance + inertiaErr) && (tV.z > cond.z.vel + cond.z.tolerance))) {
+                    if(((eV.z < cond.z.vel - cond.z.tolerance - approxErr) && (tV.z < cond.z.vel - cond.z.tolerance)) 
+                    || ((eV.z > cond.z.vel + cond.z.tolerance + approxErr) && (tV.z > cond.z.vel + cond.z.tolerance))) {
                         searchStats.endDepthRejects++;
                         continue;
                     }
                 }
 
                 if(careX){
-                    if( ((eV.x < cond.x.vel - cond.x.tolerance - inertiaErr) && (tV.x < cond.x.vel - cond.x.tolerance))
-                    || ((eV.x > cond.x.vel + cond.x.tolerance + inertiaErr) && (tV.x > cond.x.vel + cond.x.tolerance))) {
+                    if( ((eV.x < cond.x.vel - cond.x.tolerance - approxErr) && (tV.x < cond.x.vel - cond.x.tolerance))
+                    || ((eV.x > cond.x.vel + cond.x.tolerance + approxErr) && (tV.x > cond.x.vel + cond.x.tolerance))) {
                         searchStats.endDepthRejects++;
                         continue;
                     }
@@ -318,8 +320,13 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
             }
 
             int pruneR = node.airtime;
-            double lastErrX = endingDepth ? errorRecorderX[0] : INFINITY;
-            double lastErrZ = endingDepth ? errorRecorderZ[0] : INFINITY;
+            double lastErrX;
+            double lastErrZ;
+
+            if(monoCheck){
+                lastErrX = errorRecorderX[0];
+                lastErrZ = errorRecorderZ[0];
+            }
 
             // no reverse Jump
             for (int t = 1; t <= node.airtime; t++) {
@@ -341,9 +348,13 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                 bool hardPrune = dfsRecursive(depth + 1 - inputExtension, depthLimit, node, cond,  result);
                 const double childErrX = node.lerpX.error;
                 const double childErrZ = node.lerpZ.error;
-                if(endingDepth){
+                bool monotonicPrune = false;
+                if(monoCheck){
                     errorRecorderX[t] = childErrX;
                     errorRecorderZ[t] = childErrZ;
+                    const bool zErrIncrease = careZ && (childErrZ > lastErrZ);
+                    const bool xErrIncrease = careX && (childErrX > lastErrX);
+                    monotonicPrune = zErrIncrease || xErrIncrease;
                 }
 
                 node.T = baseTick;
@@ -353,10 +364,6 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                 node.airLast = airLastCache;
 
                 node.inputs.pop_back();
-
-                bool zErrIncrease = careZ && (childErrZ > lastErrZ);
-                bool xErrIncrease = careX && (childErrX > lastErrX);
-                const bool monotonicPrune = endingDepth && (zErrIncrease || xErrIncrease);
 
                 if(hardPrune || monotonicPrune ) {
                     if(hardPrune) searchStats.childHardPrunesNoRJ++;
@@ -379,8 +386,11 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                     if(baseTick + r == 0) continue;
                 }
                 
-                lastErrX = endingDepth ? errorRecorderX[r] : INFINITY;
-                lastErrZ = endingDepth ? errorRecorderZ[r] : INFINITY;
+                if(monoCheck){
+                    lastErrX = errorRecorderX[r];
+                    lastErrZ = errorRecorderZ[r];
+                }
+                
                 for (int t = r + 1; t <= node.airtime; t++) {
 
                     node.inputs.push_back(IF::input{w, a, t});
@@ -395,8 +405,15 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                     node.T = baseTick + t;
 
                     bool hardPrune = dfsRecursive( depth + 1 - inputExtension, depthLimit, node, cond, result);
+
+                    bool monotonicPrune = false;
                     const double childErrX = node.lerpX.error;
                     const double childErrZ = node.lerpZ.error;
+                    if(monoCheck){
+                        const bool zErrIncrease = careZ && (childErrZ > lastErrZ);
+                        const bool xErrIncrease = careX && (childErrX > lastErrX);
+                        monotonicPrune = zErrIncrease || xErrIncrease;
+                    }
 
                     node.T = baseTick;
                     node.airDebt = airDebtCache;
@@ -407,10 +424,6 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
 
                     node.inputs.pop_back();
                     node.revJumps.pop_back();
-
-                    bool zErrIncrease = careZ && (childErrZ > lastErrZ);
-                    bool xErrIncrease = careX && (childErrX > lastErrX);
-                    const bool monotonicPrune = endingDepth && (zErrIncrease || xErrIncrease);
 
                     if(hardPrune || monotonicPrune){
                         if(hardPrune) searchStats.childHardPrunesRJ++;
@@ -524,7 +537,7 @@ bool IF::exeSeq(player& p, const sequence& seq, const condition& cond, double in
 }
 
 // v_end = alpha * v_init + beta (assuming v were ground speed)
-void IF::alphaBetaUpdate(player& p, sequence& seq, const bool careX, const bool careZ){
+void IF::alphaBetaUpdate(player& p, sequence& seq){
     searchStats.alphaBetaUpdateCalls++;
 
     if(seq.inputs.empty()) return;
@@ -733,9 +746,9 @@ void IF::changeSettings(int maxDepth, int maxTicks){
     this->maxTicks = maxTicks;
 }
 
-void IF::riskyPrune(bool yes){
-    if(yes) inertiaErr = floatErr;
-    else inertiaErr = 3e-3;
+void IF::riskyPrune(bool riskQ){
+    if(riskQ) approxErr = floatErr;
+    else approxErr = inertiaErr;
 }
 
 void IF::logSettings(){

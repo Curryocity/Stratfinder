@@ -78,7 +78,7 @@ class inputFinder {
     bool dfsRecursive(int depth, int depthLimit, sequence& node, const condition& cond, std::vector<sequence>& result);
 
     bool exeSeq(player& p, const sequence& seq, const condition& cond, double initVx = 0, double initVz = 0, bool mmCheck = true);
-    void alphaBetaUpdate(player& p, sequence& seq, const bool careX, const bool careZ);
+    void alphaBetaUpdate(player& p, sequence& seq);
 
     enum Axis{X,Z};
     util::vec2D estimateSpeed(sequence& seq, bool endedAirborne, double initVx = 0, double initVz = 0);
@@ -124,7 +124,8 @@ class inputFinder {
 
     // constants to account movement approximation error using lerp
     const double floatErr = 1e-6;
-    double inertiaErr = 3e-3;
+    const double inertiaErr = 0.003; // Tested value, may not be the best
+    double approxErr = inertiaErr;
     SearchStats searchStats;
 
     Logger logger;

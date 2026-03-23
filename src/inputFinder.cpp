@@ -167,7 +167,7 @@ std::vector<IF::sequence> IF::dfsEntry(const condition& cond, int airtime, int d
     node.revJumps.reserve(depthLimit);
     node.airtime = airtime;
     node.T = 0;
-    
+
     dfsRecursive(0, depthLimit, node, cond, result);
 
     return result;
@@ -186,6 +186,33 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
     const bool careX = cond.x.enabled;
 
     alphaBetaUpdate(getDummy(), node, careX, careZ);
+
+    // Hardprune section on top to maximize effectiveness
+    if(node.T > 0){
+        util::vec2D minV = estimateSpeed(node, cond.endAirborne,this->vxLB, this->vzLB);
+        double minVx = minV.x - floatErr;
+        double minVz = minV.z - floatErr;
+        if(careX && (minVx > (cond.x.vel + cond.x.tolerance))) {
+            searchStats.minBoundPrunes++;
+            return true;
+        }
+        if(careZ && (minVz > (cond.z.vel + cond.z.tolerance))) {
+            searchStats.minBoundPrunes++;
+            return true;
+        }
+
+        util::vec2D maxV = estimateSpeed(node, cond.endAirborne,this->vxUB, this->vzUB);
+        double maxVx = maxV.x + floatErr;
+        double maxVz = maxV.z + floatErr;
+        if(careX && (maxVx < (cond.x.vel - cond.x.tolerance))) {
+            searchStats.maxBoundPrunes++;
+            return true;
+        }
+        if(careZ && (maxVz < (cond.z.vel - cond.z.tolerance))) {
+            searchStats.maxBoundPrunes++;
+            return true;
+        }
+    }
 
     if (depth == depthLimit) {
         util::vec2D estSpeed = estimateSpeed(node, cond.endAirborne, 0,0);
@@ -216,32 +243,6 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
         }
 
     }
-
-    if(node.T > 0){
-        util::vec2D minV = estimateSpeed(node, cond.endAirborne,this->vxLB, this->vzLB);
-        double minVx = minV.x - floatErr;
-        double minVz = minV.z - floatErr;
-        if(careX && (minVx > (cond.x.vel + cond.x.tolerance))) {
-            searchStats.minBoundPrunes++;
-            return true;
-        }
-        if(careZ && (minVz > (cond.z.vel + cond.z.tolerance))) {
-            searchStats.minBoundPrunes++;
-            return true;
-        }
-
-        util::vec2D maxV = estimateSpeed(node, cond.endAirborne,this->vxUB, this->vzUB);
-        double maxVx = maxV.x + floatErr;
-        double maxVz = maxV.z + floatErr;
-        if(careX && (maxVx < (cond.x.vel - cond.x.tolerance))) {
-            searchStats.maxBoundPrunes++;
-            return true;
-        }
-        if(careZ && (maxVz < (cond.z.vel - cond.z.tolerance))) {
-            searchStats.maxBoundPrunes++;
-            return true;
-        }
-    }
     
     const int baseTick = node.T;
     const bool biSymmetric = rotation == 0.0f || rotation == 180.0f || (!careX);
@@ -255,7 +256,7 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
         prevT = prevInput.t;
     }
 
-    // Must do it after the hardPrune section
+    // Must be after the hardPrune section
     // Early return: InputExtension is only viable when t is maximized on previous round, and maxDepth must be an inputExtension
     if(depth == depthLimit && prevT != node.airtime) return false;
 

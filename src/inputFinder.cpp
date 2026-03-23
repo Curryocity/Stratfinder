@@ -214,11 +214,13 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
         }
     }
 
-    if (depth == depthLimit) {
-        util::vec2D estSpeed = estimateSpeed(node, cond.endAirborne, 0,0);
+    util::vec2D eV;
+    const bool lastDepth = (depth == depthLimit);
+    if (lastDepth) {
+        eV = estimateSpeed(node, cond.endAirborne);
 
-        node.lerpX.error = careX? std::abs(estSpeed.x - cond.x.vel) - cond.x.tolerance - inertiaErr : 0;
-        node.lerpZ.error = careZ? std::abs(estSpeed.z - cond.z.vel) - cond.z.tolerance - inertiaErr : 0;
+        node.lerpX.error = careX? std::abs(eV.x - cond.x.vel) - cond.x.tolerance - inertiaErr : 0;
+        node.lerpZ.error = careZ? std::abs(eV.z - cond.z.vel) - cond.z.tolerance - inertiaErr : 0;
         
         if(node.lerpX.error <= 0) node.lerpX.error = 0;
         if(node.lerpZ.error <= 0) node.lerpZ.error = 0;
@@ -261,10 +263,10 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
     if(depth == depthLimit && prevT != node.airtime) return false;
 
     const bool endingDepth = (depth >= depthLimit - 1);
-
-    util::vec2D eV;
+    
     if(endingDepth){
-        eV = estimateSpeed(node, cond.endAirborne);
+        // We compute eV on lastDepth already
+        if(!lastDepth) eV = estimateSpeed(node, cond.endAirborne);
         errorRecorderX[0] = careX? std::max(0.0, std::abs(eV.x - cond.x.vel) - cond.x.tolerance - inertiaErr) : 0;
         errorRecorderZ[0] = careZ? std::max(0.0, std::abs(eV.z - cond.z.vel) - cond.z.tolerance - inertiaErr) : 0;
     }
@@ -275,7 +277,7 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
 
             if(!cond.allowStrafe && a != 0) continue;
 
-            if(biSymmetric && ( a < 0 || (w == 0 && a != 0) ) ) continue; 
+            if(biSymmetric && (a < 0 || (w == 0 && a != 0))) continue; 
             // When biSymmetric:
             // A/D gives the same outcome, thus wlog ignore assume a>=0
             // Pressing either A/D does nothing when W/S is not held

@@ -13,7 +13,7 @@ class Logger {
     }
 
     void print() const {
-        std::cout << "LOG ----------------------- \n";
+        std::cout << "\nLOG ----------------------- \n\n";
         std::cout << log;
     }
 

@@ -738,7 +738,6 @@ void IF::setRotation(double rot){ rotation = rot;}
 void IF::setEffect(int speed, int slowness){
     this->speed = speed;
     this->slowness = slowness;
-    writeLog("(speed, slow) = (" + std::to_string(speed) + ", " + std::to_string(slowness) + ")\n");
 }
 
 void IF::changeSettings(int maxDepth, int maxTicks){
@@ -754,6 +753,7 @@ void IF::riskyPrune(bool riskQ){
 void IF::logSettings(){
     writeLog("Input Finder Settings: \n");
     writeLog("maxDepth = " + std::to_string(maxDepth) + ", maxTicks = " + std::to_string(maxTicks) + "\n");
+    writeLog("(speed, slow) = (" + std::to_string(speed) + ", " + std::to_string(slowness) + ")\n");
 }
 
 player& IF::getDummy(){

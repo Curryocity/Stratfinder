@@ -1,5 +1,4 @@
 #include <algorithm>
-#include <iostream>
 #include <cmath>
 #include <string>
 #include <vector>
@@ -1084,11 +1083,9 @@ bool ZS::equalJumpListCheck(int t_mm, int maxt, fullStrat strat1, fullStrat stra
 void ZS::setEffect(int speed, int slowness){
     this->speed = speed;
     this->slowness = slowness;
-    std::cout << "(speed, slow) = (" << speed << ", " << slowness << ")\n";
 }
 
 void ZS::clearEffects(){
     speed = 0;
     slowness = 0;
-    std::cout << "Cleared all effects";
 }

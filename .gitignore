@@ -11,6 +11,3 @@ cmake_install.cmake
 
 # macOS
 .DS_Store
-
-# VS Code
-.vscode/

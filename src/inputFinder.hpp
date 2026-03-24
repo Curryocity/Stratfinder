@@ -39,7 +39,9 @@ class inputFinder {
     };
 
     struct sequence{
-        int airtime;
+        sequence(int airtime_): airtime(airtime_){}
+
+        const int airtime;
         int T = 0;
         std::vector<input> inputs;
         std::vector<int> revJumps; 
@@ -50,6 +52,14 @@ class inputFinder {
         lerp lerpZ;
         double finalVx = 0;
         double finalVz = 0;
+    };
+
+    struct nodeShapshot{
+        const int T;
+        const int airDebt = 0;
+        const bool airLast = false;
+        const lerp lerpX;
+        const lerp lerpZ;
     };
 
     struct SearchStats {
@@ -76,6 +86,8 @@ class inputFinder {
     std::vector<sequence> dfsEntry(const condition& cond, int airtime, int depthLimit);
 
     bool dfsRecursive(int depth, int depthLimit, sequence& node, const condition& cond, std::vector<sequence>& result);
+
+    void backTrack(sequence& node, const nodeShapshot& snapShot);
 
     bool exeSeq(player& p, const sequence& seq, const condition& cond, double initVx = 0, double initVz = 0, bool mmCheck = true);
     void alphaBetaUpdate(player& p, sequence& seq);

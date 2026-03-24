@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <string>
+#include <utility>
 #include <vector>
 
 using IF = inputFinder;
@@ -151,7 +152,9 @@ std::vector<IF::sequence> IF::matchSpeed(const condition& cond, int airtime){
     for(int limit = 1; limit <= maxDepth; limit ++){
         std::vector<IF::sequence> partialResult = dfsEntry(cond, airtime, limit);
         result.reserve(result.size() + partialResult.size());
-        result.insert(result.end(), partialResult.begin(), partialResult.end());
+        for (auto& seq : partialResult) {
+            result.push_back(std::move(seq));
+        }
     }
 
     return result;
@@ -162,10 +165,9 @@ std::vector<IF::sequence> IF::dfsEntry(const condition& cond, int airtime, int d
     writeLog("-------------------------------------------------\n");
     writeLog("Try searching depth = " + std::to_string(depthLimit) + " inputs\n");
     std::vector<IF::sequence> result;
-    sequence node;
+    sequence node(airtime);
     node.inputs.reserve(depthLimit);
     node.revJumps.reserve(depthLimit);
-    node.airtime = airtime;
     node.T = 0;
 
     dfsRecursive(0, depthLimit, node, cond, result);
@@ -245,9 +247,6 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
         }
 
     }
-    
-    const int baseTick = node.T;
-    const bool biSymmetric = rotation == 0.0f || rotation == 180.0f || (!careX);
 
     int prevW = 69, prevA = 69, prevT = 0;
     input prevInput;
@@ -262,6 +261,10 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
     // Early return: InputExtension is only viable when t is maximized on previous round, and maxDepth must be an inputExtension
     if(lastDepth && prevT != node.airtime) return false;
 
+    // Main search happens after here, this is for backtracking purposes
+    const nodeShapshot baseNode{node.T, node.airDebt, node.airLast, node.lerpX, node.lerpZ};
+
+    const bool symmetric = rotation == 0.0f || rotation == 180.0f || (!careX);
     const bool endingDepth = (depth >= depthLimit - 1);
     const bool penultimateDepth = (depth == depthLimit - 1);
     const bool monoCheck = endingDepth;
@@ -279,8 +282,8 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
 
             if(!cond.allowStrafe && a != 0) continue;
 
-            if(biSymmetric && (a < 0 || (w == 0 && a != 0))) continue; 
-            // When biSymmetric:
+            if(symmetric && (a < 0 || (w == 0 && a != 0))) continue; 
+            // When symmetric:
             // A/D gives the same outcome, thus wlog ignore assume a>=0
             // Pressing either A/D does nothing when W/S is not held
    
@@ -332,22 +335,22 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
             for (int t = 1; t <= node.airtime; t++) {
 
                 // Final airspeed must be air
-                if(baseTick == 0 && cond.endAirborne) break;
+                if(baseNode.T == 0 && cond.endAirborne) break;
 
                 node.inputs.push_back(IF::input{w, a, t});
-
-                int airDebtCache = node.airDebt;
-                lerp lerpX = node.lerpX;
-                lerp lerpZ = node.lerpZ;
-                bool airLastCache = node.airLast;
                 
-                node.airDebt = std::max(0, node.airDebt - t);
-                node.T = baseTick + t;
+                node.airDebt = std::max(0, baseNode.airDebt - t);
+                node.T = baseNode.T + t;
+                node.airLast = baseNode.airLast;
+                node.lerpX = baseNode.lerpX;
+                node.lerpZ = baseNode.lerpZ;
 
                 // inputExtension does not cost depth
                 bool hardPrune = dfsRecursive(depth + 1 - inputExtension, depthLimit, node, cond,  result);
                 const double childErrX = node.lerpX.error;
                 const double childErrZ = node.lerpZ.error;
+                backTrack(node, baseNode);
+
                 bool monotonicPrune = false;
                 if(monoCheck){
                     errorRecorderX[t] = childErrX;
@@ -357,11 +360,6 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                     monotonicPrune = zErrIncrease || xErrIncrease;
                 }
 
-                node.T = baseTick;
-                node.airDebt = airDebtCache;
-                node.lerpX = lerpX;
-                node.lerpZ = lerpZ;
-                node.airLast = airLastCache;
 
                 node.inputs.pop_back();
 
@@ -376,14 +374,14 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                 lastErrZ = childErrZ;
             }
 
-            for(int r = std::max(0, node.airDebt); r < pruneR; r ++){
+            for(int r = std::max(0, baseNode.airDebt); r < pruneR; r ++){
 
                 if(cond.endAirborne){
                     // Last tick must be air
-                    if(baseTick == 0 && r > 0) break;
+                    if(baseNode.T == 0 && r > 0) break;
                 }else{
                     // Last tick must be grounded, cannot reverse jump on the ending tick.
-                    if(baseTick + r == 0) continue;
+                    if(baseNode.T + r == 0) continue;
                 }
                 
                 if(monoCheck){
@@ -394,33 +392,28 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                 for (int t = r + 1; t <= node.airtime; t++) {
 
                     node.inputs.push_back(IF::input{w, a, t});
-                    node.revJumps.push_back(baseTick + r);
-
-                    int airDebtCache = node.airDebt;
-                    lerp lerpX = node.lerpX;
-                    lerp lerpZ = node.lerpZ;
-                    bool airLastCache = node.airLast;
+                    node.revJumps.push_back(baseNode.T + r);
 
                     node.airDebt = std::max(0, node.airtime - (t - r));
-                    node.T = baseTick + t;
+                    node.T = baseNode.T + t;
+                    node.airLast = baseNode.airLast;
+                    node.lerpX = baseNode.lerpX;
+                    node.lerpZ = baseNode.lerpZ;
 
                     bool hardPrune = dfsRecursive( depth + 1 - inputExtension, depthLimit, node, cond, result);
 
                     bool monotonicPrune = false;
                     const double childErrX = node.lerpX.error;
                     const double childErrZ = node.lerpZ.error;
+                    
+                    backTrack(node, baseNode);
+
                     if(monoCheck){
                         const bool zErrIncrease = careZ && (childErrZ > lastErrZ);
                         const bool xErrIncrease = careX && (childErrX > lastErrX);
                         monotonicPrune = zErrIncrease || xErrIncrease;
                     }
 
-                    node.T = baseTick;
-                    node.airDebt = airDebtCache;
-
-                    node.lerpX = lerpX;
-                    node.lerpZ = lerpZ;
-                    node.airLast = airLastCache;
 
                     node.inputs.pop_back();
                     node.revJumps.pop_back();
@@ -439,7 +432,17 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
         }
     }
 
+    backTrack(node, baseNode);
+
     return false;
+}
+
+void IF::backTrack(sequence& node, const nodeShapshot& snapShot){
+    node.T = snapShot.T;
+    node.airDebt = snapShot.airDebt;
+    node.airLast = snapShot.airLast;
+    node.lerpX = snapShot.lerpX;
+    node.lerpZ = snapShot.lerpZ;
 }
 
 // Output false if condition is not satisfied

@@ -99,9 +99,44 @@ t = 15: 6 + 0.000305 b
 t = 17: 6.625 + 0.00072 b
 ```
 
+## Inputfinder(New): Finding inputs that matches the speed and fits in the mm
+
+### Slowness I 1.5bm 6-1 to ladder, bwmm strat for facing = 0 
+
+**(took ~14ms on average to find all nostrafe inputs up to depth 4)**
+
+```
+Input Finder: 
+targetVz: -0.1276845261092279, error: 0.0000001018092642, mm: -1.5, airtime: 12, allowStrafe: 0
+
+LOG ----------------------- 
+
+Input Finder Settings: 
+maxDepth = 4, maxTicks = 40
+(speed, slow) = (0, 1)
+-------------------------------------------------
+Try searching depth = 1 inputs
+-------------------------------------------------
+Try searching depth = 2 inputs
+-------------------------------------------------
+Try searching depth = 3 inputs
+-------------------------------------------------
+Try searching depth = 4 inputs
+
+Found Seqeunce: wa.s(11) s.w(6) w.s(2) wj.s(12) w.s(1) st(1) 
+t = 33(+1), Vz: -0.1276845873572806
+
+Found Seqeunce: sa.w(1) s.w(4) st(3) stj(7) wa.s(5) w.s(2) wj.s(10) sta(2) st(1) 
+t = 35(+11), Vz: -0.1276845618947523
+
+Found Seqeunce: sa.w(7) s.w(4) stj(5) wa.s(7) w.s(2) wj.s(10) sta(2) st(1) 
+t = 38(+5), Vz: -0.1276844591763858
+
+Found Seqeunce: sa.w(1) s.w(7) st(1) stj(4) wa.s(8) wj.s(10) sta(2) st(1) 
+t = 34(+11), Vz: -0.1276844736885106
+```
+
 ### TODOs:
-1. input bruteforcer (WIP)
-2. GUI
-3. ice/slime support
-4. slime bounce jump finding?
-5. 45bwmm finder (stratfind with limited turns on mm)
+1. GUI
+2. 45bwmm finder (stratfind with limited turns on mm)
+3. Full distance jump finder

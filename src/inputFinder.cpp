@@ -276,6 +276,7 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
         errorRecorderZ[0] = careZ? std::max(0.0, std::abs(eV.z - cond.z.vel) - cond.z.tolerance - approxErr) : 0;
     }
 
+    node.inputs.push_back(IF::input{0, 0, 0});
 
     for (int w = -1; w <= 1; w++) {
         for (int a = -1; a <= 1; a++) { 
@@ -331,14 +332,18 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                 lastErrZ = errorRecorderZ[0];
             }
 
+
+            node.inputs.back().w = w;
+            node.inputs.back().a = a;
+
             // no reverse Jump
             for (int t = 1; t <= node.airtime; t++) {
 
                 // Final airspeed must be air
                 if(baseNode.T == 0 && cond.endAirborne) break;
 
-                node.inputs.push_back(IF::input{w, a, t});
                 
+                node.inputs.back().t = t;
                 node.airDebt = std::max(0, baseNode.airDebt - t);
                 node.T = baseNode.T + t;
                 node.airLast = baseNode.airLast;
@@ -360,9 +365,6 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                     monotonicPrune = zErrIncrease || xErrIncrease;
                 }
 
-
-                node.inputs.pop_back();
-
                 if(hardPrune || monotonicPrune ) {
                     if(hardPrune) searchStats.childHardPrunesNoRJ++;
                     else searchStats.monotonicPrunesNoRJ++;
@@ -373,6 +375,8 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                 lastErrX = childErrX;
                 lastErrZ = childErrZ;
             }
+
+            node.revJumps.push_back(0);
 
             for(int r = std::max(0, baseNode.airDebt); r < pruneR; r ++){
 
@@ -391,8 +395,8 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                 
                 for (int t = r + 1; t <= node.airtime; t++) {
 
-                    node.inputs.push_back(IF::input{w, a, t});
-                    node.revJumps.push_back(baseNode.T + r);
+                    node.inputs.back().t = t;
+                    node.revJumps.back() = baseNode.T + r;
 
                     node.airDebt = std::max(0, node.airtime - (t - r));
                     node.T = baseNode.T + t;
@@ -414,10 +418,6 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                         monotonicPrune = zErrIncrease || xErrIncrease;
                     }
 
-
-                    node.inputs.pop_back();
-                    node.revJumps.pop_back();
-
                     if(hardPrune || monotonicPrune){
                         if(hardPrune) searchStats.childHardPrunesRJ++;
                         else searchStats.monotonicPrunesRJ++;
@@ -429,8 +429,11 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                 }
             }
 
+            node.revJumps.pop_back();
         }
     }
+
+    node.inputs.pop_back();
 
     backTrack(node, baseNode);
 

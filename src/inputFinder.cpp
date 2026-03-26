@@ -450,15 +450,15 @@ void IF::backTrack(sequence& node, const nodeShapshot& snapShot){
 
 // Output false if condition is not satisfied
 // The final velocity is stored in player& p
-bool IF::exeSeq(player& p, const sequence& seq, const condition& cond, double initVx, double initVz, const bool mmCheck){
+bool IF::exeSeq(player& p, const sequence& seq, const condition& cond, const double initVx, const double initVz, const bool mmCheck){
     searchStats.exeSeqCalls++;
 
     int tick = seq.T;
     int airClock = (seq.airDebt == 0)? 0 : seq.airtime - seq.airDebt;
     int rjIdx = seq.revJumps.size() - 1 - (airClock > 0);
 
-    double zmm = cond.z.mm;
-    double xmm = cond.x.mm;
+    const double zmm = cond.z.mm;
+    const double xmm = cond.x.mm;
     const bool zMMCheck = ( (zmm != 0) && mmCheck);
     const bool xMMCheck = ( (xmm != 0) && mmCheck);
 
@@ -491,16 +491,16 @@ bool IF::exeSeq(player& p, const sequence& seq, const condition& cond, double in
     int n = seq.inputs.size();
     for (int i = n - 1; i >= 0; i--) {
         const input in = seq.inputs[i];
+        const bool sprintQ = (in.w == 1);
         for (int j = 0; j < in.t; j++) {
 
             bool jumpQ = false;
-            if(rjIdx >= 0 && !seq.revJumps.empty() && (tick - seq.airtime) == seq.revJumps[rjIdx]){
+            if(rjIdx >= 0 && (tick - seq.airtime) == seq.revJumps[rjIdx]){
                 jumpQ = true;
                 rjIdx --;
             }
 
             airborne = airClock > 0;
-            bool sprintQ = (in.w == 1);
             int movementType = 2 * sprintQ + (sprintQ && jumpQ);
 
             p.move(in.w, in.a, airborne, movementType, 1);
@@ -509,12 +509,10 @@ bool IF::exeSeq(player& p, const sequence& seq, const condition& cond, double in
 
             // Update mm used when grounded
             if(mmCheck && !airborne){
-                
                 if(zMMCheck)
                     if(mmViolation(zmm, zMin, zMax, preZ, p.Z())) return false;
                 if(xMMCheck)
                     if(mmViolation(xmm, xMin, xMax, preX, p.X())) return false;
-                
             }
 
             preX = p.X();
@@ -526,7 +524,7 @@ bool IF::exeSeq(player& p, const sequence& seq, const condition& cond, double in
         }
     }
 
-    // The starting position of the input is invalid
+    // Check if the starting position is invalid
     if(mmCheck){
         if (zMMCheck && ((zmm > 0 && zMax > p.Z()) || (zmm < 0 && zMin < p.Z())) )
             return false;
@@ -547,8 +545,10 @@ void IF::alphaBetaUpdate(player& p, sequence& seq){
     auto fastSamp = [&](double initVx, double initVz){
         int tick = seq.T;
         int airClock = (seq.airDebt == 0)? 0 : seq.airtime - seq.airDebt;
-        int rjIdx = seq.revJumps.size() - 1 - (airClock > 0);
-        bool airborne = false;
+        bool airborne = airClock > 0;
+
+        const int rjIdx = seq.revJumps.size() - 1 - airborne;
+        const int jumpTick = rjIdx >= 0 ? seq.revJumps[rjIdx] + seq.airtime : -1;
 
         p.resetAll();
         p.setVel(initVx, initVz);
@@ -558,15 +558,9 @@ void IF::alphaBetaUpdate(player& p, sequence& seq){
 
         for (int j = 0; j < lastInput.t; j++) {
 
-            bool jumpQ = false;
-            if(rjIdx >= 0 && !seq.revJumps.empty() && (tick - seq.airtime) == seq.revJumps[rjIdx]){
-                jumpQ = true;
-                rjIdx --;
-            }
-
             airborne = airClock > 0;
-            
-            int movementType = 2 * sprintQ + (sprintQ && jumpQ);
+            const bool jumpQ = (tick == jumpTick);
+            const int movementType = 2 * sprintQ + (sprintQ && jumpQ);
 
             p.move(lastInput.w, lastInput.a, airborne, movementType, 1);
 
@@ -574,11 +568,9 @@ void IF::alphaBetaUpdate(player& p, sequence& seq){
             if(j == 0 && airborne) p.setVel(initVx, initVz);
 
             if (jumpQ) airClock = seq.airtime;
-
             if (airClock > 0) airClock--;
             tick--;
         }
-
 
         int n = seq.inputs.size();
         if(seq.airLast && n >= 2){
@@ -595,7 +587,6 @@ void IF::alphaBetaUpdate(player& p, sequence& seq){
         vz = seq.lerpZ.alpha * vz + seq.lerpZ.beta;
 
         util::vec2D speedVec = {vx, vz};
-
         return speedVec;
     };
 

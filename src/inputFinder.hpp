@@ -88,7 +88,7 @@ class inputFinder {
 
     void backTrack(sequence& node, const nodeShapshot& snapShot);
 
-    bool exeSeq(player& p, const sequence& seq, const condition& cond, double initVx = 0, double initVz = 0, bool mmCheck = true);
+    bool exeSeq(player& p, const sequence& seq, const condition& cond, const double initVx = 0, const double initVz = 0, bool mmCheck = true);
     void alphaBetaUpdate(player& p, sequence& seq);
 
     enum Axis{X,Z};

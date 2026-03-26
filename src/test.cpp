@@ -87,7 +87,6 @@ int main() {
     cond.z.enabled = true;
     cond.z.mm = -1.5;
     cond.allowStrafe = allowStrafe;
-    cond.sideDev = 0.5;
     inputFinder::setCondWithBound(cond.z, -0.1276844242999637, -0.1276846279184921);
 
     auto printHeader = [&](bool riskIt) {

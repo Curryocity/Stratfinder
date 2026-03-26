@@ -46,7 +46,6 @@ int main() {
         cond.z.enabled = true;
         cond.z.mm = -1.5;
         cond.allowStrafe = false;
-        cond.sideDev = -1;
         f.setCondWithBound(cond.z, -0.1276844242999637, -0.1276846279184921);
         double targetVz = cond.z.vel;
         double error = cond.z.tolerance;

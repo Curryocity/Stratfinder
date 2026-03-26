@@ -509,11 +509,6 @@ bool IF::exeSeq(player& p, const sequence& seq, const condition& cond, double in
 
             // Update mm used when grounded
             if(mmCheck && !airborne){
-
-                if(cond.sideDev >= 0){
-                    if(zMMCheck && !xMMCheck && std::abs(p.X()) > cond.sideDev) return false;
-                    if(!zMMCheck && xMMCheck && std::abs(p.Z()) > cond.sideDev) return false;
-                }
                 
                 if(zMMCheck)
                     if(mmViolation(zmm, zMin, zMax, preZ, p.Z())) return false;

@@ -35,7 +35,6 @@ class inputFinder {
         axisCond x;
         bool endAirborne = false;
         bool allowStrafe = true;
-        double sideDev = -1; // only work on non-negative number
     };
 
     struct sequence{

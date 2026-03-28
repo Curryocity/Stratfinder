@@ -64,7 +64,7 @@ void printBenchmark(const BenchmarkStats& stats) {
     std::cout << "Per-run maxTick prunes: " << stats.searchStats.maxTickPrunes << "\n";
     std::cout << "Per-run minBound prunes: " << stats.searchStats.minBoundPrunes << "\n";
     std::cout << "Per-run maxBound prunes: " << stats.searchStats.maxBoundPrunes << "\n";
-    std::cout << "Per-run endDepth rejects: " << stats.searchStats.endDepthRejects << "\n";
+    std::cout << "Per-run zeroInf prunes: " << stats.searchStats.zeroInfPrune << "\n";
     std::cout << "Per-run childHard prunes (no RJ): " << stats.searchStats.childHardPrunesNoRJ << "\n";
     std::cout << "Per-run childHard prunes (RJ): " << stats.searchStats.childHardPrunesRJ << "\n";
     std::cout << "Per-run monotonic prunes (no RJ): " << stats.searchStats.monotonicPrunesNoRJ << "\n";

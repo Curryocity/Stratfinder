@@ -1,6 +1,7 @@
 #include "inputFinder.hpp"
 #include "util.hpp"
 #include "zEngine.hpp"
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdlib>
@@ -17,8 +18,6 @@ void IF::setCondWithBound(axisCond& cond, double bound1, double bound2){
 
 // heuristics
 void IF::initHeuristics(int airtime, double zDis, double xDis){
-    errorRecorderX = std::vector<double>(airtime + 1, 0);
-    errorRecorderZ = std::vector<double>(airtime + 1, 0);
 
     zEngine e(speed, slowness);
     e.s45(1);
@@ -158,7 +157,6 @@ std::vector<IF::sequence> IF::matchSpeed(const condition& cond, int airtime){
     }
 
     return result;
-
 }
 
 std::vector<IF::sequence> IF::dfsEntry(const condition& cond, int airtime, int depthLimit){
@@ -167,7 +165,6 @@ std::vector<IF::sequence> IF::dfsEntry(const condition& cond, int airtime, int d
     std::vector<IF::sequence> result;
     sequence node(airtime);
     node.inputs.reserve(depthLimit);
-    node.revJumps.reserve(depthLimit);
     node.T = 0;
 
     dfsRecursive(0, depthLimit, node, cond, result);
@@ -191,7 +188,7 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
 
     // Hardprune section on top to maximize effectiveness
     if(node.T > 0){
-        util::vec2D minV = estimateSpeed(node, cond.endAirborne,this->vxLB, this->vzLB);
+        util::vec2D minV = estimateSpeed(node, cond.endAirborne, this->vxLB, this->vzLB);
         double minVx = minV.x - floatErr;
         double minVz = minV.z - floatErr;
         if(careX && (minVx > (cond.x.vel + cond.x.tolerance))) {
@@ -203,7 +200,7 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
             return true;
         }
 
-        util::vec2D maxV = estimateSpeed(node, cond.endAirborne,this->vxUB, this->vzUB);
+        util::vec2D maxV = estimateSpeed(node, cond.endAirborne, this->vxUB, this->vzUB);
         double maxVx = maxV.x + floatErr;
         double maxVz = maxV.z + floatErr;
         if(careX && (maxVx < (cond.x.vel - cond.x.tolerance))) {
@@ -248,32 +245,31 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
 
     }
 
-    int prevW = 69, prevA = 69, prevT = 0;
+    int prevW = 69, prevA = 69;
     input prevInput;
     if(!node.inputs.empty()){
         prevInput = node.inputs.back();
         prevW = prevInput.w;
         prevA = prevInput.a;
-        prevT = prevInput.t;
     }
 
     // Must be after the hardPrune section
-    // Early return: InputExtension is only viable when t is maximized on previous round, and maxDepth must be an inputExtension
-    if(lastDepth && prevT != node.airtime) return false;
+    // Early return: maxDepth must be an inputExtension, cannot input extend airLast input
+    if(lastDepth && prevInput.type == Air) return false;
 
     // Main search happens after here, this is for backtracking purposes
-    const nodeShapshot baseNode{node.T, node.airDebt, node.airLast, node.lerpX, node.lerpZ};
+    const nodeShapshot baseNode{node.T, node.airDebt, node.lerpX, node.lerpZ};
 
     const bool symmetric = rotation == 0.0f || rotation == 180.0f || (!careX);
     const bool endingDepth = (depth >= depthLimit - 1);
     const bool penultimateDepth = (depth == depthLimit - 1);
-    const bool monoCheck = endingDepth;
-    
-    if(monoCheck){
+
+    double baseErrorX, baseErrorZ;
+    if(endingDepth){
         // We compute eV on lastDepth already
         if(penultimateDepth) eV = estimateSpeed(node, cond.endAirborne);
-        errorRecorderX[0] = careX? std::max(0.0, std::abs(eV.x - cond.x.vel) - cond.x.tolerance - approxErr) : 0;
-        errorRecorderZ[0] = careZ? std::max(0.0, std::abs(eV.z - cond.z.vel) - cond.z.tolerance - approxErr) : 0;
+        baseErrorX = careX? std::max(0.0, std::abs(eV.x - cond.x.vel) - cond.x.tolerance - approxErr) : 0;
+        baseErrorZ = careZ? std::max(0.0, std::abs(eV.z - cond.z.vel) - cond.z.tolerance - approxErr) : 0;
     }
 
     node.inputs.push_back(IF::input{0, 0, 0});
@@ -288,27 +284,27 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
             // A/D gives the same outcome, thus wlog ignore assume a>=0
             // Pressing either A/D does nothing when W/S is not held
    
-            bool inputExtension = false;
-            if((w == prevW) && (a == prevA)){
-                // Allow the extension of same movement key only when t is maximized on previous round
-                if(prevT == node.airtime) inputExtension = true;
-                else continue;
-            }
-
+            bool inputExtension = (w == prevW) && (a == prevA);
+            
             // only inputExtension is allowed at maxDepth
             if(lastDepth && !inputExtension) continue;
 
-            
-            if(monoCheck){
-                // the initial input cannot be blank
-                if(w == 0 && a == 0) continue;
+            const bool emptyInput = (w == 0) && (a == 0);
+            const bool zeroInfCheck = lastDepth || (penultimateDepth && !inputExtension);
 
+            // The initial(for regular timeline) input cannot be blank
+            // It will always fail the zeroInfCheck(that is the less obvious reason tho)
+            if(emptyInput && zeroInfCheck) continue;
+
+            // 0-inf interval check
+            if(zeroInfCheck){
+                
                 util::vec2D tV = terminalToSeq(w, a, node, cond.endAirborne);
 
                 if(careZ){
                     if(((eV.z < cond.z.vel - cond.z.tolerance - approxErr) && (tV.z < cond.z.vel - cond.z.tolerance)) 
                     || ((eV.z > cond.z.vel + cond.z.tolerance + approxErr) && (tV.z > cond.z.vel + cond.z.tolerance))) {
-                        searchStats.endDepthRejects++;
+                        searchStats.zeroInfPrune++;
                         continue;
                     }
                 }
@@ -316,95 +312,89 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                 if(careX){
                     if( ((eV.x < cond.x.vel - cond.x.tolerance - approxErr) && (tV.x < cond.x.vel - cond.x.tolerance))
                     || ((eV.x > cond.x.vel + cond.x.tolerance + approxErr) && (tV.x > cond.x.vel + cond.x.tolerance))) {
-                        searchStats.endDepthRejects++;
+                        searchStats.zeroInfPrune++;
                         continue;
                     }
 
                 }
             }
 
-            int pruneR = node.airtime;
+            // monoCheck doesn't make sense when input is empty
+            const bool monoCheck = (lastDepth || (penultimateDepth && !inputExtension)) && !emptyInput;
+
             double lastErrX;
             double lastErrZ;
-
-            if(monoCheck){
-                lastErrX = errorRecorderX[0];
-                lastErrZ = errorRecorderZ[0];
-            }
-
 
             node.inputs.back().w = w;
             node.inputs.back().a = a;
 
-            // no reverse Jump
-            for (int t = 1; t <= node.airtime; t++) {
+            // On ground:
+            if(prevInput.type != Air){
 
-                // Final airspeed must be air
-                if(baseNode.T == 0 && cond.endAirborne) break;
+                // 1. Walk/run n ticks
+                const bool endedGroundedMask = !(baseNode.T == 0 && cond.endAirborne); // zero if invalid
+                const bool extensionMask = !(inputExtension && (prevInput.type == Ground)); // zero if invalid
 
-                
-                node.inputs.back().t = t;
-                node.airDebt = std::max(0, baseNode.airDebt - t);
-                node.T = baseNode.T + t;
-                node.airLast = baseNode.airLast;
-                node.lerpX = baseNode.lerpX;
-                node.lerpZ = baseNode.lerpZ;
+                int maxRunTick = extensionMask * endedGroundedMask * (maxTicks - baseNode.T);
 
-                // inputExtension does not cost depth
-                bool hardPrune = dfsRecursive(depth + 1 - inputExtension, depthLimit, node, cond,  result);
-                const double childErrX = node.lerpX.error;
-                const double childErrZ = node.lerpZ.error;
-                backTrack(node, baseNode);
-
-                bool monotonicPrune = false;
                 if(monoCheck){
-                    errorRecorderX[t] = childErrX;
-                    errorRecorderZ[t] = childErrZ;
-                    const bool zErrIncrease = careZ && (childErrZ > lastErrZ);
-                    const bool xErrIncrease = careX && (childErrX > lastErrX);
-                    monotonicPrune = zErrIncrease || xErrIncrease;
+                    lastErrX = baseErrorX;
+                    lastErrZ = baseErrorZ;
                 }
 
-                if(hardPrune || monotonicPrune ) {
-                    if(hardPrune) searchStats.childHardPrunesNoRJ++;
-                    else searchStats.monotonicPrunesNoRJ++;
-                    pruneR = std::min(node.airtime, t + 1);
-                    break;
-                } 
-
-                lastErrX = childErrX;
-                lastErrZ = childErrZ;
-            }
-
-            node.revJumps.push_back(0);
-
-            for(int r = std::max(0, baseNode.airDebt); r < pruneR; r ++){
-
-                if(cond.endAirborne){
-                    // Last tick must be air
-                    if(baseNode.T == 0 && r > 0) break;
-                }else{
-                    // Last tick must be grounded, cannot reverse jump on the ending tick.
-                    if(baseNode.T + r == 0) continue;
-                }
-                
-                if(monoCheck){
-                    lastErrX = errorRecorderX[r];
-                    lastErrZ = errorRecorderZ[r];
-                }
-                
-                for (int t = r + 1; t <= node.airtime; t++) {
-
+                for (int t = 1; t <= maxRunTick; t++) {
                     node.inputs.back().t = t;
-                    node.revJumps.back() = baseNode.T + r;
-
-                    node.airDebt = std::max(0, node.airtime - (t - r));
+                    node.airDebt = 0;
                     node.T = baseNode.T + t;
-                    node.airLast = baseNode.airLast;
                     node.lerpX = baseNode.lerpX;
                     node.lerpZ = baseNode.lerpZ;
+                    node.inputs.back().type = Ground;
 
-                    bool hardPrune = dfsRecursive( depth + 1 - inputExtension, depthLimit, node, cond, result);
+                    // inputExtension does not cost depth
+                    bool hardPrune = dfsRecursive(depth + 1 - inputExtension, depthLimit, node, cond, result);
+
+                    const double childErrX = node.lerpX.error;
+                    const double childErrZ = node.lerpZ.error;
+                    backTrack(node, baseNode);
+
+                    bool monotonicPrune = false;
+                    if(monoCheck){
+                        const bool zErrIncrease = careZ && (childErrZ > lastErrZ);
+                        const bool xErrIncrease = careX && (childErrX > lastErrX);
+                        monotonicPrune = zErrIncrease || xErrIncrease;
+                    }
+
+                    if(hardPrune || monotonicPrune) {
+                        if(hardPrune) searchStats.childHardPrunesNoRJ++;
+                        else searchStats.monotonicPrunesNoRJ++;
+                        break;
+                    } 
+
+                    lastErrX = childErrX;
+                    lastErrZ = childErrZ;
+                }
+                
+                // 2. Do revJump (at most until reverse landed)
+
+
+                const bool endedAirMask = !(baseNode.T == 0 && !cond.endAirborne); // zero if invalid
+                const int revLandTick = node.airtime * endedAirMask;
+
+                if(monoCheck){
+                    lastErrX = baseErrorX;
+                    lastErrZ = baseErrorZ;
+                }
+
+                for (int t = 1; t <= revLandTick; t++) {
+
+                    node.inputs.back().t = t;
+                    node.airDebt = std::max(0, node.airtime - t);
+                    node.T = baseNode.T + t;
+                    node.lerpX = baseNode.lerpX;
+                    node.lerpZ = baseNode.lerpZ;
+                    node.inputs.back().type = (t == revLandTick)? Jump : Air;
+
+                    bool hardPrune = dfsRecursive(depth + 1 - inputExtension, depthLimit, node, cond, result);
 
                     bool monotonicPrune = false;
                     const double childErrX = node.lerpX.error;
@@ -426,10 +416,56 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
 
                     lastErrX = childErrX;
                     lastErrZ = childErrZ;
-                }
-            }
 
-            node.revJumps.pop_back();
+                }
+
+
+            }else if(!inputExtension){  // Airborne, cannot be inputExtension
+
+                // Extend the air ticks(at most until reverse landed)
+
+                const int revLandTick = baseNode.airDebt;
+
+                if(monoCheck){
+                    lastErrX = baseErrorX;
+                    lastErrZ = baseErrorZ;
+                }
+
+                for (int t = 1; t <= revLandTick; t++) {
+
+                    node.inputs.back().t = t;
+                    node.airDebt = std::max(0, baseNode.airDebt - t);
+                    node.T = baseNode.T + t;
+                    node.lerpX = baseNode.lerpX;
+                    node.lerpZ = baseNode.lerpZ;
+                    node.inputs.back().type = (t == revLandTick)? Jump : Air;
+
+                    bool hardPrune = dfsRecursive(depth + 1, depthLimit, node, cond, result);
+
+                    bool monotonicPrune = false;
+                    const double childErrX = node.lerpX.error;
+                    const double childErrZ = node.lerpZ.error;
+                    
+                    backTrack(node, baseNode);
+
+                    if(monoCheck){
+                        const bool zErrIncrease = careZ && (childErrZ > lastErrZ);
+                        const bool xErrIncrease = careX && (childErrX > lastErrX);
+                        monotonicPrune = zErrIncrease || xErrIncrease;
+                    }
+
+                    if(hardPrune || monotonicPrune){
+                        if(hardPrune) searchStats.childHardPrunesRJ++;
+                        else searchStats.monotonicPrunesRJ++;
+                        break;
+                    } 
+
+                    lastErrX = childErrX;
+                    lastErrZ = childErrZ;
+
+                }
+
+            }
         }
     }
 
@@ -443,7 +479,6 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
 void IF::backTrack(sequence& node, const nodeShapshot& snapShot){
     node.T = snapShot.T;
     node.airDebt = snapShot.airDebt;
-    node.airLast = snapShot.airLast;
     node.lerpX = snapShot.lerpX;
     node.lerpZ = snapShot.lerpZ;
 }
@@ -455,7 +490,6 @@ bool IF::exeSeq(player& p, const sequence& seq, const condition& cond, const dou
 
     int tick = seq.T;
     int airClock = (seq.airDebt == 0)? 0 : seq.airtime - seq.airDebt;
-    int rjIdx = seq.revJumps.size() - 1 - (airClock > 0);
 
     const double zmm = cond.z.mm;
     const double xmm = cond.x.mm;
@@ -492,13 +526,9 @@ bool IF::exeSeq(player& p, const sequence& seq, const condition& cond, const dou
     for (int i = n - 1; i >= 0; i--) {
         const input in = seq.inputs[i];
         const bool sprintQ = (in.w == 1);
-        for (int j = 0; j < in.t; j++) {
+        for (int t = 0; t < in.t; t++) {
 
-            bool jumpQ = false;
-            if(rjIdx >= 0 && (tick - seq.airtime) == seq.revJumps[rjIdx]){
-                jumpQ = true;
-                rjIdx --;
-            }
+            bool jumpQ = (in.type == Jump) && (t == 0);
 
             airborne = airClock > 0;
             int movementType = 2 * sprintQ + (sprintQ && jumpQ);
@@ -547,25 +577,22 @@ void IF::alphaBetaUpdate(player& p, sequence& seq){
         int airClock = (seq.airDebt == 0)? 0 : seq.airtime - seq.airDebt;
         bool airborne = airClock > 0;
 
-        const int rjIdx = seq.revJumps.size() - 1 - airborne;
-        const int jumpTick = rjIdx >= 0 ? seq.revJumps[rjIdx] + seq.airtime : -1;
-
         p.resetAll();
         p.setVel(initVx, initVz);
 
         const input lastInput = seq.inputs.back();
         const bool sprintQ = (lastInput.w == 1);
 
-        for (int j = 0; j < lastInput.t; j++) {
+        for (int t = 0; t < lastInput.t; t++) {
 
             airborne = airClock > 0;
-            const bool jumpQ = (tick == jumpTick);
+            const bool jumpQ = (t == 0) && (lastInput.type == Jump);
             const int movementType = 2 * sprintQ + (sprintQ && jumpQ);
 
             p.move(lastInput.w, lastInput.a, airborne, movementType, 1);
 
             // ignoring the movement of first tick, cuz sprintDelay makes air as first tick unreliable
-            if(j == 0 && airborne) p.setVel(initVx, initVz);
+            if(t == 0 && airborne) p.setVel(initVx, initVz);
 
             if (jumpQ) airClock = seq.airtime;
             if (airClock > 0) airClock--;
@@ -573,10 +600,12 @@ void IF::alphaBetaUpdate(player& p, sequence& seq){
         }
 
         int n = seq.inputs.size();
-        if(seq.airLast && n >= 2){
+        if(n >= 2){
             const input prevInput = seq.inputs[n - 2];
-            p.sa(prevInput.w, prevInput.a, 1);
-            airborne = true;
+            if(prevInput.type == Air){
+                p.sa(prevInput.w, prevInput.a, 1);
+                airborne = true;
+            }
         }
 
         // force ground speed format
@@ -599,8 +628,6 @@ void IF::alphaBetaUpdate(player& p, sequence& seq){
     seq.lerpZ.alpha = vec1.z - vec0.z;
     seq.lerpZ.beta = vec0.z;
 
-    seq.airLast = seq.airDebt > 0;
-
     p.toggleInertia(true);
 
 }
@@ -608,7 +635,7 @@ void IF::alphaBetaUpdate(player& p, sequence& seq){
 util::vec2D IF::estimateSpeed(sequence& seq, bool endedAirborne, double initVx, double initVz){
     searchStats.estimateSpeedCalls++;
 
-    if(initVz == 0 && initVx == 0 && seq.airLast){ 
+    if(initVz == 0 && initVx == 0 && seq.airDebt > 0){ 
         getDummy();
         input lastInput = seq.inputs.back();
         dummy.sa(lastInput.w, lastInput.a, 1);
@@ -631,7 +658,7 @@ util::vec2D IF::terminalToSeq(int w, int a, sequence& seq, bool endedAirborne){
     double initVx = wasdTerminalVx[3*(a+1) + (w+1)];
     getDummy();
     dummy.setVel(initVx, initVz);
-    if(seq.airLast){
+    if(seq.airDebt > 0){
         dummy.setPrevSprint(w == 1);
         dummy.sa(w, a, 1);
     }
@@ -651,7 +678,6 @@ std::string IF::seq2Mothball(const sequence& seq) {
 
     int tick = seq.T;
     int airClock = (seq.airDebt == 0)? 0 : seq.airtime - seq.airDebt;
-    int rjIdx = seq.revJumps.size() - 1 - (airClock > 0);
 
     bool streakFromJump = false;
     int streak = 0;
@@ -687,14 +713,12 @@ std::string IF::seq2Mothball(const sequence& seq) {
     int n = seq.inputs.size();
     for (int i = n - 1; i >= 0; i--) {
         const input in = seq.inputs[i];
-        for (int j = 0; j < in.t; j++) {
+        for (int t = 0; t < in.t; t++) {
             bool jumpQ = false;
-            if(rjIdx >= 0 && (tick - seq.airtime) == seq.revJumps[rjIdx]){
+            if(t == 0 && in.type == Jump){
                 jumpQ = true;
-                rjIdx --;
             }
 
-            
             int gaj = (airClock > 0) ? 1 : 0;
             if (jumpQ) gaj = 2;
 

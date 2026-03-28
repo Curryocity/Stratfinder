@@ -10,10 +10,13 @@ class inputFinder {
     // IMPORTANT: I ASSUMED TOGGLESPRINT FOR EFFICIENCY
     public:
 
+    enum segmentType{None, Ground, Air, Jump};
+
     struct input {
         int w = 0; // -1, 0, 1
         int a = 0; // -1, 0, 1
         int t = 1;
+        segmentType type = None;
     };
 
     struct lerp{
@@ -43,10 +46,7 @@ class inputFinder {
         const int airtime;
         int T = 0;
         std::vector<input> inputs;
-        std::vector<int> revJumps; 
-        // Reverse jump: time travel airtime ticks in the past to jump so you are landing this tick
         int airDebt = 0;
-        bool airLast = false;
         lerp lerpX;
         lerp lerpZ;
         double finalVx = 0;
@@ -56,7 +56,6 @@ class inputFinder {
     struct nodeShapshot{
         const int T;
         const int airDebt = 0;
-        const bool airLast = false;
         const lerp lerpX;
         const lerp lerpZ;
     };
@@ -69,7 +68,7 @@ class inputFinder {
         std::uint64_t maxTickPrunes = 0;
         std::uint64_t minBoundPrunes = 0;
         std::uint64_t maxBoundPrunes = 0;
-        std::uint64_t endDepthRejects = 0;
+        std::uint64_t zeroInfPrune = 0;
         std::uint64_t childHardPrunesNoRJ = 0;
         std::uint64_t childHardPrunesRJ = 0;
         std::uint64_t monotonicPrunesNoRJ = 0;
@@ -126,15 +125,13 @@ class inputFinder {
     double vxLB = 0, vxUB = 0;
     std::vector<double> wasdTerminalVz =  std::vector<double>(9, 0); // index: 3*(a+1) + (w+1)
     std::vector<double> wasdTerminalVx =  std::vector<double>(9, 0); 
-    std::vector<double> errorRecorderX;
-    std::vector<double> errorRecorderZ;
 
     // engine settings
     int maxDepth = 3;
     int maxTicks = 40;
 
     // constants to account movement approximation error using lerp
-    const double floatErr = 1e-6;
+    const double floatErr = 1e-5;
     const double inertiaErr = 0.003; // Tested value, may not be the best
     double approxErr = inertiaErr;
     SearchStats searchStats;

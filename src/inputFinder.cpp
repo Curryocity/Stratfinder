@@ -218,13 +218,13 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
     if (lastDepth) {
         eV = estimateSpeed(node, cond.endAirborne);
 
-        node.lerpX.error = careX? std::abs(eV.x - cond.x.vel) - cond.x.tolerance - approxErr : 0;
-        node.lerpZ.error = careZ? std::abs(eV.z - cond.z.vel) - cond.z.tolerance - approxErr : 0;
+        node.errX = careX? std::abs(eV.x - cond.x.vel) - cond.x.tolerance - approxErr : 0;
+        node.errZ = careZ? std::abs(eV.z - cond.z.vel) - cond.z.tolerance - approxErr : 0;
         
-        if(node.lerpX.error <= 0) node.lerpX.error = 0;
-        if(node.lerpZ.error <= 0) node.lerpZ.error = 0;
+        if(node.errX <= 0) node.errX = 0;
+        if(node.errZ <= 0) node.errZ = 0;
 
-        if(node.lerpX.error == 0 && node.lerpZ.error == 0){
+        if(node.errX == 0 && node.errZ == 0){
 
             bool valid = exeSeq(dummy, node, cond, 0, 0, true);
             double vx = dummy.Vx(), vz = dummy.Vz();
@@ -258,7 +258,7 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
     if(lastDepth && prevInput.type == Air) return false;
 
     // Main search happens after here, this is for backtracking purposes
-    const nodeShapshot baseNode{node.T, node.airDebt, node.lerpX, node.lerpZ};
+    const nodeShapshot baseNode{node.T, node.airDebt, node.lerpX, node.lerpZ, node.errX, node.errZ};
 
     const bool symmetric = rotation == 0.0f || rotation == 180.0f || (!careX);
     const bool endingDepth = (depth >= depthLimit - 1);
@@ -353,8 +353,8 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                     // inputExtension does not cost depth
                     bool hardPrune = dfsRecursive(depth + 1 - inputExtension, depthLimit, node, cond, result);
 
-                    const double childErrX = node.lerpX.error;
-                    const double childErrZ = node.lerpZ.error;
+                    const double childErrX = node.errX;
+                    const double childErrZ = node.errZ;
                     backTrack(node, baseNode);
 
                     bool monotonicPrune = false;
@@ -365,8 +365,8 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                     }
 
                     if(hardPrune || monotonicPrune) {
-                        if(hardPrune) searchStats.childHardPrunesNoRJ++;
-                        else searchStats.monotonicPrunesNoRJ++;
+                        if(hardPrune) searchStats.childHardPrunesGroundRun++;
+                        else searchStats.monotonicPrunesGroundRun++;
                         break;
                     } 
 
@@ -397,8 +397,8 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                     bool hardPrune = dfsRecursive(depth + 1 - inputExtension, depthLimit, node, cond, result);
 
                     bool monotonicPrune = false;
-                    const double childErrX = node.lerpX.error;
-                    const double childErrZ = node.lerpZ.error;
+                    const double childErrX = node.errX;
+                    const double childErrZ = node.errZ;
                     
                     backTrack(node, baseNode);
 
@@ -409,8 +409,8 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                     }
 
                     if(hardPrune || monotonicPrune){
-                        if(hardPrune) searchStats.childHardPrunesRJ++;
-                        else searchStats.monotonicPrunesRJ++;
+                        if(hardPrune) searchStats.childHardPrunesGroundAir++;
+                        else searchStats.monotonicPrunesGroundAir++;
                         break;
                     } 
 
@@ -443,8 +443,8 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                     bool hardPrune = dfsRecursive(depth + 1, depthLimit, node, cond, result);
 
                     bool monotonicPrune = false;
-                    const double childErrX = node.lerpX.error;
-                    const double childErrZ = node.lerpZ.error;
+                    const double childErrX = node.errX;
+                    const double childErrZ = node.errZ;
                     
                     backTrack(node, baseNode);
 
@@ -455,8 +455,8 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                     }
 
                     if(hardPrune || monotonicPrune){
-                        if(hardPrune) searchStats.childHardPrunesRJ++;
-                        else searchStats.monotonicPrunesRJ++;
+                        if(hardPrune) searchStats.childHardPrunesAirExtend++;
+                        else searchStats.monotonicPrunesAirExtend++;
                         break;
                     } 
 
@@ -481,6 +481,8 @@ void IF::backTrack(sequence& node, const nodeShapshot& snapShot){
     node.airDebt = snapShot.airDebt;
     node.lerpX = snapShot.lerpX;
     node.lerpZ = snapShot.lerpZ;
+    node.errX = snapShot.errX;
+    node.errZ = snapShot.errZ;
 }
 
 // Output false if condition is not satisfied

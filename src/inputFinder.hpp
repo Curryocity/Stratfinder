@@ -22,7 +22,6 @@ class inputFinder {
     struct lerp{
         double alpha = 1;
         double beta = 0;
-        double error = 65536;
     };
 
     struct axisCond{
@@ -42,13 +41,14 @@ class inputFinder {
 
     struct sequence{
         sequence(int airtime_): airtime(airtime_){}
-
         const int airtime;
         int T = 0;
         std::vector<input> inputs;
         int airDebt = 0;
         lerp lerpX;
         lerp lerpZ;
+        double errX = 65536;
+        double errZ = 65536;
         double finalVx = 0;
         double finalVz = 0;
     };
@@ -58,6 +58,8 @@ class inputFinder {
         const int airDebt = 0;
         const lerp lerpX;
         const lerp lerpZ;
+        const double errX;
+        const double errZ;
     };
 
     struct SearchStats {
@@ -69,10 +71,12 @@ class inputFinder {
         std::uint64_t minBoundPrunes = 0;
         std::uint64_t maxBoundPrunes = 0;
         std::uint64_t zeroInfPrune = 0;
-        std::uint64_t childHardPrunesNoRJ = 0;
-        std::uint64_t childHardPrunesRJ = 0;
-        std::uint64_t monotonicPrunesNoRJ = 0;
-        std::uint64_t monotonicPrunesRJ = 0;
+        std::uint64_t childHardPrunesGroundRun = 0;
+        std::uint64_t childHardPrunesGroundAir = 0;
+        std::uint64_t childHardPrunesAirExtend = 0;
+        std::uint64_t monotonicPrunesGroundRun = 0;
+        std::uint64_t monotonicPrunesGroundAir = 0;
+        std::uint64_t monotonicPrunesAirExtend = 0;
     };
 
     static void setCondWithBound(axisCond& cond, double bound1, double bound2);

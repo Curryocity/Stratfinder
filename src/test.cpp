@@ -65,10 +65,12 @@ void printBenchmark(const BenchmarkStats& stats) {
     std::cout << "Per-run minBound prunes: " << stats.searchStats.minBoundPrunes << "\n";
     std::cout << "Per-run maxBound prunes: " << stats.searchStats.maxBoundPrunes << "\n";
     std::cout << "Per-run zeroInf prunes: " << stats.searchStats.zeroInfPrune << "\n";
-    std::cout << "Per-run childHard prunes (no RJ): " << stats.searchStats.childHardPrunesNoRJ << "\n";
-    std::cout << "Per-run childHard prunes (RJ): " << stats.searchStats.childHardPrunesRJ << "\n";
-    std::cout << "Per-run monotonic prunes (no RJ): " << stats.searchStats.monotonicPrunesNoRJ << "\n";
-    std::cout << "Per-run monotonic prunes (RJ): " << stats.searchStats.monotonicPrunesRJ << "\n";
+    std::cout << "Per-run childHard prunes (ground run): " << stats.searchStats.childHardPrunesGroundRun << "\n";
+    std::cout << "Per-run childHard prunes (ground air): " << stats.searchStats.childHardPrunesGroundAir << "\n";
+    std::cout << "Per-run childHard prunes (air extend): " << stats.searchStats.childHardPrunesAirExtend << "\n";
+    std::cout << "Per-run monotonic prunes (ground run): " << stats.searchStats.monotonicPrunesGroundRun << "\n";
+    std::cout << "Per-run monotonic prunes (ground air): " << stats.searchStats.monotonicPrunesGroundAir << "\n";
+    std::cout << "Per-run monotonic prunes (air extend): " << stats.searchStats.monotonicPrunesAirExtend << "\n";
 }
 
 }

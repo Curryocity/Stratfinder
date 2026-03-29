@@ -1,4 +1,5 @@
 #include "inputFinder.hpp"
+#include "segLerp.hpp"
 #include "util.hpp"
 #include "zEngine.hpp"
 #include <algorithm>
@@ -146,6 +147,9 @@ std::vector<IF::sequence> IF::matchSpeed(const condition& cond, int airtime){
 
     std::vector<IF::sequence> result;
     initHeuristics(airtime, std::abs(cond.z.mm) + 0.6f, std::abs(cond.x.mm) + 0.6f);
+    lerpUpdater.setParameters(airtime, speed, slowness, rotation);
+    lerpUpdater.enableAxis(cond.x.enabled, cond.z.enabled);
+    lerpUpdater.buildTransform();
 
     // find input sequence via iterative deepening dfs
     for(int limit = 1; limit <= maxDepth; limit ++){
@@ -188,7 +192,7 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
 
     // Hardprune section on top to maximize effectiveness
     if(node.T > 0){
-        util::vec2D minV = estimateSpeed(node, cond.endAirborne, this->vxLB, this->vzLB);
+        util::vec2D minV = estimateSpeed(node, cond.endAirborne, this->vxLB, this->vzLB, true);
         double minVx = minV.x - floatErr;
         double minVz = minV.z - floatErr;
         if(careX && (minVx > (cond.x.vel + cond.x.tolerance))) {
@@ -200,7 +204,7 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
             return true;
         }
 
-        util::vec2D maxV = estimateSpeed(node, cond.endAirborne, this->vxUB, this->vzUB);
+        util::vec2D maxV = estimateSpeed(node, cond.endAirborne, this->vxUB, this->vzUB, true);
         double maxVx = maxV.x + floatErr;
         double maxVz = maxV.z + floatErr;
         if(careX && (maxVx < (cond.x.vel - cond.x.tolerance))) {
@@ -255,10 +259,10 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
 
     // Must be after the hardPrune section
     // Early return: maxDepth must be an inputExtension, cannot input extend airLast input
-    if(lastDepth && prevInput.type == Air) return false;
+    if(lastDepth && prevInput.type == segLerp::Air) return false;
 
     // Main search happens after here, this is for backtracking purposes
-    const nodeShapshot baseNode{node.T, node.airDebt, node.lerpX, node.lerpZ, node.errX, node.errZ};
+    const nodeShapshot baseNode{node.T, node.airDebt, node.lerp0, node.lerp1, node.errX, node.errZ};
 
     const bool symmetric = rotation == 0.0f || rotation == 180.0f || (!careX);
     const bool endingDepth = (depth >= depthLimit - 1);
@@ -329,14 +333,15 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
             node.inputs.back().a = a;
 
             // On ground:
-            if(prevInput.type != Air){
+            if(prevInput.type != segLerp::Air){
 
                 // 1. Walk/run n ticks
                 const bool endedGroundedMask = !(baseNode.T == 0 && cond.endAirborne); // zero if invalid
-                const bool extensionMask = !(inputExtension && (prevInput.type == Ground)); // zero if invalid
+                const bool extensionMask = !(inputExtension && (prevInput.type == segLerp::Ground)); // zero if invalid
 
-                int maxRunTick = extensionMask * endedGroundedMask * (maxTicks - baseNode.T);
-
+                // 31 ticks max
+                int maxRunTick = std::min(extensionMask * endedGroundedMask * (maxTicks - baseNode.T), 31);
+                
                 if(monoCheck){
                     lastErrX = baseErrorX;
                     lastErrZ = baseErrorZ;
@@ -346,9 +351,9 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                     node.inputs.back().t = t;
                     node.airDebt = 0;
                     node.T = baseNode.T + t;
-                    node.lerpX = baseNode.lerpX;
-                    node.lerpZ = baseNode.lerpZ;
-                    node.inputs.back().type = Ground;
+                    node.lerp0 = baseNode.lerp0;
+                    node.lerp1 = baseNode.lerp1;
+                    node.inputs.back().type = segLerp::Ground;
 
                     // inputExtension does not cost depth
                     bool hardPrune = dfsRecursive(depth + 1 - inputExtension, depthLimit, node, cond, result);
@@ -390,9 +395,9 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                     node.inputs.back().t = t;
                     node.airDebt = std::max(0, node.airtime - t);
                     node.T = baseNode.T + t;
-                    node.lerpX = baseNode.lerpX;
-                    node.lerpZ = baseNode.lerpZ;
-                    node.inputs.back().type = (t == revLandTick)? Jump : Air;
+                    node.lerp0 = baseNode.lerp0;
+                    node.lerp1 = baseNode.lerp1;
+                    node.inputs.back().type = (t == revLandTick)? segLerp::Jump : segLerp::Air;
 
                     bool hardPrune = dfsRecursive(depth + 1 - inputExtension, depthLimit, node, cond, result);
 
@@ -436,9 +441,9 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                     node.inputs.back().t = t;
                     node.airDebt = std::max(0, baseNode.airDebt - t);
                     node.T = baseNode.T + t;
-                    node.lerpX = baseNode.lerpX;
-                    node.lerpZ = baseNode.lerpZ;
-                    node.inputs.back().type = (t == revLandTick)? Jump : Air;
+                    node.lerp0 = baseNode.lerp0;
+                    node.lerp1 = baseNode.lerp1;
+                    node.inputs.back().type = (t == revLandTick)? segLerp::Jump : segLerp::Air;
 
                     bool hardPrune = dfsRecursive(depth + 1, depthLimit, node, cond, result);
 
@@ -479,8 +484,8 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
 void IF::backTrack(sequence& node, const nodeShapshot& snapShot){
     node.T = snapShot.T;
     node.airDebt = snapShot.airDebt;
-    node.lerpX = snapShot.lerpX;
-    node.lerpZ = snapShot.lerpZ;
+    node.lerp0 = snapShot.lerp0;
+    node.lerp1 = snapShot.lerp1;
     node.errX = snapShot.errX;
     node.errZ = snapShot.errZ;
 }
@@ -530,7 +535,7 @@ bool IF::exeSeq(player& p, const sequence& seq, const condition& cond, const dou
         const bool sprintQ = (in.w == 1);
         for (int t = 0; t < in.t; t++) {
 
-            bool jumpQ = (in.type == Jump) && (t == 0);
+            bool jumpQ = (in.type == segLerp::Jump) && (t == 0);
 
             airborne = airClock > 0;
             int movementType = 2 * sprintQ + (sprintQ && jumpQ);
@@ -572,82 +577,22 @@ void IF::alphaBetaUpdate(player& p, sequence& seq){
     searchStats.alphaBetaUpdateCalls++;
 
     if(seq.inputs.empty()) return;
-    p.toggleInertia(false);
+    const input lastInput = seq.inputs.back();
 
-    auto fastSamp = [&](double initVx, double initVz){
-        int tick = seq.T;
-        int airClock = (seq.airDebt == 0)? 0 : seq.airtime - seq.airDebt;
-        bool airborne = airClock > 0;
-
-        p.resetAll();
-        p.setVel(initVx, initVz);
-
-        const input lastInput = seq.inputs.back();
-        const bool sprintQ = (lastInput.w == 1);
-
-        for (int t = 0; t < lastInput.t; t++) {
-
-            airborne = airClock > 0;
-            const bool jumpQ = (t == 0) && (lastInput.type == Jump);
-            const int movementType = 2 * sprintQ + (sprintQ && jumpQ);
-
-            p.move(lastInput.w, lastInput.a, airborne, movementType, 1);
-
-            // ignoring the movement of first tick, cuz sprintDelay makes air as first tick unreliable
-            if(t == 0 && airborne) p.setVel(initVx, initVz);
-
-            if (jumpQ) airClock = seq.airtime;
-            if (airClock > 0) airClock--;
-            tick--;
-        }
-
-        int n = seq.inputs.size();
-        if(n >= 2){
-            const input prevInput = seq.inputs[n - 2];
-            if(prevInput.type == Air){
-                p.sa(prevInput.w, prevInput.a, 1);
-                airborne = true;
-            }
-        }
-
-        // force ground speed format
-        double vx = p.Vx(), vz = p.Vz();
-        if(airborne) vx /= 0.6f, vz /= 0.6f;
-
-        vx = seq.lerpX.alpha * vx + seq.lerpX.beta;
-        vz = seq.lerpZ.alpha * vz + seq.lerpZ.beta;
-
-        util::vec2D speedVec = {vx, vz};
-        return speedVec;
-    };
-
-    util::vec2D vec0 = fastSamp(0, 0);
-    util::vec2D vec1 = fastSamp(1, 1);
-
-    seq.lerpX.alpha = vec1.x - vec0.x;
-    seq.lerpX.beta = vec0.x;
-    
-    seq.lerpZ.alpha = vec1.z - vec0.z;
-    seq.lerpZ.beta = vec0.z;
-
-    p.toggleInertia(true);
-
+    lerpUpdater.updateLerp(seq.lerp0, seq.lerp1,lastInput.w, lastInput.a, lastInput.t, lastInput.type);
 }
 
-util::vec2D IF::estimateSpeed(sequence& seq, bool endedAirborne, double initVx, double initVz){
+util::vec2D IF::estimateSpeed(sequence& seq, bool endedAirborne, double initVx, double initVz, bool prevSprint){
     searchStats.estimateSpeedCalls++;
 
-    if(initVz == 0 && initVx == 0 && seq.airDebt > 0){ 
-        getDummy();
-        input lastInput = seq.inputs.back();
-        dummy.sa(lastInput.w, lastInput.a, 1);
-        // force ground speed format
-        initVx = dummy.Vx() / 0.6f;
-        initVz = dummy.Vz() / 0.6f;
+    double vx, vz;
+    if(!prevSprint){ 
+        vx = seq.lerp0.lerpX.alpha * initVx + seq.lerp0.lerpZ.beta;
+        vz = seq.lerp0.lerpZ.alpha * initVz + seq.lerp0.lerpZ.beta;
+    }else{
+        vx = seq.lerp1.lerpX.alpha * initVx + seq.lerp1.lerpZ.beta;
+        vz = seq.lerp1.lerpZ.alpha * initVz + seq.lerp1.lerpZ.beta;
     }
-
-    double vx = seq.lerpX.alpha * initVx + seq.lerpX.beta;
-    double vz = seq.lerpZ.alpha * initVz + seq.lerpZ.beta;
 
     // get actual speed (ground format to air)
     if(endedAirborne) vx *= 0.6f, vz *= 0.6f;
@@ -658,21 +603,8 @@ util::vec2D IF::estimateSpeed(sequence& seq, bool endedAirborne, double initVx, 
 util::vec2D IF::terminalToSeq(int w, int a, sequence& seq, bool endedAirborne){
     double initVz = wasdTerminalVz[3*(a+1) + (w+1)];
     double initVx = wasdTerminalVx[3*(a+1) + (w+1)];
-    getDummy();
-    dummy.setVel(initVx, initVz);
-    if(seq.airDebt > 0){
-        dummy.setPrevSprint(w == 1);
-        dummy.sa(w, a, 1);
-    }
-    initVz = dummy.Vz(), initVx = dummy.Vx();
 
-    double vx = seq.lerpX.alpha * initVx + seq.lerpX.beta;
-    double vz = seq.lerpZ.alpha * initVz + seq.lerpZ.beta;
-
-    // get actual speed (ground format to air)
-    if(endedAirborne) vx *= 0.6f, vz *= 0.6f;
-
-    return util::vec2D{vx, vz};
+    return estimateSpeed(seq, endedAirborne, initVx, initVz, true);
 }
 
 std::string IF::seq2Mothball(const sequence& seq) {
@@ -717,7 +649,7 @@ std::string IF::seq2Mothball(const sequence& seq) {
         const input in = seq.inputs[i];
         for (int t = 0; t < in.t; t++) {
             bool jumpQ = false;
-            if(t == 0 && in.type == Jump){
+            if(t == 0 && in.type == segLerp::Jump){
                 jumpQ = true;
             }
 

@@ -7,7 +7,7 @@
             "command": "/bin/zsh",
             "args": [
                 "-lc",
-                "mkdir -p build && clang++ -std=c++20 -O0 -g -Isrc src/main.cpp src/zEngine.cpp src/zSolver.cpp src/player.cpp src/inputFinder.cpp -o build/main-debug -ffp-contract=off"
+                "mkdir -p build && clang++ -std=c++20 -O0 -g -Isrc src/main.cpp src/zEngine.cpp src/zSolver.cpp src/player.cpp src/inputFinder.cpp src/segLerp.cpp -o build/main-debug -ffp-contract=off"
             ],
             "group": {
                 "kind": "build",
@@ -21,7 +21,7 @@
             "command": "/bin/zsh",
             "args": [
                 "-lc",
-                "mkdir -p build && clang++ -std=c++20 -O3 -Isrc src/main.cpp src/zEngine.cpp src/zSolver.cpp src/player.cpp src/inputFinder.cpp -o build/main-release -ffp-contract=off"
+                "mkdir -p build && clang++ -std=c++20 -O3 -Isrc src/main.cpp src/zEngine.cpp src/zSolver.cpp src/player.cpp src/inputFinder.cpp src/segLerp.cpp -o build/main-release -ffp-contract=off"
             ],
             "problemMatcher": ["$gcc"]
         },
@@ -31,7 +31,7 @@
             "command": "/bin/zsh",
             "args": [
                 "-lc",
-                "mkdir -p build && clang++ -std=c++20 -O3 -g -Isrc src/test.cpp src/zEngine.cpp src/zSolver.cpp src/player.cpp src/inputFinder.cpp -o build/test -ffp-contract=off"
+                "mkdir -p build && clang++ -std=c++20 -O3 -g -Isrc src/test.cpp src/zEngine.cpp src/zSolver.cpp src/player.cpp src/inputFinder.cpp src/segLerp.cpp -o build/test -ffp-contract=off"
             ],
             "problemMatcher": ["$gcc"]
         }

@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <vector>
 #include <string>
+#include "segLerp.hpp"
 #include "util.hpp"
 #include "player.hpp"
 
@@ -10,18 +11,12 @@ class inputFinder {
     // IMPORTANT: I ASSUMED TOGGLESPRINT FOR EFFICIENCY
     public:
 
-    enum segmentType{None, Ground, Air, Jump};
 
     struct input {
         int w = 0; // -1, 0, 1
         int a = 0; // -1, 0, 1
         int t = 1;
-        segmentType type = None;
-    };
-
-    struct lerp{
-        double alpha = 1;
-        double beta = 0;
+        segLerp::segmentType type = segLerp::None;
     };
 
     struct axisCond{
@@ -45,8 +40,8 @@ class inputFinder {
         int T = 0;
         std::vector<input> inputs;
         int airDebt = 0;
-        lerp lerpX;
-        lerp lerpZ;
+        segLerp::lerp lerp0;
+        segLerp::lerp lerp1;
         double errX = 65536;
         double errZ = 65536;
         double finalVx = 0;
@@ -56,8 +51,8 @@ class inputFinder {
     struct nodeShapshot{
         const int T;
         const int airDebt = 0;
-        const lerp lerpX;
-        const lerp lerpZ;
+        const segLerp::lerp lerp0;
+        const segLerp::lerp lerp1;
         const double errX;
         const double errZ;
     };
@@ -95,7 +90,7 @@ class inputFinder {
     void alphaBetaUpdate(player& p, sequence& seq);
 
     enum Axis{X,Z};
-    util::vec2D estimateSpeed(sequence& seq, bool endedAirborne, double initVx = 0, double initVz = 0);
+    util::vec2D estimateSpeed(sequence& seq, bool endedAirborne, double initVx = 0, double initVz = 0, bool prevSprint = false);
     util::vec2D terminalToSeq(int w, int a, sequence& seq, bool endedAirborne);
 
     std::string seq2Mothball(const sequence& seq);
@@ -125,6 +120,7 @@ class inputFinder {
     int slowness = 0;
 
     // heuristics/pruning helper 
+    segLerp lerpUpdater = segLerp();
     double vzLB = 0, vzUB = 0;
     double vxLB = 0, vxUB = 0;
     std::vector<double> wasdTerminalVz =  std::vector<double>(9, 0); // index: 3*(a+1) + (w+1)

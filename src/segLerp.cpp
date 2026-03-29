@@ -47,7 +47,7 @@ int segLerp::prefixIdx(int w, int a, segmentType type) const {
     const int aIdx = a + 1;
     const int typeIdx = (type == Air) ? 0 : 1;
 
-    return (typeIdx * 2 + aIdx) * 3 + wIdx;
+    return (typeIdx * 3 + aIdx) * 3 + wIdx;
 }
 
 int segLerp::idx(int w, int a, int t, segmentType type) const {

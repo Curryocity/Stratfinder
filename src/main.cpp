@@ -1,4 +1,5 @@
 #include <iostream>
+#include <vector>
 #include "util.hpp"
 #include "inputFinder.hpp"
 #include "zSolver.hpp"
@@ -14,7 +15,7 @@ void init() {
 int main() {
     init();
 
-    if(true){
+    if(false){
         // Finding jumps for slowness 1.5bm less than 50t airtime, 0.01 offset
         zSolver s;
         s.setEffect(0, 1);
@@ -33,7 +34,7 @@ int main() {
         std::cout << "--------------- \n\n";
     }
 
-    if(true){
+    if(false){
         // Finding input for slowness I 1.5bm 6-1 to ladder (perfect double 45.01)
         inputFinder f;
         f.changeSettings(4, 40);
@@ -59,6 +60,38 @@ int main() {
 
         f.matchSpeed(cond, airtime);
         f.printLog();
+    }
+
+    if(true){
+        inputFinder f;
+        f.changeSettings(4, 30);
+        f.riskyPrune(false);
+        f.setRotation(103.13);
+        f.logSettings();
+
+        inputFinder::polorCond cond;
+        double targetNorm = 0.236876;
+        double normErr = 0.0001;
+        double targetAngle = -104.2;
+        double angleErr = 0.1;
+        cond.normLb = targetNorm - normErr;
+        cond.normUb = targetNorm + normErr;
+        cond.angle1 = targetAngle - angleErr;
+        cond.angle2 = targetAngle + angleErr;
+
+        cond.xmm = 1;
+        cond.zmm = -1;
+        cond.zWalled = true;
+
+        const int airtime = 12;
+        std::cout << "------------------------------\n";
+        std::cout << "Polar Input Finder:\n";
+        std::cout << "Norm: (" << util::df(cond.normLb) << ", " << util::df(cond.normUb)
+                  << "), Angle: (" << util::df(cond.angle1) << ", " << util::df(cond.angle2)
+                  << "), Airtime: " << airtime << "\n";
+
+        std::vector<inputFinder::sequence> solutions = f.matchSpeed(cond, airtime);
+        std::cout << f.showSolutions(solutions, inputFinder::Polar);
     }
 
     return 0;

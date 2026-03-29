@@ -30,6 +30,18 @@ class inputFinder {
         double tol() const { return std::abs(ub - lb) / 2.0; }
     };
 
+    struct polorCond{
+        double normLb;
+        double normUb;
+        double angle1;
+        double angle2;
+        bool endAirborne = false;
+        double xmm = 0;
+        double zmm = 0;
+        bool xWalled = false;
+        bool zWalled = false;
+    };
+
     struct condition{
         axisCond z;
         axisCond x;
@@ -81,8 +93,8 @@ class inputFinder {
 
     void initHeuristics(int airtime, double zDis, double xDis);
 
-    // Depth means how many inputs to try before
-    std::vector<sequence> matchSpeed(const condition& cond, int airtime = 12);
+    std::vector<sequence> matchSpeed(const condition& cond, int airtime);
+    std::vector<sequence> matchSpeed(const polorCond& cond, int airtime);
     std::vector<sequence> dfsEntry(const condition& cond, int airtime, int depthLimit);
 
     bool dfsRecursive(int depth, int depthLimit, sequence& node, const condition& cond, std::vector<sequence>& result);
@@ -93,12 +105,14 @@ class inputFinder {
     void alphaBetaUpdate(player& p, sequence& seq);
 
     enum Axis{X,Z};
+    enum SolutionFormat{Cartesian, Polar};
     double estimateVx(sequence& seq, bool endedAirborne, double initVx = 0, bool prevSprint = false);
     double estimateVz(sequence& seq, bool endedAirborne, double initVz = 0, bool prevSprint = false);
     double terminalVxToSeq(int w, int a, sequence& seq, bool endedAirborne);
     double terminalVzToSeq(int w, int a, sequence& seq, bool endedAirborne);
 
-    std::string seq2Mothball(const sequence& seq);
+    std::string seq2Mothball(const sequence& seq) const;
+    std::string showSolutions(const std::vector<sequence>& solutions, SolutionFormat format = Cartesian) const;
 
     void setEffect(int speed = 0, int slowness = 0);
     void setRotation(double rot = 0);
@@ -140,7 +154,6 @@ class inputFinder {
     const double inertiaErr = 0.003; // Tested value, may not be the best
     double approxErr = inertiaErr;
     SearchStats searchStats;
-
     Logger logger;
     
 };

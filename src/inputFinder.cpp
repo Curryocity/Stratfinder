@@ -6,15 +6,52 @@
 #include <array>
 #include <cmath>
 #include <cstdlib>
+#include <limits>
 #include <string>
 #include <utility>
 #include <vector>
 
 using IF = inputFinder;
 
+namespace {
+
+double normalizeDeg(double angle) {
+    double norm = std::fmod(angle, 360.0);
+    if (norm < 0) norm += 360.0;
+    return norm;
+}
+
+double shortArcSpan(double angle1, double angle2) {
+    const double a1 = normalizeDeg(angle1);
+    const double a2 = normalizeDeg(angle2);
+    double span = a2 - a1;
+    if (span < 0) span += 360.0;
+    return span;
+}
+
+bool inArcSpan(double angle, double angle1, double angle2) {
+    const double a = normalizeDeg(angle);
+    const double start = normalizeDeg(angle1);
+    double offset = a - start;
+    if (offset < 0) offset += 360.0;
+    return offset <= shortArcSpan(angle1, angle2);
+}
+
+void updatePolarBox(double angleDeg, double radius, double& xLb, double& xUb, double& zLb, double& zUb) {
+    const double x = -radius * util::sin(static_cast<float>(angleDeg));
+    const double z = radius * util::cos(static_cast<float>(angleDeg));
+    xLb = std::min(xLb, x);
+    xUb = std::max(xUb, x);
+    zLb = std::min(zLb, z);
+    zUb = std::max(zUb, z);
+}
+
+}
+
 void IF::setCondWithBound(axisCond& cond, double bound1, double bound2){
     cond.lb = std::min(bound1, bound2);
     cond.ub = std::max(bound1, bound2);
+    cond.enabled = true;
 }
 
 // heuristics
@@ -163,6 +200,68 @@ std::vector<IF::sequence> IF::matchSpeed(const condition& cond, int airtime){
     return result;
 }
 
+std::vector<IF::sequence> IF::matchSpeed(const polorCond& cond, int airtime){
+    const double angleSpan = shortArcSpan(cond.angle1, cond.angle2);
+    if (angleSpan > 90.0) {
+        writeLog("Exception: polorCond angle span must be <= 90 degrees\n");
+        return {};
+    }
+
+    condition rectCond;
+    rectCond.endAirborne = cond.endAirborne;
+    rectCond.allowStrafe = true;
+    rectCond.x.enabled = true;
+    rectCond.z.enabled = true;
+    rectCond.x.mm = cond.xmm;
+    rectCond.z.mm = cond.zmm;
+    rectCond.x.walled = cond.xWalled;
+    rectCond.z.walled = cond.zWalled;
+
+    const double normLb = std::max(0.0, cond.normLb);
+    const double normUb = std::max(normLb, cond.normUb);
+
+    double xLb = std::numeric_limits<double>::infinity();
+    double xUb = -std::numeric_limits<double>::infinity();
+    double zLb = std::numeric_limits<double>::infinity();
+    double zUb = -std::numeric_limits<double>::infinity();
+
+    std::vector<double> candidateAngles = {
+        cond.angle1,
+        cond.angle2,
+        0.0,
+        90.0,
+        180.0,
+        270.0
+    };
+
+    for (double angle : candidateAngles) {
+        if (!inArcSpan(angle, cond.angle1, cond.angle2)) continue;
+        updatePolarBox(angle, normLb, xLb, xUb, zLb, zUb);
+        updatePolarBox(angle, normUb, xLb, xUb, zLb, zUb);
+    }
+
+    setCondWithBound(rectCond.x, xLb, xUb);
+    setCondWithBound(rectCond.z, zLb, zUb);
+
+    std::vector<sequence> rectResult = matchSpeed(rectCond, airtime);
+    std::vector<sequence> result;
+    result.reserve(rectResult.size());
+
+    for (auto& seq : rectResult) {
+        const double vx = seq.finalVx;
+        const double vz = seq.finalVz;
+        const double norm = std::sqrt(vx * vx + vz * vz);
+        const double angle = std::atan2(-vx, vz) * 180.0 / util::PId;
+
+        if (norm < normLb || norm > normUb) continue;
+        if (!inArcSpan(angle, cond.angle1, cond.angle2)) continue;
+
+        result.push_back(std::move(seq));
+    }
+
+    return result;
+}
+
 std::vector<IF::sequence> IF::dfsEntry(const condition& cond, int airtime, int depthLimit){
     writeLog("-------------------------------------------------\n");
     writeLog("Try searching depth = " + std::to_string(depthLimit) + " inputs\n");
@@ -191,7 +290,7 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
     const bool careX = cond.x.enabled;
 
     // Hardprune section on top to maximize effectiveness
-        if(node.T > 0){
+    if(node.T > 0){
         if(careX) {
             double minVx = estimateVx(node, cond.endAirborne, this->vxLB, true) - floatErr;
             if (minVx > cond.x.ub) {
@@ -272,7 +371,7 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
     // Main search happens after here, this is for backtracking purposes
     const nodeShapshot baseNode{node.T, node.airDebt, node.lerp0, node.lerp1, node.errX, node.errZ};
 
-    const bool symmetric = rotation == 0.0f || rotation == 180.0f || (!careX);
+    const bool symmetric = (rotation == 0.0f || rotation == 180.0f) && (!careX);
     const bool endingDepth = (depth >= depthLimit - 1);
     const bool penultimateDepth = (depth == depthLimit - 1);
 
@@ -514,6 +613,7 @@ bool IF::exeSeq(player& p, const sequence& seq, const condition& cond, const boo
     const bool xMMCheck = ( (xmm != 0) && mmCheck);
 
     double zMin = 0, zMax = 0, xMin = 0, xMax = 0;
+    double zWallMin = 0, zWallMax = 0, xWallMin = 0, xWallMax = 0;
     double preZ = 0, preX = 0;
     bool prevAirborne = true;
     bool airborne = airClock > 0;
@@ -525,12 +625,12 @@ bool IF::exeSeq(player& p, const sequence& seq, const condition& cond, const boo
             if(prevPos > maxPos) maxPos = prevPos;
             if(prevPos < minPos) minPos = prevPos;
         }else{
-            bool preVzPos = (curPos - prevPos) > 0;
-            if(preVzPos && prevPos > maxPos) maxPos = prevPos;
-            if(!preVzPos && curPos > maxPos) maxPos = curPos;
+            bool preVelPositive = (curPos - prevPos) > 0;
+            if(preVelPositive && prevPos > maxPos) maxPos = prevPos;
+            if(!preVelPositive && curPos > maxPos) maxPos = curPos;
 
-            if(!preVzPos && prevPos < minPos) minPos = prevPos;
-            if(preVzPos && curPos < minPos) minPos = curPos;
+            if(!preVelPositive && prevPos < minPos) minPos = prevPos;
+            if(preVelPositive && curPos < minPos) minPos = curPos;
         }
 
         return (maxPos - minPos) > (std::abs(mm) + 0.6f);
@@ -543,7 +643,6 @@ bool IF::exeSeq(player& p, const sequence& seq, const condition& cond, const boo
         const input in = seq.inputs[i];
         const bool sprintQ = (in.w == 1);
         for (int t = 0; t < in.t; t++) {
-
             bool jumpQ = (in.type == segLerp::Jump) && (t == 0);
 
             airborne = airClock > 0;
@@ -553,6 +652,14 @@ bool IF::exeSeq(player& p, const sequence& seq, const condition& cond, const boo
 
             if (jumpQ) airClock = seq.airtime;
 
+            if(xMMCheck){
+                xWallMin = std::min(xWallMin, p.X());
+                xWallMax = std::max(xWallMax, p.X());
+            }
+            if(zMMCheck){
+                zWallMin = std::min(zWallMin, p.Z());
+                zWallMax = std::max(zWallMax, p.Z());
+            }
             // Update mm used when grounded
             if(mmCheck && !airborne){
                 if(zMMCheck)
@@ -569,9 +676,31 @@ bool IF::exeSeq(player& p, const sequence& seq, const condition& cond, const boo
             tick--;
         }
     }
-
-    // Check if the starting position is invalid
+    
     if(mmCheck){
+        // Final mm violation check(the above check skips the last tick update)
+        if(xMMCheck){
+            xMax = std::max(xMax, p.X());
+            xMin = std::min(xMin, p.X());
+            if((xMax - xMin) > (std::abs(xmm) + 0.6f)) return false;
+        }
+        if(zMMCheck){
+            zMax = std::max(zMax, p.Z());
+            zMin = std::min(zMin, p.Z());
+            if((zMax - zMin) > (std::abs(zmm) + 0.6f)) return false;
+        }
+
+        // Walled mm check
+        if (cond.x.walled) {
+            if (xmm < 0 && xWallMax - xMin > abs(xmm)) return false;
+            if (xmm > 0 && xMax - xWallMin > abs(xmm)) return false;
+        }
+        if (cond.z.walled) {
+            if (zmm < 0 && zWallMax - zMin > abs(zmm)) return false;
+            if (zmm > 0 && zMax - zWallMin > abs(zmm)) return false;
+        }
+
+        // Check if the starting position is invalid
         if (zMMCheck && ((zmm > 0 && zMax > p.Z()) || (zmm < 0 && zMin < p.Z())) )
             return false;
         if (xMMCheck && ((xmm > 0 && xMax > p.X()) || (xmm < 0 && xMin < p.X())) )
@@ -634,7 +763,7 @@ double IF::terminalVzToSeq(int w, int a, sequence& seq, bool endedAirborne){
     return estimateVz(seq, endedAirborne, initVz, true);
 }
 
-std::string IF::seq2Mothball(const sequence& seq) {
+std::string IF::seq2Mothball(const sequence& seq) const {
     std::string desc;
 
     int tick = seq.T;
@@ -708,6 +837,29 @@ std::string IF::seq2Mothball(const sequence& seq) {
 
     flush();
     return desc;
+}
+
+std::string IF::showSolutions(const std::vector<sequence>& solutions, SolutionFormat format) const {
+    std::string out;
+
+    for (const auto& seq : solutions) {
+        out += seq2Mothball(seq);
+        out += "\n";
+
+        if (format == Cartesian) {
+            out += "Vx: " + util::df(seq.finalVx) + ", Vz: " + util::df(seq.finalVz);
+        } else {
+            const double norm = std::sqrt(seq.finalVx * seq.finalVx + seq.finalVz * seq.finalVz);
+            const double angle = std::atan2(-seq.finalVx, seq.finalVz) * 180.0 / util::PId;
+            out += "Norm: " + util::df(norm) + ", Angle: " + util::df(angle);
+        }
+
+        out += ", t = " + std::to_string(seq.T);
+        out += "(+" + std::to_string(std::max(0, seq.airDebt)) + ")";
+        out += "\n\n";
+    }
+
+    return out;
 }
 
 void IF::setRotation(double rot){ rotation = rot;}

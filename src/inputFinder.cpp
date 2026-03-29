@@ -192,38 +192,46 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
 
     // Hardprune section on top to maximize effectiveness
     if(node.T > 0){
-        util::vec2D minV = estimateSpeed(node, cond.endAirborne, this->vxLB, this->vzLB, true);
-        double minVx = minV.x - floatErr;
-        double minVz = minV.z - floatErr;
-        if(careX && (minVx > (cond.x.vel + cond.x.tolerance))) {
-            searchStats.minBoundPrunes++;
-            return true;
+        if(careX) {
+            double minVx = estimateVx(node, cond.endAirborne, this->vxLB, true) - floatErr;
+            if (minVx > (cond.x.vel + cond.x.tolerance)) {
+                searchStats.minBoundPrunes++;
+                return true;
+            }
         }
-        if(careZ && (minVz > (cond.z.vel + cond.z.tolerance))) {
-            searchStats.minBoundPrunes++;
-            return true;
+        if(careZ) {
+            double minVz = estimateVz(node, cond.endAirborne, this->vzLB, true) - floatErr;
+            if (minVz > (cond.z.vel + cond.z.tolerance)) {
+                searchStats.minBoundPrunes++;
+                return true;
+            }
         }
 
-        util::vec2D maxV = estimateSpeed(node, cond.endAirborne, this->vxUB, this->vzUB, true);
-        double maxVx = maxV.x + floatErr;
-        double maxVz = maxV.z + floatErr;
-        if(careX && (maxVx < (cond.x.vel - cond.x.tolerance))) {
-            searchStats.maxBoundPrunes++;
-            return true;
+        if(careX) {
+            double maxVx = estimateVx(node, cond.endAirborne, this->vxUB, true) + floatErr;
+            if (maxVx < (cond.x.vel - cond.x.tolerance)) {
+                searchStats.maxBoundPrunes++;
+                return true;
+            }
         }
-        if(careZ && (maxVz < (cond.z.vel - cond.z.tolerance))) {
-            searchStats.maxBoundPrunes++;
-            return true;
+        if(careZ) {
+            double maxVz = estimateVz(node, cond.endAirborne, this->vzUB, true) + floatErr;
+            if (maxVz < (cond.z.vel - cond.z.tolerance)) {
+                searchStats.maxBoundPrunes++;
+                return true;
+            }
         }
     }
 
-    util::vec2D eV;
+    double eVx = 0;
+    double eVz = 0;
     const bool lastDepth = (depth == depthLimit);
     if (lastDepth) {
-        eV = estimateSpeed(node, cond.endAirborne);
+        if(careX) eVx = estimateVx(node, cond.endAirborne);
+        if(careZ) eVz = estimateVz(node, cond.endAirborne);
 
-        node.errX = careX? std::abs(eV.x - cond.x.vel) - cond.x.tolerance - approxErr : 0;
-        node.errZ = careZ? std::abs(eV.z - cond.z.vel) - cond.z.tolerance - approxErr : 0;
+        node.errX = careX? std::abs(eVx - cond.x.vel) - cond.x.tolerance - approxErr : 0;
+        node.errZ = careZ? std::abs(eVz - cond.z.vel) - cond.z.tolerance - approxErr : 0;
         
         if(node.errX <= 0) node.errX = 0;
         if(node.errZ <= 0) node.errZ = 0;
@@ -271,9 +279,12 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
     double baseErrorX, baseErrorZ;
     if(endingDepth){
         // We compute eV on lastDepth already
-        if(penultimateDepth) eV = estimateSpeed(node, cond.endAirborne);
-        baseErrorX = careX? std::max(0.0, std::abs(eV.x - cond.x.vel) - cond.x.tolerance - approxErr) : 0;
-        baseErrorZ = careZ? std::max(0.0, std::abs(eV.z - cond.z.vel) - cond.z.tolerance - approxErr) : 0;
+        if(penultimateDepth) {
+            if(careX) eVx = estimateVx(node, cond.endAirborne);
+            if(careZ) eVz = estimateVz(node, cond.endAirborne);
+        }
+        baseErrorX = careX? std::max(0.0, std::abs(eVx - cond.x.vel) - cond.x.tolerance - approxErr) : 0;
+        baseErrorZ = careZ? std::max(0.0, std::abs(eVz - cond.z.vel) - cond.z.tolerance - approxErr) : 0;
     }
 
     node.inputs.push_back(IF::input{0, 0, 0});
@@ -302,20 +313,19 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
 
             // 0-inf interval check
             if(zeroInfCheck){
-                
-                util::vec2D tV = terminalToSeq(w, a, node, cond.endAirborne);
-
                 if(careZ){
-                    if(((eV.z < cond.z.vel - cond.z.tolerance - approxErr) && (tV.z < cond.z.vel - cond.z.tolerance)) 
-                    || ((eV.z > cond.z.vel + cond.z.tolerance + approxErr) && (tV.z > cond.z.vel + cond.z.tolerance))) {
+                    double tVz = terminalVzToSeq(w, a, node, cond.endAirborne);
+                    if(((eVz < cond.z.vel - cond.z.tolerance - approxErr) && (tVz < cond.z.vel - cond.z.tolerance)) 
+                    || ((eVz > cond.z.vel + cond.z.tolerance + approxErr) && (tVz > cond.z.vel + cond.z.tolerance))) {
                         searchStats.zeroInfPrune++;
                         continue;
                     }
                 }
 
                 if(careX){
-                    if( ((eV.x < cond.x.vel - cond.x.tolerance - approxErr) && (tV.x < cond.x.vel - cond.x.tolerance))
-                    || ((eV.x > cond.x.vel + cond.x.tolerance + approxErr) && (tV.x > cond.x.vel + cond.x.tolerance))) {
+                    double tVx = terminalVxToSeq(w, a, node, cond.endAirborne);
+                    if( ((eVx < cond.x.vel - cond.x.tolerance - approxErr) && (tVx < cond.x.vel - cond.x.tolerance))
+                    || ((eVx > cond.x.vel + cond.x.tolerance + approxErr) && (tVx > cond.x.vel + cond.x.tolerance))) {
                         searchStats.zeroInfPrune++;
                         continue;
                     }
@@ -582,29 +592,47 @@ void IF::alphaBetaUpdate(player& p, sequence& seq){
     lerpUpdater.updateLerp(seq.lerp0, seq.lerp1,lastInput.w, lastInput.a, lastInput.t, lastInput.type);
 }
 
-util::vec2D IF::estimateSpeed(sequence& seq, bool endedAirborne, double initVx, double initVz, bool prevSprint){
+double IF::estimateVx(sequence& seq, bool endedAirborne, double initVx, bool prevSprint){
     searchStats.estimateSpeedCalls++;
 
-    double vx, vz;
+    double vx;
     if(!prevSprint){ 
-        vx = seq.lerp0.lerpX.alpha * initVx + seq.lerp0.lerpZ.beta;
-        vz = seq.lerp0.lerpZ.alpha * initVz + seq.lerp0.lerpZ.beta;
+        vx = seq.lerp0.lerpX.alpha * initVx + seq.lerp0.lerpX.beta;
     }else{
-        vx = seq.lerp1.lerpX.alpha * initVx + seq.lerp1.lerpZ.beta;
-        vz = seq.lerp1.lerpZ.alpha * initVz + seq.lerp1.lerpZ.beta;
+        vx = seq.lerp1.lerpX.alpha * initVx + seq.lerp1.lerpX.beta;
     }
 
     // get actual speed (ground format to air)
-    if(endedAirborne) vx *= 0.6f, vz *= 0.6f;
+    if(endedAirborne) vx *= 0.6f;
 
-    return util::vec2D{vx, vz};
+    return vx;
 }
 
-util::vec2D IF::terminalToSeq(int w, int a, sequence& seq, bool endedAirborne){
-    double initVz = wasdTerminalVz[3*(a+1) + (w+1)];
+double IF::estimateVz(sequence& seq, bool endedAirborne, double initVz, bool prevSprint){
+    searchStats.estimateSpeedCalls++;
+
+    double vz;
+    if(!prevSprint){ 
+        vz = seq.lerp0.lerpZ.alpha * initVz + seq.lerp0.lerpZ.beta;
+    }else{
+        vz = seq.lerp1.lerpZ.alpha * initVz + seq.lerp1.lerpZ.beta;
+    }
+
+    if(endedAirborne) vz *= 0.6f;
+
+    return vz;
+}
+
+double IF::terminalVxToSeq(int w, int a, sequence& seq, bool endedAirborne){
     double initVx = wasdTerminalVx[3*(a+1) + (w+1)];
 
-    return estimateSpeed(seq, endedAirborne, initVx, initVz, true);
+    return estimateVx(seq, endedAirborne, initVx, true);
+}
+
+double IF::terminalVzToSeq(int w, int a, sequence& seq, bool endedAirborne){
+    double initVz = wasdTerminalVz[3*(a+1) + (w+1)];
+
+    return estimateVz(seq, endedAirborne, initVz, true);
 }
 
 std::string IF::seq2Mothball(const sequence& seq) {

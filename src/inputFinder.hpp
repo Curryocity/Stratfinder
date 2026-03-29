@@ -90,8 +90,10 @@ class inputFinder {
     void alphaBetaUpdate(player& p, sequence& seq);
 
     enum Axis{X,Z};
-    util::vec2D estimateSpeed(sequence& seq, bool endedAirborne, double initVx = 0, double initVz = 0, bool prevSprint = false);
-    util::vec2D terminalToSeq(int w, int a, sequence& seq, bool endedAirborne);
+    double estimateVx(sequence& seq, bool endedAirborne, double initVx = 0, bool prevSprint = false);
+    double estimateVz(sequence& seq, bool endedAirborne, double initVz = 0, bool prevSprint = false);
+    double terminalVxToSeq(int w, int a, sequence& seq, bool endedAirborne);
+    double terminalVzToSeq(int w, int a, sequence& seq, bool endedAirborne);
 
     std::string seq2Mothball(const sequence& seq);
 

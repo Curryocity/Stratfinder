@@ -21,10 +21,13 @@ class inputFinder {
 
     struct axisCond{
         bool enabled = false;
-        double vel = 0;
-        double tolerance = 1e-4;
+        double lb = -1e-4;
+        double ub = 1e-4;
         double mm = 0;
         bool walled = false;
+
+        double mid() const { return (lb + ub) / 2.0; }
+        double tol() const { return std::abs(ub - lb) / 2.0; }
     };
 
     struct condition{
@@ -86,7 +89,7 @@ class inputFinder {
 
     void backTrack(sequence& node, const nodeShapshot& snapShot);
 
-    bool exeSeq(player& p, const sequence& seq, const condition& cond, const double initVx = 0, const double initVz = 0, bool mmCheck = true);
+    bool exeSeq(player& p, const sequence& seq, const condition& cond, bool mmCheck = true);
     void alphaBetaUpdate(player& p, sequence& seq);
 
     enum Axis{X,Z};

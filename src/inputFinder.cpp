@@ -13,8 +13,8 @@
 using IF = inputFinder;
 
 void IF::setCondWithBound(axisCond& cond, double bound1, double bound2){
-    cond.vel = (bound1 + bound2)/2;
-    cond.tolerance = std::abs((bound1 - bound2)/2);
+    cond.lb = std::min(bound1, bound2);
+    cond.ub = std::max(bound1, bound2);
 }
 
 // heuristics
@@ -191,17 +191,17 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
     const bool careX = cond.x.enabled;
 
     // Hardprune section on top to maximize effectiveness
-    if(node.T > 0){
+        if(node.T > 0){
         if(careX) {
             double minVx = estimateVx(node, cond.endAirborne, this->vxLB, true) - floatErr;
-            if (minVx > (cond.x.vel + cond.x.tolerance)) {
+            if (minVx > cond.x.ub) {
                 searchStats.minBoundPrunes++;
                 return true;
             }
         }
         if(careZ) {
             double minVz = estimateVz(node, cond.endAirborne, this->vzLB, true) - floatErr;
-            if (minVz > (cond.z.vel + cond.z.tolerance)) {
+            if (minVz > cond.z.ub) {
                 searchStats.minBoundPrunes++;
                 return true;
             }
@@ -209,14 +209,14 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
 
         if(careX) {
             double maxVx = estimateVx(node, cond.endAirborne, this->vxUB, true) + floatErr;
-            if (maxVx < (cond.x.vel - cond.x.tolerance)) {
+            if (maxVx < cond.x.lb) {
                 searchStats.maxBoundPrunes++;
                 return true;
             }
         }
         if(careZ) {
             double maxVz = estimateVz(node, cond.endAirborne, this->vzUB, true) + floatErr;
-            if (maxVz < (cond.z.vel - cond.z.tolerance)) {
+            if (maxVz < cond.z.lb) {
                 searchStats.maxBoundPrunes++;
                 return true;
             }
@@ -230,19 +230,19 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
         if(careX) eVx = estimateVx(node, cond.endAirborne);
         if(careZ) eVz = estimateVz(node, cond.endAirborne);
 
-        node.errX = careX? std::abs(eVx - cond.x.vel) - cond.x.tolerance - approxErr : 0;
-        node.errZ = careZ? std::abs(eVz - cond.z.vel) - cond.z.tolerance - approxErr : 0;
+        node.errX = careX? std::abs(eVx - cond.x.mid()) - cond.x.tol() - approxErr : 0;
+        node.errZ = careZ? std::abs(eVz - cond.z.mid()) - cond.z.tol() - approxErr : 0;
         
         if(node.errX <= 0) node.errX = 0;
         if(node.errZ <= 0) node.errZ = 0;
 
         if(node.errX == 0 && node.errZ == 0){
 
-            bool valid = exeSeq(dummy, node, cond, 0, 0, true);
+            bool valid = exeSeq(dummy, node, cond, true);
             double vx = dummy.Vx(), vz = dummy.Vz();
 
-            bool xSat = (!careX) || (std::abs(vx - cond.x.vel) <= cond.x.tolerance);
-            bool zSat = (!careZ) || (std::abs(vz - cond.z.vel) <= cond.z.tolerance);
+            bool xSat = (!careX) || (vx >= cond.x.lb && vx <= cond.x.ub);
+            bool zSat = (!careZ) || (vz >= cond.z.lb && vz <= cond.z.ub);
             
             if(valid && xSat && zSat){ 
                 node.finalVx = vx, node.finalVz = vz;
@@ -283,8 +283,8 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
             if(careX) eVx = estimateVx(node, cond.endAirborne);
             if(careZ) eVz = estimateVz(node, cond.endAirborne);
         }
-        baseErrorX = careX? std::max(0.0, std::abs(eVx - cond.x.vel) - cond.x.tolerance - approxErr) : 0;
-        baseErrorZ = careZ? std::max(0.0, std::abs(eVz - cond.z.vel) - cond.z.tolerance - approxErr) : 0;
+        baseErrorX = careX? std::max(0.0, std::abs(eVx - cond.x.mid()) - cond.x.tol() - approxErr) : 0;
+        baseErrorZ = careZ? std::max(0.0, std::abs(eVz - cond.z.mid()) - cond.z.tol() - approxErr) : 0;
     }
 
     node.inputs.push_back(IF::input{0, 0, 0});
@@ -315,8 +315,8 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
             if(zeroInfCheck){
                 if(careZ){
                     double tVz = terminalVzToSeq(w, a, node, cond.endAirborne);
-                    if(((eVz < cond.z.vel - cond.z.tolerance - approxErr) && (tVz < cond.z.vel - cond.z.tolerance)) 
-                    || ((eVz > cond.z.vel + cond.z.tolerance + approxErr) && (tVz > cond.z.vel + cond.z.tolerance))) {
+                    if(((eVz < cond.z.lb - approxErr) && (tVz < cond.z.lb)) 
+                    || ((eVz > cond.z.ub + approxErr) && (tVz > cond.z.ub))) {
                         searchStats.zeroInfPrune++;
                         continue;
                     }
@@ -324,8 +324,8 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
 
                 if(careX){
                     double tVx = terminalVxToSeq(w, a, node, cond.endAirborne);
-                    if( ((eVx < cond.x.vel - cond.x.tolerance - approxErr) && (tVx < cond.x.vel - cond.x.tolerance))
-                    || ((eVx > cond.x.vel + cond.x.tolerance + approxErr) && (tVx > cond.x.vel + cond.x.tolerance))) {
+                    if( ((eVx < cond.x.lb - approxErr) && (tVx < cond.x.lb))
+                    || ((eVx > cond.x.ub + approxErr) && (tVx > cond.x.ub))) {
                         searchStats.zeroInfPrune++;
                         continue;
                     }
@@ -502,7 +502,7 @@ void IF::backTrack(sequence& node, const nodeShapshot& snapShot){
 
 // Output false if condition is not satisfied
 // The final velocity is stored in player& p
-bool IF::exeSeq(player& p, const sequence& seq, const condition& cond, const double initVx, const double initVz, const bool mmCheck){
+bool IF::exeSeq(player& p, const sequence& seq, const condition& cond, const bool mmCheck){
     searchStats.exeSeqCalls++;
 
     int tick = seq.T;
@@ -537,7 +537,6 @@ bool IF::exeSeq(player& p, const sequence& seq, const condition& cond, const dou
     };
 
     p.resetAll();
-    p.setVel(initVx, initVz);
 
     int n = seq.inputs.size();
     for (int i = n - 1; i >= 0; i--) {

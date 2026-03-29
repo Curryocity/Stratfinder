@@ -107,7 +107,7 @@ t = 17: 6.625 + 0.00072 b
 
 ```
 Input Finder: 
-targetVz: -0.1276845261092279, error: 0.0000001018092642, mm: -1.5, airtime: 12, allowStrafe: 0
+TargetVz: (-0.1276846279184921, -0.1276844242999637), Interval Width: 2.03619e-07, MM: -1.5, Airtime: 12, AllowStrafe: 0
 
 LOG ----------------------- 
 

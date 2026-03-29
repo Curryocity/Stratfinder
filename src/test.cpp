@@ -79,6 +79,7 @@ int main() {
     init();
 
     const int depth = 4;
+    const int maxTick = 40;
     const int airtime = 12;
     const int runs = 100;
     const bool allowStrafe = false;
@@ -92,18 +93,25 @@ int main() {
     inputFinder::setCondWithBound(cond.z, -0.1276844242999637, -0.1276846279184921);
 
     auto printHeader = [&](bool riskIt) {
+        double vzLB = cond.z.lb;
+        double vzUB = cond.z.ub;
+        double intervalWidth = cond.z.ub - cond.z.lb;
+        double mm = cond.z.mm;
+        bool hasStrafe = cond.allowStrafe;
         std::cout << "------------------------------\n";
-        std::cout << "depth: " << depth << ", airtime: " << airtime << ", runs: " << runs << "\n";
-        std::cout << "allowStrafe: " << allowStrafe << ", riskyPrune: " << riskIt << "\n";
-        std::cout << "targetVz: " << util::df(cond.z.vel)
-                  << ", error: " << util::df(cond.z.tolerance)
-                  << ", mm: " << util::fmt(cond.z.mm) << "\n";
+        std::cout << "Depth: " << depth << ", MaxTicks: " << maxTick << ", Runs: " << runs << "\n";
+        std::cout << "AllowStrafe: " << allowStrafe << ", RiskyPrune: " << riskIt << "\n";
+        std::cout << "TargetVz: (" << util::df(vzLB) << ", " << util::df(vzUB)
+                  << "), Interval Width: " << intervalWidth
+                  << ", MM: " << util::fmt(mm)
+                  << ", Airtime: " << airtime
+                  << ", AllowStrafe: " << hasStrafe << "\n";
     };
 
     for (bool riskIt : {false, true}) {
         inputFinder f;
         f.toggleLog(false);
-        f.changeSettings(depth, 40);
+        f.changeSettings(depth, maxTick);
         f.riskyPrune(riskIt);
         f.setEffect(0, 1);
 

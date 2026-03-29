@@ -47,14 +47,15 @@ int main() {
         cond.z.mm = -1.5;
         cond.allowStrafe = false;
         f.setCondWithBound(cond.z, -0.1276844242999637, -0.1276846279184921);
-        double targetVz = cond.z.vel;
-        double error = cond.z.tolerance;
+        double vzLB = cond.z.lb;
+        double vzUB = cond.z.ub;
+        double inervalWidth = cond.z.ub - cond.z.lb;
         double mm = cond.z.mm;
         double airtime = 12;
         bool hasStrafe = cond.allowStrafe;
         std::cout << "------------------------------\n";
         std::cout << "Input Finder: \n";
-        std::cout << "targetVz: " << util::df(targetVz) << ", error: " << util::df(error) << ", mm: " << util::fmt(mm) << ", airtime: " << airtime << ", allowStrafe: " << hasStrafe << "\n";
+        std::cout << "TargetVz: (" << util::df(vzLB) << ", " << util::df(vzUB) << "), Interval Width: " << inervalWidth << ", MM: " << util::fmt(mm) << ", Airtime: " << airtime << ", AllowStrafe: " << hasStrafe << "\n";
 
         f.matchSpeed(cond, airtime);
         f.printLog();

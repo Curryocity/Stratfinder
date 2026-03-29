@@ -103,7 +103,7 @@ t = 17: 6.625 + 0.00072 b
 
 ### Slowness I 1.5bm 6-1 to ladder, bwmm strat for facing = 0 
 
-**(took ~17ms on average to find all nostrafe inputs up to depth 4)**
+**(took ~5ms on average to find all nostrafe inputs up to depth 4 on my M1 mac)**
 
 ```
 Input Finder: 

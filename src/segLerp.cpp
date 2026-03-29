@@ -1,8 +1,6 @@
 #include "segLerp.hpp"
 #include "player.hpp"
 
-#include <algorithm>
-
 namespace {
 
 segLerp::axisLerp composeAxis(const segLerp::axisLerp& outer, const segLerp::axisLerp& inner) {

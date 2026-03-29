@@ -64,8 +64,9 @@ void player::move(float w, float a, bool airborne, int movementType, int repeat)
         foward *= 0.98f;
         strafe *= 0.98f;
 
-        float dist = std::sqrtf(foward * foward + strafe * strafe);
-        if (dist > 1.0f) accelf /= dist;
+        // Small optimization to save a sqrt() when dist2 <= 1
+        float dist2 = foward * foward + strafe * strafe;
+        if (dist2 > 1.0f) accelf /= std::sqrtf(dist2);
 
         foward *= accelf;
         strafe *= accelf;

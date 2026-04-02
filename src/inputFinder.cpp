@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <limits>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -14,6 +15,38 @@
 using IF = inputFinder;
 
 namespace {
+
+bool inputEmpty(const IF::input& in){
+    return in.w == 0 && in.a == 0;
+}
+
+bool startWithEmpty(const IF::sequence& seq){
+    if(seq.inputs.empty()) throw std::runtime_error{"Expected non empty inputs vector"};
+    return inputEmpty(seq.inputs.back());
+}
+
+bool noOverlap(const IF::input& lhs, const IF::input& rhs) {
+    const bool shareW = lhs.w != 0 && lhs.w == rhs.w;
+    const bool shareA = lhs.a != 0 && lhs.a == rhs.a;
+    return !(shareW || shareA);
+}
+
+// Whether a input is "input -> stops -> noOverLap input" or "stops -> input"
+bool stopRefundQ(const IF::sequence& seq){
+    const int n = seq.inputs.size();
+    if(n <= 1 || startWithEmpty(seq)) return false;
+    if(!inputEmpty(seq.inputs[n-2])) return false;
+
+    int w = seq.inputs.back().w, a = seq.inputs.back().a;
+
+    for(int i = n - 3; i >= 0; i--){
+        // return on first nonEmpty input
+        if(!inputEmpty(seq.inputs[i]))
+            return noOverlap(seq.inputs[i], seq.inputs.back());
+    }
+
+    return true;
+}
 
 double normalizeDeg(double angle) {
     double norm = std::fmod(angle, 360.0);
@@ -326,10 +359,13 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
     double eVx = 0;
     double eVz = 0;
     const bool lastDepth = (depth == depthLimit);
-    if (lastDepth) {
+    
+    if(lastDepth){
         if(careX) eVx = estimateVx(node, cond.endAirborne);
         if(careZ) eVz = estimateVz(node, cond.endAirborne);
+    }
 
+    if (lastDepth && !startWithEmpty(node) ) {
         node.errX = careX? std::abs(eVx - cond.x.mid()) - cond.x.tol() - approxErr : 0;
         node.errZ = careZ? std::abs(eVz - cond.z.mid()) - cond.z.tol() - approxErr : 0;
         
@@ -365,10 +401,6 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
         prevA = prevInput.a;
     }
 
-    // Must be after the hardPrune section
-    // Early return: maxDepth must be an inputExtension, cannot input extend airLast input
-    if(lastDepth && prevInput.type == segLerp::Air) return false;
-
     // Main search happens after here, this is for backtracking purposes
     const nodeShapshot baseNode{node.T, node.airDebt, node.lerp0, node.lerp1, node.errX, node.errZ};
 
@@ -400,16 +432,15 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
             // Pressing either A/D does nothing when W/S is not held
    
             bool inputExtension = (w == prevW) && (a == prevA);
+            node.inputs.back().w = w;
+            node.inputs.back().a = a;
+            bool refund = inputExtension || stopRefundQ(node);
             
-            // only inputExtension is allowed at maxDepth
-            if(lastDepth && !inputExtension) continue;
+            // only refundable input is allowed at maxDepth
+            if(lastDepth && !refund) continue;
 
             const bool emptyInput = (w == 0) && (a == 0);
-            const bool zeroInfCheck = lastDepth || (penultimateDepth && !inputExtension);
-
-            // The initial(for regular timeline) input cannot be blank
-            // It will always fail the zeroInfCheck(that is the less obvious reason tho)
-            if(emptyInput && zeroInfCheck) continue;
+            const bool zeroInfCheck = !emptyInput && (lastDepth || (penultimateDepth && !refund));
 
             // 0-inf interval check
             if(zeroInfCheck){
@@ -434,13 +465,10 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
             }
 
             // monoCheck doesn't make sense when input is empty
-            const bool monoCheck = (lastDepth || (penultimateDepth && !inputExtension)) && !emptyInput;
+            const bool monoCheck = (lastDepth || (penultimateDepth && !refund)) && !emptyInput;
 
             double lastErrX;
             double lastErrZ;
-
-            node.inputs.back().w = w;
-            node.inputs.back().a = a;
 
             // On ground:
             if(prevInput.type != segLerp::Air){
@@ -466,7 +494,7 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                     node.inputs.back().type = segLerp::Ground;
 
                     // inputExtension does not cost depth
-                    bool hardPrune = dfsRecursive(depth + 1 - inputExtension, depthLimit, node, cond, result);
+                    bool hardPrune = dfsRecursive(depth + 1 - refund, depthLimit, node, cond, result);
 
                     const double childErrX = node.errX;
                     const double childErrZ = node.errZ;
@@ -509,7 +537,7 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                     node.lerp1 = baseNode.lerp1;
                     node.inputs.back().type = (t == revLandTick)? segLerp::Jump : segLerp::Air;
 
-                    bool hardPrune = dfsRecursive(depth + 1 - inputExtension, depthLimit, node, cond, result);
+                    bool hardPrune = dfsRecursive(depth + 1 - refund, depthLimit, node, cond, result);
 
                     bool monotonicPrune = false;
                     const double childErrX = node.errX;
@@ -555,7 +583,7 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                     node.lerp1 = baseNode.lerp1;
                     node.inputs.back().type = (t == revLandTick)? segLerp::Jump : segLerp::Air;
 
-                    bool hardPrune = dfsRecursive(depth + 1, depthLimit, node, cond, result);
+                    bool hardPrune = dfsRecursive(depth + 1 - refund, depthLimit, node, cond, result);
 
                     bool monotonicPrune = false;
                     const double childErrX = node.errX;

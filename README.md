@@ -103,28 +103,21 @@ t = 17: 6.625 + 0.00072 b
 
 ### Slowness I 1.5bm 6-1 to ladder, bwmm strat for facing = 0 
 
-**(took ~5ms on average to find all nostrafe inputs up to depth 4 on my M1 mac)**
+**(took ~5.5ms on average to find all inputs up to depth 2 on my macbook)**
 
 ```
 Input Finder: 
-TargetVz: (-0.1276846279184921, -0.1276844242999637), Interval Width: 2.03619e-07, MM: -1.5, Airtime: 12, AllowStrafe: 0
+TargetVz: (-0.1276846279184921, -0.1276844242999637), Interval Width: 2.03619e-07, MM: -1.5, Airtime: 12, AllowStrafe: 1
 
-LOG ----------------------- 
-
-Input Finder Settings: 
-maxDepth = 4, maxTicks = 40
+maxDepth = 2, maxTicks = 50
 (speed, slow) = (0, 1)
 -------------------------------------------------
 Try searching depth = 1 inputs
 -------------------------------------------------
 Try searching depth = 2 inputs
--------------------------------------------------
-Try searching depth = 3 inputs
--------------------------------------------------
-Try searching depth = 4 inputs
 
-Found Seqeunce: wa.s(11) s.w(6) w.s(2) wj.s(12) w.s(1) st(1) 
-t = 33(+1), Vz: -0.1276845873572806
+Found Seqeunce: s.wa(1) sj.wa(3) sta(9) st(2) stj(5) wa.s(7) wj.s(10) sta(2) st(1) 
+t = 40(+0), Vz: -0.1276845948993475
 
 Found Seqeunce: sa.w(1) s.w(7) st(1) stj(4) wa.s(8) wj.s(10) sta(2) st(1) 
 t = 34(+11), Vz: -0.1276844736885106

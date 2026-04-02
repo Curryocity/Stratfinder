@@ -78,11 +78,11 @@ void printBenchmark(const BenchmarkStats& stats) {
 int main() {
     init();
 
-    const int depth = 4;
-    const int maxTick = 40;
+    const int depth = 2;
+    const int maxTick = 50;
     const int airtime = 12;
     const int runs = 100;
-    const bool allowStrafe = false;
+    const bool allowStrafe = true;
 
     inputFinder::condition cond;
     cond.endAirborne = false;

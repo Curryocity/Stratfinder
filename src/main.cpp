@@ -34,7 +34,7 @@ int main() {
         std::cout << "--------------- \n\n";
     }
 
-    if(false){
+    if(true){
         // Finding input for slowness I 1.5bm 6-1 to ladder (perfect double 45.01)
         inputFinder f;
         f.changeSettings(4, 40);
@@ -43,7 +43,6 @@ int main() {
         f.logSettings();
         inputFinder::condition cond;
         cond.endAirborne = false;
-        cond.x.enabled = false;
         cond.z.enabled = true;
         cond.z.mm = -1.5;
         cond.allowStrafe = false;
@@ -62,7 +61,7 @@ int main() {
         f.printLog();
     }
 
-    if(true){
+    if(false){
         inputFinder f;
         f.changeSettings(4, 30);
         f.riskyPrune(false);

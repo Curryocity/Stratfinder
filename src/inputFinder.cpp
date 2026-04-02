@@ -54,6 +54,7 @@ void IF::setCondWithBound(axisCond& cond, double bound1, double bound2){
     cond.enabled = true;
 }
 
+// TODO: improve/revisit this
 // heuristics
 void IF::initHeuristics(int airtime, double zDis, double xDis){
 
@@ -691,11 +692,11 @@ bool IF::exeSeq(player& p, const sequence& seq, const condition& cond, const boo
         }
 
         // Walled mm check
-        if (cond.x.walled) {
+        if (xMMCheck && cond.x.walled) {
             if (xmm < 0 && xWallMax - xMin > abs(xmm)) return false;
             if (xmm > 0 && xMax - xWallMin > abs(xmm)) return false;
         }
-        if (cond.z.walled) {
+        if (zMMCheck && cond.z.walled) {
             if (zmm < 0 && zWallMax - zMin > abs(zmm)) return false;
             if (zmm > 0 && zMax - zWallMin > abs(zmm)) return false;
         }

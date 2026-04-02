@@ -126,12 +126,6 @@ Try searching depth = 4 inputs
 Found Seqeunce: wa.s(11) s.w(6) w.s(2) wj.s(12) w.s(1) st(1) 
 t = 33(+1), Vz: -0.1276845873572806
 
-Found Seqeunce: sa.w(1) s.w(4) st(3) stj(7) wa.s(5) w.s(2) wj.s(10) sta(2) st(1) 
-t = 35(+11), Vz: -0.1276845618947523
-
-Found Seqeunce: sa.w(7) s.w(4) stj(5) wa.s(7) w.s(2) wj.s(10) sta(2) st(1) 
-t = 38(+5), Vz: -0.1276844591763858
-
 Found Seqeunce: sa.w(1) s.w(7) st(1) stj(4) wa.s(8) wj.s(10) sta(2) st(1) 
 t = 34(+11), Vz: -0.1276844736885106
 ```

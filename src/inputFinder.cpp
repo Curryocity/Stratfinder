@@ -943,7 +943,7 @@ void IF::riskyPrune(bool riskQ){
 }
 
 void IF::logSearch(std::ostream& out, const condition& cond, int airtime) const {
-    out << "Input Finder:\n";
+    out << "Input Finder:\n\n";
     if (cond.x.enabled) {
         out << "TargetVx: (" << util::df(cond.x.lb) << ", " << util::df(cond.x.ub)
             << "), Interval Size: " << (cond.x.ub - cond.x.lb)
@@ -955,10 +955,10 @@ void IF::logSearch(std::ostream& out, const condition& cond, int airtime) const 
             << ", ZMM: " << util::fmt(cond.z.mm) << "\n";
     }
     out << "Airtime: " << airtime
-        << ", EndAirborne: " << cond.endAirborne
-        << ", Facing: " << util::fmt(rotation) << " deg"
-        << ", Speed/Slowness: (" << speed << ", " << slowness << ")"
-        << ", AllowKeys: " << keysToString(cond.allowKeys) << "\n";
+        << ", EndAirborne: " << cond.endAirborne << "\n";
+    out << "Facing: " << util::fmt(rotation) << " deg\n";
+    out << "Speed/Slowness: (" << speed << ", " << slowness << ")\n";
+    out << "AllowKeys: " << keysToString(cond.allowKeys) << "\n";
     out << "MaxDepth: " << maxDepth
         << ", MaxTicks: " << maxTicks
         << ", MaxTransitionTime: " << maxTransTick
@@ -966,16 +966,16 @@ void IF::logSearch(std::ostream& out, const condition& cond, int airtime) const 
 }
 
 void IF::logSearch(std::ostream& out, const polorCond& cond, int airtime) const {
-    out << "Polar Input Finder:\n";
+    out << "Polar Input Finder:\n\n";
     out << "Norm: (" << util::df(cond.normLb) << ", " << util::df(cond.normUb)
         << "), Angle: (" << util::df(cond.angle1) << ", " << util::df(cond.angle2) << ")\n";
     out << "XMM: " << util::fmt(cond.xmm)
         << ", ZMM: " << util::fmt(cond.zmm) << "\n";
     out << "Airtime: " << airtime
-        << ", EndAirborne: " << cond.endAirborne
-        << ", Facing: " << util::fmt(rotation) << " deg"
-        << ", Speed/Slowness: (" << speed << ", " << slowness << ")"
-        << ", AllowKeys: " << keysToString(cond.allowKeys) << "\n";
+        << ", EndAirborne: " << cond.endAirborne << "\n";
+    out << "Facing: " << util::fmt(rotation) << " deg\n";
+    out << "Speed/Slowness: (" << speed << ", " << slowness << ")\n";
+    out << "AllowKeys: " << keysToString(cond.allowKeys) << "\n";
     out << "MaxDepth: " << maxDepth
         << ", MaxTicks: " << maxTicks
         << ", MaxTransitionTime: " << maxTransTick

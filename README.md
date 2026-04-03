@@ -106,15 +106,15 @@ t = 17: 6.625 + 0.00072 b
 **(The full search with settings below took ~9500 micro-seconds on average on my M1 Mac)**
 
 ```
-Input Finder: 
-TargetVz: (-0.1276846279184921, -0.1276844242999637), Interval Width: 2.03619e-07, MM: -1.5, Airtime: 12, AllowStrafe: 1
+Input Finder:
 
-LOG ----------------------- 
+TargetVz: (-0.1276846279184921, -0.1276844242999637), Interval Size: 2.03619e-07, ZMM: -1.5
+Airtime: 12, EndAirborne: 0
+Facing: 0.015 deg
+Speed/Slowness: (0, 1)
+AllowKeys: WASD
+MaxDepth: 2, MaxTicks: 50, MaxTransitionTime: -1, GeneralBridge: 0
 
-Settings: 
-maxDepth = 2, maxTicks = 50
-(speed, slow) = (0, 1)
-Facing = 0.015 deg 
 -------------------------------------------------
 Try searching depth = 1 inputs
 -------------------------------------------------

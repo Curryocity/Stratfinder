@@ -82,30 +82,18 @@ int main() {
     const int maxTick = 50;
     const int airtime = 12;
     const int runs = 100;
-    const bool allowStrafe = true;
 
     inputFinder::condition cond;
     cond.endAirborne = false;
     cond.x.enabled = false;
     cond.z.enabled = true;
     cond.z.mm = -1.5;
-    cond.allowStrafe = allowStrafe;
     inputFinder::setCondWithBound(cond.z, -0.1276844242999637, -0.1276846279184921);
 
     auto printHeader = [&](bool riskIt) {
-        double vzLB = cond.z.lb;
-        double vzUB = cond.z.ub;
-        double intervalWidth = cond.z.ub - cond.z.lb;
-        double mm = cond.z.mm;
-        bool hasStrafe = cond.allowStrafe;
         std::cout << "------------------------------\n";
         std::cout << "Depth: " << depth << ", MaxTicks: " << maxTick << ", Runs: " << runs << "\n";
-        std::cout << "AllowStrafe: " << allowStrafe << ", RiskyPrune: " << riskIt << "\n";
-        std::cout << "TargetVz: (" << util::df(vzLB) << ", " << util::df(vzUB)
-                  << "), Interval Width: " << intervalWidth
-                  << ", MM: " << util::fmt(mm)
-                  << ", Airtime: " << airtime
-                  << ", AllowStrafe: " << hasStrafe << "\n";
+        std::cout << "RiskyPrune: " << riskIt << "\n";
     };
 
     for (bool riskIt : {false, true}) {
@@ -127,6 +115,7 @@ int main() {
         );
 
         printHeader(riskIt);
+        f.logSearch(std::cout, cond, airtime);
         std::cout << "InputFinder:\n";
         printBenchmark(inputStats);
     }

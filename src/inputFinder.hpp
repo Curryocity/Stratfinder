@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <iosfwd>
 #include <vector>
 #include <string>
 #include "segLerp.hpp"
@@ -11,6 +12,12 @@ class inputFinder {
     // IMPORTANT: I ASSUMED TOGGLESPRINT FOR EFFICIENCY
     public:
 
+    struct WASD{
+        bool w = false;
+        bool a = false;
+        bool s = false;
+        bool d = false;
+    };
 
     struct input {
         int w = 0; // -1, 0, 1
@@ -31,6 +38,7 @@ class inputFinder {
     };
 
     struct polorCond{
+        WASD allowKeys = {1, 1, 1, 1};
         double normLb;
         double normUb;
         double angle1;
@@ -45,8 +53,8 @@ class inputFinder {
     struct condition{
         axisCond z;
         axisCond x;
+        WASD allowKeys = {1, 1, 1, 1};
         bool endAirborne = false;
-        bool allowStrafe = true;
     };
 
     struct sequence{
@@ -122,6 +130,8 @@ class inputFinder {
     // Faster when on, it may skip inputs that requires inertia
 
     void logSettings();
+    void logSearch(std::ostream& out, const condition& cond, int airtime) const;
+    void logSearch(std::ostream& out, const polorCond& cond, int airtime) const;
     player& getDummy();
 
     void writeLog(std::string str);

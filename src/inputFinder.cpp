@@ -6,6 +6,7 @@
 #include <array>
 #include <cmath>
 #include <cstdlib>
+#include <ostream>
 #include <limits>
 #include <stdexcept>
 #include <string>
@@ -16,12 +17,18 @@ using IF = inputFinder;
 
 namespace {
 
-struct WASD{
-    bool w = false;
-    bool a = false;
-    bool s = false;
-    bool d = false;
-};
+bool isKeyAllowed(int w, int a, const IF::WASD& rule){
+    return !((!rule.w && w == 1) || (!rule.a && a == 1) || (!rule.s && w == -1) || (!rule.d && a == -1));
+}
+
+std::string keysToString(const IF::WASD& keys) {
+    std::string out;
+    if (keys.w) out += "W";
+    if (keys.a) out += "A";
+    if (keys.s) out += "S";
+    if (keys.d) out += "D";
+    return out.empty() ? "-" : out;
+}
 
 bool inputEmpty(const IF::input& in){
     return in.w == 0 && in.a == 0;
@@ -32,15 +39,15 @@ bool startWithEmpty(const IF::sequence& seq){
     return inputEmpty(seq.inputs.back());
 }
 
-bool equalWASD(const WASD& lhs, const WASD& rhs){
+bool equalWASD(const IF::WASD& lhs, const IF::WASD& rhs){
     return (lhs.w == rhs.w) && (lhs.a == rhs.a) && (lhs.s == rhs.s) && (lhs.d == rhs.d);
 }
 
-WASD toWASD(const IF::input& in){
+IF::WASD toWASD(const IF::input& in){
     return {in.w == 1, in.a == 1, in.w == -1, in.a == -1};
 }
 
-WASD overlap(const WASD& lhs, const WASD& rhs) {
+IF::WASD overlap(const IF::WASD& lhs, const IF::WASD& rhs) {
     return {(lhs.w && rhs.w ), (lhs.a && rhs.a ), (lhs.s && rhs.s), (lhs.d && rhs.d)};
 }
 
@@ -49,15 +56,15 @@ WASD overlap(const WASD& lhs, const WASD& rhs) {
 bool transitionRefund(const IF::sequence& seq, int maxTransTick, bool generalBridgeQ){
     const int n = seq.inputs.size();
     if(maxTransTick == 0 || n <= 1 || startWithEmpty(seq)) return false;
-    WASD cur = toWASD(seq.inputs[n-1]);
-    WASD bridge = toWASD(seq.inputs[n-2]);
+    IF::WASD cur = toWASD(seq.inputs[n-1]);
+    IF::WASD bridge = toWASD(seq.inputs[n-2]);
 
     // non general transition: only accept "stop" as valid bridge
     if(!generalBridgeQ && !inputEmpty(seq.inputs[n-2])) return false;
     int transitionTime = seq.inputs[n-2].t;
 
     for(int i = n - 3; i >= 0; i--){
-        WASD prev = toWASD(seq.inputs[i]);
+        IF::WASD prev = toWASD(seq.inputs[i]);
         if(!equalWASD(bridge, prev))
             return equalWASD(overlap(prev, cur), bridge) && (maxTransTick < 0 || transitionTime < maxTransTick);
         transitionTime += seq.inputs[i].t;
@@ -235,6 +242,12 @@ std::vector<IF::sequence> IF::matchSpeed(const condition& cond, int airtime){
         return {};
     } 
 
+    if (!(cond.allowKeys.w || cond.allowKeys.a || cond.allowKeys.s || cond.allowKeys.d)) {
+        writeLog("Exception: No movement keys were allowed\n");
+        writeLog("------EXIT------\n");
+        return {};
+    }
+
     std::vector<IF::sequence> result;
     initHeuristics(airtime, std::abs(cond.z.mm) + 0.6f, std::abs(cond.x.mm) + 0.6f);
     lerpUpdater.setParameters(airtime, speed, slowness, rotation);
@@ -262,7 +275,7 @@ std::vector<IF::sequence> IF::matchSpeed(const polorCond& cond, int airtime){
 
     condition rectCond;
     rectCond.endAirborne = cond.endAirborne;
-    rectCond.allowStrafe = true;
+    rectCond.allowKeys = cond.allowKeys;
     rectCond.x.enabled = true;
     rectCond.z.enabled = true;
     rectCond.x.mm = cond.xmm;
@@ -443,7 +456,7 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
     for (int w = -1; w <= 1; w++) {
         for (int a = -1; a <= 1; a++) { 
 
-            if(!cond.allowStrafe && a != 0) continue;
+            if(!isKeyAllowed(w, a, cond.allowKeys)) continue;
 
             if(symmetric && (a < 0 || (w == 0 && a != 0))) continue; 
             // When symmetric:
@@ -937,6 +950,34 @@ void IF::logSettings(){
         + ", generalBridge = " + std::to_string(generalBridgeQ) + "\n");
     writeLog("(speed, slow) = (" + std::to_string(speed) + ", " + std::to_string(slowness) + ")\n");
     writeLog("Facing = " + util::fmt(rotation) + " deg \n");
+}
+
+void IF::logSearch(std::ostream& out, const condition& cond, int airtime) const {
+    out << "Input Finder:\n";
+    if (cond.x.enabled) {
+        out << "TargetVx: (" << util::df(cond.x.lb) << ", " << util::df(cond.x.ub)
+            << "), Interval Width: " << (cond.x.ub - cond.x.lb)
+            << ", XMM: " << util::fmt(cond.x.mm) << "\n";
+    }
+    if (cond.z.enabled) {
+        out << "TargetVz: (" << util::df(cond.z.lb) << ", " << util::df(cond.z.ub)
+            << "), Interval Width: " << (cond.z.ub - cond.z.lb)
+            << ", ZMM: " << util::fmt(cond.z.mm) << "\n";
+    }
+    out << "Airtime: " << airtime
+        << ", EndAirborne: " << cond.endAirborne
+        << ", AllowKeys: " << keysToString(cond.allowKeys) << "\n";
+}
+
+void IF::logSearch(std::ostream& out, const polorCond& cond, int airtime) const {
+    out << "Polar Input Finder:\n";
+    out << "Norm: (" << util::df(cond.normLb) << ", " << util::df(cond.normUb)
+        << "), Angle: (" << util::df(cond.angle1) << ", " << util::df(cond.angle2) << ")\n";
+    out << "XMM: " << util::fmt(cond.xmm)
+        << ", ZMM: " << util::fmt(cond.zmm)
+        << ", Airtime: " << airtime
+        << ", EndAirborne: " << cond.endAirborne
+        << ", AllowKeys: " << keysToString(cond.allowKeys) << "\n";
 }
 
 player& IF::getDummy(){

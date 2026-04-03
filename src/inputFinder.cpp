@@ -66,7 +66,7 @@ bool transitionRefund(const IF::sequence& seq, int maxTransTick, bool generalBri
     for(int i = n - 3; i >= 0; i--){
         IF::WASD prev = toWASD(seq.inputs[i]);
         if(!equalWASD(bridge, prev))
-            return equalWASD(overlap(prev, cur), bridge) && (maxTransTick < 0 || transitionTime < maxTransTick);
+            return equalWASD(overlap(prev, cur), bridge) && (maxTransTick < 0 || transitionTime <= maxTransTick);
         transitionTime += seq.inputs[i].t;
     }
 
@@ -942,31 +942,27 @@ void IF::riskyPrune(bool riskQ){
     else approxErr = inertiaErr;
 }
 
-void IF::logSettings(){
-    writeLog("Settings: \n");
-    writeLog("maxDepth = " + std::to_string(maxDepth)
-        + ", maxTicks = " + std::to_string(maxTicks)
-        + ", maxTransitionTime = " + std::to_string(maxTransTick)
-        + ", generalBridge = " + std::to_string(generalBridgeQ) + "\n");
-    writeLog("(speed, slow) = (" + std::to_string(speed) + ", " + std::to_string(slowness) + ")\n");
-    writeLog("Facing = " + util::fmt(rotation) + " deg \n");
-}
-
 void IF::logSearch(std::ostream& out, const condition& cond, int airtime) const {
     out << "Input Finder:\n";
     if (cond.x.enabled) {
         out << "TargetVx: (" << util::df(cond.x.lb) << ", " << util::df(cond.x.ub)
-            << "), Interval Width: " << (cond.x.ub - cond.x.lb)
+            << "), Interval Size: " << (cond.x.ub - cond.x.lb)
             << ", XMM: " << util::fmt(cond.x.mm) << "\n";
     }
     if (cond.z.enabled) {
         out << "TargetVz: (" << util::df(cond.z.lb) << ", " << util::df(cond.z.ub)
-            << "), Interval Width: " << (cond.z.ub - cond.z.lb)
+            << "), Interval Size: " << (cond.z.ub - cond.z.lb)
             << ", ZMM: " << util::fmt(cond.z.mm) << "\n";
     }
     out << "Airtime: " << airtime
         << ", EndAirborne: " << cond.endAirborne
+        << ", Facing: " << util::fmt(rotation) << " deg"
+        << ", Speed/Slowness: (" << speed << ", " << slowness << ")"
         << ", AllowKeys: " << keysToString(cond.allowKeys) << "\n";
+    out << "MaxDepth: " << maxDepth
+        << ", MaxTicks: " << maxTicks
+        << ", MaxTransitionTime: " << maxTransTick
+        << ", GeneralBridge: " << generalBridgeQ << "\n";
 }
 
 void IF::logSearch(std::ostream& out, const polorCond& cond, int airtime) const {
@@ -974,10 +970,16 @@ void IF::logSearch(std::ostream& out, const polorCond& cond, int airtime) const 
     out << "Norm: (" << util::df(cond.normLb) << ", " << util::df(cond.normUb)
         << "), Angle: (" << util::df(cond.angle1) << ", " << util::df(cond.angle2) << ")\n";
     out << "XMM: " << util::fmt(cond.xmm)
-        << ", ZMM: " << util::fmt(cond.zmm)
-        << ", Airtime: " << airtime
+        << ", ZMM: " << util::fmt(cond.zmm) << "\n";
+    out << "Airtime: " << airtime
         << ", EndAirborne: " << cond.endAirborne
+        << ", Facing: " << util::fmt(rotation) << " deg"
+        << ", Speed/Slowness: (" << speed << ", " << slowness << ")"
         << ", AllowKeys: " << keysToString(cond.allowKeys) << "\n";
+    out << "MaxDepth: " << maxDepth
+        << ", MaxTicks: " << maxTicks
+        << ", MaxTransitionTime: " << maxTransTick
+        << ", GeneralBridge: " << generalBridgeQ << "\n";
 }
 
 player& IF::getDummy(){

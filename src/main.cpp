@@ -41,7 +41,6 @@ int main() {
         f.riskyPrune(false);
         f.setEffect(0, 1);
         f.setRotation(0.015);
-        f.logSettings();
         inputFinder::condition cond;
         cond.endAirborne = false;
         cond.z.enabled = true;
@@ -61,7 +60,6 @@ int main() {
         f.changeSettings(4, 30);
         f.riskyPrune(false);
         f.setRotation(103.13);
-        f.logSettings();
 
         inputFinder::polorCond cond;
         double targetNorm = 0.236876;

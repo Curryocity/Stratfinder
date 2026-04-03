@@ -129,7 +129,6 @@ class inputFinder {
     void riskyPrune(bool riskIt); 
     // Faster when on, it may skip inputs that requires inertia
 
-    void logSettings();
     void logSearch(std::ostream& out, const condition& cond, int airtime) const;
     void logSearch(std::ostream& out, const polorCond& cond, int airtime) const;
     player& getDummy();

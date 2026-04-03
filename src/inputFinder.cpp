@@ -909,9 +909,10 @@ void IF::riskyPrune(bool riskQ){
 }
 
 void IF::logSettings(){
-    writeLog("Input Finder Settings: \n");
+    writeLog("Settings: \n");
     writeLog("maxDepth = " + std::to_string(maxDepth) + ", maxTicks = " + std::to_string(maxTicks) + "\n");
     writeLog("(speed, slow) = (" + std::to_string(speed) + ", " + std::to_string(slowness) + ")\n");
+    writeLog("Facing = " + util::fmt(rotation) + " deg \n");
 }
 
 player& IF::getDummy(){

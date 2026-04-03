@@ -114,6 +114,7 @@ int main() {
         f.changeSettings(depth, maxTick);
         f.riskyPrune(riskIt);
         f.setEffect(0, 1);
+        f.setRotation(0.015);
 
         BenchmarkStats inputStats = benchmarkUs(
             [&]() {

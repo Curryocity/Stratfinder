@@ -40,7 +40,7 @@ int main() {
         f.changeSettings(2, 50);
         f.riskyPrune(true);
         f.setEffect(0, 1);
-        f.setRotation(0);
+        f.setRotation(0.015);
         f.logSettings();
         inputFinder::condition cond;
         cond.endAirborne = false;

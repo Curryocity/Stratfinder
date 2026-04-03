@@ -101,23 +101,33 @@ t = 17: 6.625 + 0.00072 b
 
 ## Inputfinder(New): Finding inputs that matches the speed and fits in the mm
 
-### Slowness I 1.5bm 6-1 to ladder, bwmm strat for facing = 0 
+### Slowness I 1.5bm 6-1 to ladder, bwmm strat for facing = 0.015 
 
-**(took ~5.5ms on average to find all inputs up to depth 2 on my macbook)**
+**(The full search with settings below took ~9500 micro-seconds on average on my M1 Mac)**
 
 ```
 Input Finder: 
 TargetVz: (-0.1276846279184921, -0.1276844242999637), Interval Width: 2.03619e-07, MM: -1.5, Airtime: 12, AllowStrafe: 1
 
+LOG ----------------------- 
+
+Settings: 
 maxDepth = 2, maxTicks = 50
 (speed, slow) = (0, 1)
+Facing = 0.015 deg 
 -------------------------------------------------
 Try searching depth = 1 inputs
 -------------------------------------------------
 Try searching depth = 2 inputs
 
+Found Seqeunce: sa.wa(2) sta(3) wa.sd(3) w.sd(5) 
+t = 13(+4), Vz: -0.1276845089733
+
 Found Seqeunce: s.wa(1) sj.wa(3) sta(9) st(2) stj(5) wa.s(7) wj.s(10) sta(2) st(1) 
-t = 40(+0), Vz: -0.1276845948993475
+t = 40(+0), Vz: -0.1276845156104653
+
+Found Seqeunce: sa.wa(3) sj.wa(3) sta(9) st(2) stj(5) wa.s(7) wj.s(10) sta(2) st(1) 
+t = 42(+9), Vz: -0.1276846239996365
 
 Found Seqeunce: sa.w(1) s.w(7) st(1) stj(4) wa.s(8) wj.s(10) sta(2) st(1) 
 t = 34(+11), Vz: -0.1276844736885106

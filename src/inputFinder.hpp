@@ -113,14 +113,14 @@ class inputFinder {
     void alphaBetaUpdate(player& p, sequence& seq);
 
     enum Axis{X,Z};
-    enum SolutionFormat{Cartesian, Polar};
+    enum ConditionForm{Cartesian = 0, Polar = 1};
     double estimateVx(sequence& seq, bool endedAirborne, double initVx = 0, bool prevSprint = false);
     double estimateVz(sequence& seq, bool endedAirborne, double initVz = 0, bool prevSprint = false);
     double terminalVxToSeq(int w, int a, sequence& seq, bool endedAirborne);
     double terminalVzToSeq(int w, int a, sequence& seq, bool endedAirborne);
 
     std::string seq2Mothball(const sequence& seq) const;
-    std::string showSolutions(const std::vector<sequence>& solutions, SolutionFormat format = Cartesian) const;
+    std::string showSolutions(const std::vector<sequence>& solutions, ConditionForm format = Cartesian) const;
 
     void setEffect(int speed = 0, int slowness = 0);
     void setRotation(double rot = 0);
@@ -158,7 +158,7 @@ class inputFinder {
     int maxDepth = 3;
     int maxTicks = 40;
     int maxTransTick = -1;
-    bool generalBridgeQ = false;
+    bool allowNonEmptyBridge = false;
 
     // constants to account movement approximation error using lerp
     const double floatErr = 1e-5;

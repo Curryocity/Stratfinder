@@ -466,7 +466,7 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
             bool inputExtension = (w == prevW) && (a == prevA);
             node.inputs.back().w = w;
             node.inputs.back().a = a;
-            bool refund = inputExtension || transitionRefund(node, maxTransTick, generalBridgeQ);
+            bool refund = inputExtension || transitionRefund(node, maxTransTick, allowNonEmptyBridge);
             
             // only refundable input is allowed at maxDepth
             if(lastDepth && !refund) continue;
@@ -900,7 +900,7 @@ std::string IF::seq2Mothball(const sequence& seq) const {
     return desc;
 }
 
-std::string IF::showSolutions(const std::vector<sequence>& solutions, SolutionFormat format) const {
+std::string IF::showSolutions(const std::vector<sequence>& solutions, ConditionForm format) const {
     std::string out;
 
     for (const auto& seq : solutions) {
@@ -934,7 +934,7 @@ void IF::changeSettings(int maxDepth, int maxTicks, int maxTransitionTime, bool 
     this->maxDepth = maxDepth;
     this->maxTicks = maxTicks;
     this->maxTransTick = maxTransitionTime;
-    this->generalBridgeQ = generalBridgeQ;
+    this->allowNonEmptyBridge = generalBridgeQ;
 }
 
 void IF::riskyPrune(bool riskQ){
@@ -962,7 +962,7 @@ void IF::logSearch(std::ostream& out, const condition& cond, int airtime) const 
     out << "MaxDepth: " << maxDepth
         << ", MaxTicks: " << maxTicks
         << ", MaxTransitionTime: " << maxTransTick
-        << ", GeneralBridge: " << generalBridgeQ << "\n";
+        << ", GeneralBridge: " << allowNonEmptyBridge << "\n";
 }
 
 void IF::logSearch(std::ostream& out, const polorCond& cond, int airtime) const {
@@ -979,7 +979,7 @@ void IF::logSearch(std::ostream& out, const polorCond& cond, int airtime) const 
     out << "MaxDepth: " << maxDepth
         << ", MaxTicks: " << maxTicks
         << ", MaxTransitionTime: " << maxTransTick
-        << ", GeneralBridge: " << generalBridgeQ << "\n";
+        << ", GeneralBridge: " << allowNonEmptyBridge << "\n";
 }
 
 player& IF::getDummy(){

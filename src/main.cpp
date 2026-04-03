@@ -1,6 +1,8 @@
+#include "inputFinder.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <filesystem>
 
 #if !defined(GL_SILENCE_DEPRECATION)
 #define GL_SILENCE_DEPRECATION
@@ -17,12 +19,28 @@
 #include "../third_party/imgui/backends/imgui_impl_glfw.h"
 #include "../third_party/imgui/backends/imgui_impl_opengl3.h"
 
+using IF = inputFinder;
+
 namespace {
 
 const char* kWindowTitle = "Input Cracker";
 
 struct GuiState {
     float leftWidth = 420.0f;
+    IF::ConditionForm coordType = IF::Cartesian;
+    IF::condition cond;
+    IF::polorCond pCond;
+    float rotation = 0.0f;
+    int speed = 0;
+    int slowness = 0;
+
+    // engine settings
+    int maxDepth = 3;
+    int maxTicks = 40;
+    int maxTransTick = -1;
+    bool allowNonEmptyBridge = false;
+
+    bool riskyLerp = true;
 };
 
 struct RGB {
@@ -30,6 +48,10 @@ struct RGB {
     float g;
     float b;
 };
+
+ImFont* codeFont = nullptr;
+ImFont* bigCodeFont = nullptr;
+ImFont* uiFont = nullptr;
 
 void glfwErrorCallback(int error, const char* description) {
     std::fprintf(stderr, "GLFW Error %d: %s\n", error, description);
@@ -127,6 +149,23 @@ void applyTheme() {
     applyAccent({0.45f, 0.39f, 0.60f});
 }
 
+void initFonts() {
+    ImGuiIO& io = ImGui::GetIO();
+    const std::filesystem::path codeFontPath = "asset/fonts/JetBrainsMono-Regular.ttf";
+    const std::filesystem::path uiFontPath = "asset/fonts/MinecraftRegular.otf";
+
+    if (std::filesystem::exists(codeFontPath)) {
+        codeFont = io.Fonts->AddFontFromFileTTF(codeFontPath.string().c_str(), 16.0f);
+        bigCodeFont = io.Fonts->AddFontFromFileTTF(codeFontPath.string().c_str(), 22.0f);
+    }
+
+    if (std::filesystem::exists(uiFontPath)) {
+        uiFont = io.Fonts->AddFontFromFileTTF(uiFontPath.string().c_str(), 16.0f);
+    }
+
+    if (uiFont != nullptr) io.FontDefault = uiFont;
+}
+
 void drawSplitter(float& leftWidth, float minLeft, float minRight) {
     ImGuiStyle& style = ImGui::GetStyle();
     const float splitterWidth = 8.0f;
@@ -155,8 +194,29 @@ void drawSplitter(float& leftWidth, float minLeft, float minRight) {
     );
 }
 
+static const char* coordTypes[2] = {"Cartesian", "Polar"};
 void inputPanel(GuiState& state) {
-    
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(24.0f, 10.0f));
+    ImGui::BeginChild("InputPanel", ImVec2(0, 0), true);
+    ImGui::PopStyleVar();
+
+    ImGui::PushFont(uiFont);
+
+    ImGui::SeparatorText("Input Cracker");
+
+    ImGui::Spacing();
+    ImGui::AlignTextToFramePadding();
+    ImGui::Text("Geometry:");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(150.0f);
+
+    int coordIdx = (int)state.coordType;
+    if(ImGui::Combo("##coordType", &coordIdx, coordTypes, 2)){
+        state.coordType = (IF::ConditionForm) coordIdx;
+    }
+
+    ImGui::PopFont();
+    ImGui::EndChild();
 }
 
 void outputPanel(GuiState& state) {
@@ -190,6 +250,7 @@ int main() {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     applyTheme();
+    initFonts();
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glslVersion);

@@ -46,16 +46,21 @@ WASD overlap(const WASD& lhs, const WASD& rhs) {
 
 // Refund when the middle bridge state equals the overlap of the surrounding inputs,
 // or when the sequence starts with an empty bridge before the first real input.
-bool transitionRefund(const IF::sequence& seq){
+bool transitionRefund(const IF::sequence& seq, int maxTransTick, bool generalBridgeQ){
     const int n = seq.inputs.size();
-    if(n <= 1 || startWithEmpty(seq)) return false;
+    if(maxTransTick == 0 || n <= 1 || startWithEmpty(seq)) return false;
     WASD cur = toWASD(seq.inputs[n-1]);
     WASD bridge = toWASD(seq.inputs[n-2]);
+
+    // non general transition: only accept "stop" as valid bridge
+    if(!generalBridgeQ && !inputEmpty(seq.inputs[n-2])) return false;
+    int transitionTime = seq.inputs[n-2].t;
 
     for(int i = n - 3; i >= 0; i--){
         WASD prev = toWASD(seq.inputs[i]);
         if(!equalWASD(bridge, prev))
-            return equalWASD(overlap(prev, cur), bridge);
+            return equalWASD(overlap(prev, cur), bridge) && (maxTransTick < 0 || transitionTime < maxTransTick);
+        transitionTime += seq.inputs[i].t;
     }
 
     bool bridgeEmpty = inputEmpty(seq.inputs[n-2]);
@@ -448,7 +453,7 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
             bool inputExtension = (w == prevW) && (a == prevA);
             node.inputs.back().w = w;
             node.inputs.back().a = a;
-            bool refund = inputExtension || transitionRefund(node);
+            bool refund = inputExtension || transitionRefund(node, maxTransTick, generalBridgeQ);
             
             // only refundable input is allowed at maxDepth
             if(lastDepth && !refund) continue;
@@ -912,9 +917,11 @@ void IF::setEffect(int speed, int slowness){
     this->slowness = slowness;
 }
 
-void IF::changeSettings(int maxDepth, int maxTicks){
+void IF::changeSettings(int maxDepth, int maxTicks, int maxTransitionTime, bool generalBridgeQ){
     this->maxDepth = maxDepth;
     this->maxTicks = maxTicks;
+    this->maxTransTick = maxTransitionTime;
+    this->generalBridgeQ = generalBridgeQ;
 }
 
 void IF::riskyPrune(bool riskQ){
@@ -924,7 +931,10 @@ void IF::riskyPrune(bool riskQ){
 
 void IF::logSettings(){
     writeLog("Settings: \n");
-    writeLog("maxDepth = " + std::to_string(maxDepth) + ", maxTicks = " + std::to_string(maxTicks) + "\n");
+    writeLog("maxDepth = " + std::to_string(maxDepth)
+        + ", maxTicks = " + std::to_string(maxTicks)
+        + ", maxTransitionTime = " + std::to_string(maxTransTick)
+        + ", generalBridge = " + std::to_string(generalBridgeQ) + "\n");
     writeLog("(speed, slow) = (" + std::to_string(speed) + ", " + std::to_string(slowness) + ")\n");
     writeLog("Facing = " + util::fmt(rotation) + " deg \n");
 }

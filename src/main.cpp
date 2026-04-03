@@ -37,7 +37,7 @@ int main() {
     if(true){
         // Finding input for slowness I 1.5bm 6-1 to ladder (perfect double 45.01)
         inputFinder f;
-        f.changeSettings(2, 50);
+        f.changeSettings(3, 40, -1);
         f.riskyPrune(true);
         f.setEffect(0, 1);
         f.setRotation(0);
@@ -46,7 +46,7 @@ int main() {
         cond.endAirborne = false;
         cond.z.enabled = true;
         cond.z.mm = -1.5;
-        cond.allowStrafe = true;
+        cond.allowStrafe = false;
         f.setCondWithBound(cond.z, -0.1276844242999637, -0.1276846279184921);
         double vzLB = cond.z.lb;
         double vzUB = cond.z.ub;

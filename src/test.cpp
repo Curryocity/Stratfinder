@@ -111,7 +111,7 @@ int main() {
     for (bool riskIt : {false, true}) {
         inputFinder f;
         f.toggleLog(false);
-        f.changeSettings(depth, maxTick);
+        f.changeSettings(depth, maxTick, -1);
         f.riskyPrune(riskIt);
         f.setEffect(0, 1);
         f.setRotation(0.015);

@@ -117,7 +117,7 @@ class inputFinder {
     void setEffect(int speed = 0, int slowness = 0);
     void setRotation(double rot = 0);
 
-    void changeSettings(int maxDepth, int maxTicks);
+    void changeSettings(int maxDepth, int maxTicks, int maxTransitionTime = -1, bool generalBridgeQ = false);
     void riskyPrune(bool riskIt); 
     // Faster when on, it may skip inputs that requires inertia
 
@@ -148,6 +148,8 @@ class inputFinder {
     // engine settings
     int maxDepth = 3;
     int maxTicks = 40;
+    int maxTransTick = -1;
+    bool generalBridgeQ = false;
 
     // constants to account movement approximation error using lerp
     const double floatErr = 1e-5;

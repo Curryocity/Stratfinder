@@ -16,6 +16,13 @@ using IF = inputFinder;
 
 namespace {
 
+struct WASD{
+    bool w = false;
+    bool a = false;
+    bool s = false;
+    bool d = false;
+};
+
 bool inputEmpty(const IF::input& in){
     return in.w == 0 && in.a == 0;
 }
@@ -25,27 +32,34 @@ bool startWithEmpty(const IF::sequence& seq){
     return inputEmpty(seq.inputs.back());
 }
 
-bool noOverlap(const IF::input& lhs, const IF::input& rhs) {
-    const bool shareW = lhs.w != 0 && lhs.w == rhs.w;
-    const bool shareA = lhs.a != 0 && lhs.a == rhs.a;
-    return !(shareW || shareA);
+bool equalWASD(const WASD& lhs, const WASD& rhs){
+    return (lhs.w == rhs.w) && (lhs.a == rhs.a) && (lhs.s == rhs.s) && (lhs.d == rhs.d);
 }
 
-// Whether a input is "input -> stops -> noOverLap input" or "stops -> input"
-bool stopRefundQ(const IF::sequence& seq){
+WASD toWASD(const IF::input& in){
+    return {in.w == 1, in.a == 1, in.w == -1, in.a == -1};
+}
+
+WASD overlap(const WASD& lhs, const WASD& rhs) {
+    return {(lhs.w && rhs.w ), (lhs.a && rhs.a ), (lhs.s && rhs.s), (lhs.d && rhs.d)};
+}
+
+// Refund when the middle bridge state equals the overlap of the surrounding inputs,
+// or when the sequence starts with an empty bridge before the first real input.
+bool transitionRefund(const IF::sequence& seq){
     const int n = seq.inputs.size();
     if(n <= 1 || startWithEmpty(seq)) return false;
-    if(!inputEmpty(seq.inputs[n-2])) return false;
-
-    int w = seq.inputs.back().w, a = seq.inputs.back().a;
+    WASD cur = toWASD(seq.inputs[n-1]);
+    WASD bridge = toWASD(seq.inputs[n-2]);
 
     for(int i = n - 3; i >= 0; i--){
-        // return on first nonEmpty input
-        if(!inputEmpty(seq.inputs[i]))
-            return noOverlap(seq.inputs[i], seq.inputs.back());
+        WASD prev = toWASD(seq.inputs[i]);
+        if(!equalWASD(bridge, prev))
+            return equalWASD(overlap(prev, cur), bridge);
     }
 
-    return true;
+    bool bridgeEmpty = inputEmpty(seq.inputs[n-2]);
+    return bridgeEmpty;
 }
 
 double normalizeDeg(double angle) {
@@ -434,7 +448,7 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
             bool inputExtension = (w == prevW) && (a == prevA);
             node.inputs.back().w = w;
             node.inputs.back().a = a;
-            bool refund = inputExtension || stopRefundQ(node);
+            bool refund = inputExtension || transitionRefund(node);
             
             // only refundable input is allowed at maxDepth
             if(lastDepth && !refund) continue;

@@ -8,7 +8,10 @@
       "cStandard": "c17",
       "intelliSenseMode": "macos-clang-arm64",
       "includePath": [
-        "${workspaceFolder}/src"
+        "${workspaceFolder}/src",
+        "${workspaceFolder}/third_party/imgui",
+        "${workspaceFolder}/third_party/imgui/backends",
+        "/opt/homebrew/include"
       ]
     }
   ]

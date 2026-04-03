@@ -1,87 +1,249 @@
-#include <iostream>
-#include <vector>
-#include "util.hpp"
-#include "inputFinder.hpp"
-#include "zSolver.hpp"
+#include <algorithm>
+#include <cmath>
+#include <cstdio>
+
+#if !defined(GL_SILENCE_DEPRECATION)
+#define GL_SILENCE_DEPRECATION
+#endif
+
+#if defined(__APPLE__)
+#include <OpenGL/gl3.h>
+#else
+#include <GL/gl.h>
+#endif
+#include <GLFW/glfw3.h>
+
+#include "../third_party/imgui/imgui.h"
+#include "../third_party/imgui/backends/imgui_impl_glfw.h"
+#include "../third_party/imgui/backends/imgui_impl_opengl3.h"
 
 namespace {
 
-void init() {
-    util::init();
+const char* kWindowTitle = "Input Cracker";
+
+struct GuiState {
+    float leftWidth = 420.0f;
+};
+
+struct RGB {
+    float r;
+    float g;
+    float b;
+};
+
+void glfwErrorCallback(int error, const char* description) {
+    std::fprintf(stderr, "GLFW Error %d: %s\n", error, description);
 }
 
+RGB mix(const RGB& lhs, const RGB& rhs, float t) {
+    return {
+        lhs.r + (rhs.r - lhs.r) * t,
+        lhs.g + (rhs.g - lhs.g) * t,
+        lhs.b + (rhs.b - lhs.b) * t,
+    };
 }
+
+ImVec4 rgba(const RGB& rgb, float a = 1.0f) {
+    return {rgb.r, rgb.g, rgb.b, a};
+}
+
+ImVec4 scale(const RGB& rgb, float mult, float a = 1.0f) {
+    return {
+        std::fmin(rgb.r * mult, 1.0f),
+        std::fmin(rgb.g * mult, 1.0f),
+        std::fmin(rgb.b * mult, 1.0f),
+        a,
+    };
+}
+
+void applyAccent(const RGB& accent) {
+    auto& c = ImGui::GetStyle().Colors;
+
+    const RGB dark = {0.10f, 0.10f, 0.10f};
+    const RGB mid = mix(dark, accent, 0.35f);
+    const RGB soft = mix(dark, accent, 0.20f);
+    const RGB tabBg = mix(dark, accent, 0.28f);
+    const RGB tabActive = mix(dark, accent, 0.52f);
+
+    c[ImGuiCol_Button] = scale(accent, 0.85f, 0.85f);
+    c[ImGuiCol_ButtonHovered] = scale(accent, 1.00f, 0.95f);
+    c[ImGuiCol_ButtonActive] = scale(accent, 1.15f, 1.00f);
+
+    c[ImGuiCol_Header] = scale(accent, 0.70f, 0.85f);
+    c[ImGuiCol_HeaderHovered] = scale(accent, 0.85f, 0.90f);
+    c[ImGuiCol_HeaderActive] = scale(accent, 1.00f, 0.95f);
+
+    c[ImGuiCol_SliderGrab] = scale(accent, 1.10f);
+    c[ImGuiCol_SliderGrabActive] = scale(accent, 1.25f);
+
+    c[ImGuiCol_CheckMark] = scale(accent, 1.30f);
+    c[ImGuiCol_NavHighlight] = scale(accent, 1.30f);
+
+    c[ImGuiCol_Border] = scale(accent, 0.75f, 0.80f);
+    c[ImGuiCol_Separator] = scale(accent, 0.75f, 0.90f);
+
+    c[ImGuiCol_TableBorderLight] = rgba(soft, 0.65f);
+    c[ImGuiCol_TableBorderStrong] = rgba(mid, 0.85f);
+    c[ImGuiCol_TableRowBg] = rgba(soft, 0.60f);
+    c[ImGuiCol_TableRowBgAlt] = rgba(mid, 0.60f);
+
+    c[ImGuiCol_Tab] = rgba(tabBg, 0.90f);
+    c[ImGuiCol_TabHovered] = rgba(tabActive, 0.95f);
+    c[ImGuiCol_TabActive] = rgba(tabActive, 1.00f);
+    c[ImGuiCol_TabUnfocused] = rgba(tabBg, 0.70f);
+    c[ImGuiCol_TabUnfocusedActive] = rgba(tabActive, 0.80f);
+}
+
+void applyTheme() {
+    ImGuiStyle& style = ImGui::GetStyle();
+
+    style.WindowRounding = 7.0f;
+    style.ChildRounding = 6.0f;
+    style.FrameRounding = 5.0f;
+    style.GrabRounding = 4.0f;
+    style.ScrollbarRounding = 6.0f;
+    style.WindowBorderSize = 1.0f;
+    style.FrameBorderSize = 0.0f;
+    style.WindowPadding = ImVec2(12.0f, 10.0f);
+    style.FramePadding = ImVec2(9.0f, 6.0f);
+    style.ItemSpacing = ImVec2(9.0f, 8.0f);
+
+    auto& c = style.Colors;
+    c[ImGuiCol_Text] = {0.95f, 0.95f, 0.95f, 1.0f};
+    c[ImGuiCol_TextDisabled] = {0.6f, 0.6f, 0.6f, 1.0f};
+    c[ImGuiCol_TextSelectedBg] = {0.8f, 0.8f, 0.8f, 0.30f};
+
+    c[ImGuiCol_WindowBg] = {0.04f, 0.04f, 0.04f, 1.0f};
+    c[ImGuiCol_ChildBg] = {0.06f, 0.06f, 0.06f, 1.0f};
+    c[ImGuiCol_PopupBg] = {0.10f, 0.10f, 0.10f, 1.0f};
+
+    c[ImGuiCol_FrameBg] = {0.25f, 0.25f, 0.25f, 1.0f};
+    c[ImGuiCol_FrameBgHovered] = {0.25f, 0.25f, 0.25f, 1.0f};
+    c[ImGuiCol_FrameBgActive] = {0.30f, 0.30f, 0.30f, 1.0f};
+
+    c[ImGuiCol_TitleBg] = {0.10f, 0.10f, 0.10f, 1.0f};
+    c[ImGuiCol_TitleBgActive] = {0.15f, 0.15f, 0.15f, 1.0f};
+
+    applyAccent({0.45f, 0.39f, 0.60f});
+}
+
+void drawSplitter(float& leftWidth, float minLeft, float minRight) {
+    ImGuiStyle& style = ImGui::GetStyle();
+    const float splitterWidth = 8.0f;
+    const float availWidth = ImGui::GetContentRegionAvail().x;
+    const float maxLeft = leftWidth + availWidth - minRight - splitterWidth;
+    leftWidth = std::clamp(leftWidth, minLeft, maxLeft);
+
+    ImGui::SameLine(0.0f, style.ItemSpacing.x);
+    ImGui::InvisibleButton("PanelSplitter", ImVec2(splitterWidth, -1.0f));
+    if (ImGui::IsItemActive()) {
+        leftWidth += ImGui::GetIO().MouseDelta.x;
+        leftWidth = std::clamp(leftWidth, minLeft, maxLeft);
+    }
+
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+    const ImVec2 min = ImGui::GetItemRectMin();
+    const ImVec2 max = ImGui::GetItemRectMax();
+    const ImU32 color = ImGui::GetColorU32(ImGui::IsItemActive() || ImGui::IsItemHovered()
+        ? ImGuiCol_SeparatorActive
+        : ImGuiCol_Separator);
+    drawList->AddLine(
+        ImVec2((min.x + max.x) * 0.5f, min.y + 4.0f),
+        ImVec2((min.x + max.x) * 0.5f, max.y - 4.0f),
+        color,
+        2.0f
+    );
+}
+
+void inputPanel(GuiState& state) {
+    
+}
+
+void outputPanel(GuiState& state) {
+
+}
+
+} // namespace
 
 int main() {
-    init();
+    glfwSetErrorCallback(glfwErrorCallback);
+    if (!glfwInit()) return 1;
 
-    if(false){
-        // Finding jumps for slowness 1.5bm less than 50t airtime, 0.01 offset
-        zSolver s;
-        s.setEffect(0, 1);
-        std::string out;
-        const double mm  = 1.5;
-        const double mmAirTime = 12;
-        const int searchAirTime = 50;
-        const double threshold = 0.01;
-        const bool backwalled = false;
-        s.poss(mm, mmAirTime, searchAirTime, threshold, backwalled, out);
+    const char* glslVersion = "#version 330 core";
 
-        std::cout << out << "\n";
+#if defined(__APPLE__)
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+#endif
 
-        std::cout << "StratFinder log: \n";
-        s.printLog();
-        std::cout << "--------------- \n\n";
+    GLFWwindow* window = glfwCreateWindow(1280, 800, kWindowTitle, nullptr, nullptr);
+    if (window == nullptr) {
+        glfwTerminate();
+        return 1;
     }
 
-    if(true){
-        // Finding input for slowness I 1.5bm 6-1 to ladder (perfect double 45.01)
-        inputFinder f;
-        f.changeSettings(2, 50, -1, false);
-        f.riskyPrune(false);
-        f.setEffect(0, 1);
-        f.setRotation(0.015);
-        inputFinder::condition cond;
-        cond.endAirborne = false;
-        cond.z.enabled = true;
-        cond.z.mm = -1.5;
-        cond.allowKeys = {1, 1, 1, 1};
-        f.setCondWithBound(cond.z, -0.1276844242999637, -0.1276846279184921);
-        double airtime = 12;
-        std::cout << "------------------------------\n";
-        f.logSearch(std::cout, cond, airtime);
+    glfwMakeContextCurrent(window);
+    glfwSwapInterval(1);
 
-        f.matchSpeed(cond, airtime);
-        f.printLog();
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    applyTheme();
+
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init(glslVersion);
+
+    GuiState state;
+
+    while (!glfwWindowShouldClose(window)) {
+        glfwPollEvents();
+
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+
+        ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize, ImGuiCond_Always);
+        ImGui::Begin(
+            "Input Cracker",
+            nullptr,
+            ImGuiWindowFlags_NoDecoration |
+            ImGuiWindowFlags_NoMove |
+            ImGuiWindowFlags_NoSavedSettings
+        );
+
+        const float minLeft = 260.0f;
+        const float minRight = 320.0f;
+
+        ImGui::BeginChild("InputPanel", ImVec2(state.leftWidth, 0.0f), true);
+        inputPanel(state);
+        ImGui::EndChild();
+
+        drawSplitter(state.leftWidth, minLeft, minRight);
+
+        ImGui::SameLine(0.0f, ImGui::GetStyle().ItemSpacing.x);
+        ImGui::BeginChild("OutputPanel", ImVec2(0.0f, 0.0f), true);
+        outputPanel(state);
+        ImGui::EndChild();
+
+        ImGui::End();
+
+        ImGui::Render();
+        int displayW = 0;
+        int displayH = 0;
+        glfwGetFramebufferSize(window, &displayW, &displayH);
+        glViewport(0, 0, displayW, displayH);
+        glClearColor(0.08f, 0.09f, 0.11f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        glfwSwapBuffers(window);
     }
 
-    if(false){
-        inputFinder f;
-        f.changeSettings(4, 30);
-        f.riskyPrune(false);
-        f.setRotation(103.13);
-
-        inputFinder::polorCond cond;
-        double targetNorm = 0.236876;
-        double normErr = 0.0001;
-        double targetAngle = -104.2;
-        double angleErr = 0.1;
-        cond.normLb = targetNorm - normErr;
-        cond.normUb = targetNorm + normErr;
-        cond.angle1 = targetAngle - angleErr;
-        cond.angle2 = targetAngle + angleErr;
-
-        cond.xmm = 1;
-        cond.zmm = -1;
-        cond.zWalled = true;
-
-        const int airtime = 12;
-        std::cout << "------------------------------\n";
-        f.logSearch(std::cout, cond, airtime);
-
-        std::vector<inputFinder::sequence> solutions = f.matchSpeed(cond, airtime);
-        std::cout << f.showSolutions(solutions, inputFinder::Polar);
-    }
-
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
+    glfwDestroyWindow(window);
+    glfwTerminate();
     return 0;
 }

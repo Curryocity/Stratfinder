@@ -109,6 +109,7 @@ class inputCracker {
 
     static void setCondWithBound(axisCond& cond, double bound1, double bound2);
 
+    void makeBannedList(const WASD& allowKeys, const bool careX, const bool careZ);
     void initHeuristics(int airtime, double zDis, double xDis);
 
     std::vector<Solution> matchSpeed(const condition& cond, int airtime);
@@ -119,8 +120,8 @@ class inputCracker {
 
     void backTrack(sequence& node, const nodeShapshot& snapShot);
 
-    bool exeSeq(player& p, const sequence& seq, const condition& cond, bool mmCheck = true);
-    void alphaBetaUpdate(player& p, sequence& seq);
+    bool exeSeq(const sequence& seq, const condition& cond, bool mmCheck = true);
+    void alphaBetaUpdate(sequence& seq);
 
     enum Axis{X,Z};
     enum ConditionForm{Cartesian = 0, Polar = 1};
@@ -142,7 +143,7 @@ class inputCracker {
 
     void logSearch(std::ostream& out, const condition& cond, int airtime) const;
     void logSearch(std::ostream& out, const polorCond& cond, int airtime) const;
-    player& getDummy();
+    void syncDummy();
 
     void writeLog(std::string str);
     void printLog();
@@ -164,6 +165,9 @@ class inputCracker {
     double vxLB = 0, vxUB = 0;
     std::vector<double> wasdTerminalVz =  std::vector<double>(9, 0); // index: 3*(a+1) + (w+1)
     std::vector<double> wasdTerminalVx =  std::vector<double>(9, 0); 
+
+    // deduplicator
+    std::vector<bool> bannedCombs = std::vector<bool>(9, false);
 
     // engine settings
     int maxDepth = 3;

@@ -121,6 +121,55 @@ void IC::setCondWithBound(axisCond& cond, double bound1, double bound2){
     cond.enabled = true;
 }
 
+void IC::makeBannedList(const WASD& allowKeys, const bool careX, const bool careZ){
+    std::fill(bannedCombs.begin(), bannedCombs.end(), false);
+
+    for (int a = -1; a <= 1; ++a) {
+        for (int w = -1; w <= 1; ++w) {
+            const int idx = 3 * (a + 1) + (w + 1);
+            bannedCombs[idx] = !isKeyAllowed(w, a, allowKeys);
+        }
+    }
+
+    if(careX && careZ) return;
+
+    dummy.toggleInertia(false);
+
+    auto sameEffect = [&](int i, int j)-> bool{
+        int w_i = i % 3 - 1, a_i = i/3 - 1;
+        int w_j = j % 3 - 1, a_j = j/3 - 1;
+        bool sprintI = (w_i == 1), sprintJ = (w_j == 1);
+        dummy.resetAll();
+        dummy.move(w_i, a_i, false, 2*sprintI, 1);
+        double vx_i = dummy.Vx(), vz_i = dummy.Vz();
+        dummy.resetAll();
+        dummy.move(w_j, a_j, false, 2*sprintJ, 1);
+        double vx_j = dummy.Vx(), vz_j = dummy.Vz();
+        if(careX) return std::abs(vx_i - vx_j) < 1e-16;
+        if(careZ) return std::abs(vz_i - vz_j) < 1e-16;
+
+        return false;
+    };
+
+    for (int i = 0; i < 9; ++i) {
+        if (bannedCombs[i]) continue;
+        for (int j = i + 1; j < 9; ++j) {
+            if (bannedCombs[j]) continue;
+            if (sameEffect(i, j)) {
+                const bool jIsStop = (j == 4);
+                if (jIsStop) {
+                    bannedCombs[i] = true;
+                    break;
+                } else {
+                    bannedCombs[j] = true;
+                }
+            }
+        }
+    }
+
+    dummy.toggleInertia(true);
+}
+
 // TODO: improve/revisit this
 // heuristics
 void IC::initHeuristics(int airtime, double zDis, double xDis){
@@ -134,7 +183,7 @@ void IC::initHeuristics(int airtime, double zDis, double xDis){
     const bool groundBetter = gTerm > aTerm;
     // this holds for every keystroke and axis
 
-    getDummy();
+    syncDummy();
 
     auto getZ = [&](player& p){ return p.Z();};
     auto getX = [&](player& p){ return p.X();};
@@ -231,8 +280,8 @@ void IC::initHeuristics(int airtime, double zDis, double xDis){
         return std::array<double, 2>{ velLb, velUb};
     };
 
-    std::array<double, 2> zVelBound = getVelUbLb(getDummy() ,wasdTerminalVz, getVz, getZ, zDis);
-    std::array<double, 2> xVelBound = getVelUbLb(getDummy() ,wasdTerminalVx, getVx, getX, xDis);
+    std::array<double, 2> zVelBound = getVelUbLb(dummy, wasdTerminalVz, getVz, getZ, zDis);
+    std::array<double, 2> xVelBound = getVelUbLb(dummy, wasdTerminalVx, getVx, getX, xDis);
 
     this->vxLB = xVelBound[0];
     this->vxUB = xVelBound[1];
@@ -243,6 +292,7 @@ void IC::initHeuristics(int airtime, double zDis, double xDis){
 
 std::vector<IC::Solution> IC::matchSpeed(const condition& cond, int airtime){
     searchStats = {};
+    syncDummy();
 
     if( (!cond.x.enabled) && (!cond.z.enabled) ){
         writeLog("Exception: None of the conditions were enabled\n");
@@ -258,12 +308,7 @@ std::vector<IC::Solution> IC::matchSpeed(const condition& cond, int airtime){
 
     condition searchCond = cond;
 
-    // When symmetric:
-    // A/D gives the same outcome, thus wlog ignore assume a>=0
-    const bool symmetric = (rotation == 0.0f || rotation == 180.0f) && (!searchCond.x.enabled);
-    if(symmetric && searchCond.allowKeys.a && searchCond.allowKeys.d){
-        searchCond.allowKeys.d = false;
-    }
+    makeBannedList(searchCond.allowKeys, searchCond.x.enabled, searchCond.z.enabled);
 
     std::vector<IC::Solution> result;
     initHeuristics(airtime, std::abs(searchCond.z.mm) + 0.6f, std::abs(searchCond.x.mm) + 0.6f);
@@ -377,7 +422,7 @@ bool IC::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
         return true;
     }
 
-    alphaBetaUpdate(getDummy(), node);
+    alphaBetaUpdate(node);
 
     const bool careZ = cond.z.enabled;
     const bool careX = cond.x.enabled;
@@ -433,7 +478,7 @@ bool IC::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
 
         if(node.errX == 0 && node.errZ == 0){
 
-            bool valid = exeSeq(dummy, node, cond, true);
+            bool valid = exeSeq(node, cond, true);
             double vx = dummy.Vx(), vz = dummy.Vz();
 
             bool xSat = (!careX) || (vx >= cond.x.lb && vx <= cond.x.ub);
@@ -486,16 +531,10 @@ bool IC::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
     }
 
     node.inputs.push_back(IC::input{0, 0, 0});
-    const bool symmetric = (rotation == 0.0f || rotation == 180.0f) && (!careX);
 
     for (int w = -1; w <= 1; w++) {
         for (int a = -1; a <= 1; a++) { 
-
-            if(!isKeyAllowed(w, a, cond.allowKeys)) continue;
-
-            if(symmetric && (w == 0 && a != 0)) continue; 
-            // When symmetric:
-            // Pressing either A/D does nothing when W/S is not held
+            if(bannedCombs[3 * (a + 1) + (w + 1)]) continue;
    
             bool inputExtension = (w == prevW) && (a == prevA);
             node.inputs.back().w = w;
@@ -695,8 +734,9 @@ void IC::backTrack(sequence& node, const nodeShapshot& snapShot){
 }
 
 // Output false if condition is not satisfied
-// The final velocity is stored in player& p
-bool IC::exeSeq(player& p, const sequence& seq, const condition& cond, const bool mmCheck){
+// The final velocity is stored in dummy
+bool IC::exeSeq(const sequence& seq, const condition& cond, const bool mmCheck){
+    player& p = dummy;
     searchStats.exeSeqCalls++;
 
     int tick = seq.T;
@@ -807,7 +847,7 @@ bool IC::exeSeq(player& p, const sequence& seq, const condition& cond, const boo
 }
 
 // v_end = alpha * v_init + beta (assuming v were ground speed)
-void IC::alphaBetaUpdate(player& p, sequence& seq){
+void IC::alphaBetaUpdate(sequence& seq){
     searchStats.alphaBetaUpdateCalls++;
 
     if(seq.inputs.empty()) return;
@@ -1025,11 +1065,10 @@ void IC::logSearch(std::ostream& out, const polorCond& cond, int airtime) const 
         << ", MaxResult: " << maxResult << "\n";
 }
 
-player& IC::getDummy(){
+void IC::syncDummy(){
     dummy.resetAll();
     dummy.setEffect(speed, slowness);
     dummy.setF(rotation);
-    return dummy;
 }
 
 void IC::writeLog(std::string str){

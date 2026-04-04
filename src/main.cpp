@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
+#include <string>
 
 #if !defined(GL_SILENCE_DEPRECATION)
 #define GL_SILENCE_DEPRECATION
@@ -16,6 +17,7 @@
 #include <GLFW/glfw3.h>
 
 #include "../third_party/imgui/imgui.h"
+#include "../third_party/imgui/misc/cpp/imgui_stdlib.h"
 #include "../third_party/imgui/backends/imgui_impl_glfw.h"
 #include "../third_party/imgui/backends/imgui_impl_opengl3.h"
 
@@ -24,20 +26,35 @@ using IF = inputFinder;
 namespace {
 
 const char* kWindowTitle = "Input Cracker";
+constexpr float kDefaultSplitRatio = 0.5f;
 
 struct GuiState {
-    float leftWidth = 420.0f;
+    float leftWidth = 0.0f;
+    bool leftWidthInitialized = false;
     IF::ConditionForm coordType = IF::Cartesian;
-    IF::condition cond;
-    IF::polorCond pCond;
-    float rotation = 0.0f;
+    bool enableX = false;
+    bool enableZ = true;
+    bool xWalled = false;
+    bool zWalled = false;
+    std::string xLbText = "-0.1";
+    std::string xUbText = "0.1";
+    std::string xMmText = "0";
+    std::string zLbText = "-0.1276846279184921";
+    std::string zUbText = "-0.1276844242999637";
+    std::string zMmText = "-1.5";
+
+    int airtime = 12;
+    bool endAirborne = false;
+    IF::WASD allowKeys = {true, true, true, true};
+
+    std::string rotationText = "0.0";
     int speed = 0;
-    int slowness = 0;
+    int slowness = 1;
 
     // engine settings
     int maxDepth = 3;
     int maxTicks = 40;
-    int maxTransTick = -1;
+    int maxTransTick = 16;
     bool allowNonEmptyBridge = false;
 
     bool riskyLerp = true;
@@ -194,6 +211,45 @@ void drawSplitter(float& leftWidth, float minLeft, float minRight) {
     );
 }
 
+void drawLabeledTextInput(const char* label, const char* id, float width, std::string& text) {
+    ImGui::AlignTextToFramePadding();
+    ImGui::Text("%s", label);
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(width);
+    ImGui::InputText(id, &text);
+}
+
+void drawKeyToggle(const char* label, bool& enabled) {
+    ImGui::PushStyleColor(
+        ImGuiCol_Button,
+        enabled ? ImGui::GetStyle().Colors[ImGuiCol_Button]
+                : ImVec4(0.18f, 0.18f, 0.18f, 0.85f)
+    );
+    ImGui::PushStyleColor(
+        ImGuiCol_ButtonHovered,
+        enabled ? ImGui::GetStyle().Colors[ImGuiCol_ButtonHovered]
+                : ImVec4(0.24f, 0.24f, 0.24f, 0.95f)
+    );
+    ImGui::PushStyleColor(
+        ImGuiCol_ButtonActive,
+        enabled ? ImGui::GetStyle().Colors[ImGuiCol_ButtonActive]
+                : ImVec4(0.30f, 0.30f, 0.30f, 1.00f)
+    );
+
+    if (ImGui::Button(label, ImVec2(32.0f, 0.0f))) {
+        enabled = !enabled;
+    }
+
+    ImGui::PopStyleColor(3);
+}
+
+void crack(GuiState& state) {
+    (void)state;
+}
+
+void cartesianGUI(GuiState& state);
+void polarGUI(GuiState& state);
+
 static const char* coordTypes[2] = {"Cartesian", "Polar"};
 void inputPanel(GuiState& state) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(24.0f, 10.0f));
@@ -215,12 +271,126 @@ void inputPanel(GuiState& state) {
         state.coordType = (IF::ConditionForm) coordIdx;
     }
 
+    ImGui::AlignTextToFramePadding();
+    ImGui::Text("Speed Type:");
+    ImGui::SameLine();
+    if(ImGui::Button(state.endAirborne ? "Air" : "Ground")){
+        state.endAirborne = !state.endAirborne;
+    }
+
+    ImGui::AlignTextToFramePadding();
+    ImGui::Text("MM Airtime:");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(50.0f);
+    ImGui::InputInt("##Airtime", &state.airtime, 0, 0);
+    ImGui::SameLine(0, 15);
+    drawLabeledTextInput("Facing:", "##facing", 100.0f, state.rotationText);
+
+    ImGui::AlignTextToFramePadding();
+    ImGui::Text("Allowed Keys:");
+    ImGui::SameLine();
+    drawKeyToggle("W", state.allowKeys.w);
+    ImGui::SameLine();
+    drawKeyToggle("A", state.allowKeys.a);
+    ImGui::SameLine();
+    drawKeyToggle("S", state.allowKeys.s);
+    ImGui::SameLine();
+    drawKeyToggle("D", state.allowKeys.d);
+
+
+    ImGui::AlignTextToFramePadding();
+    ImGui::Text("Speed/Slowness:");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(50.0f);
+    ImGui::InputInt("##Speed", &state.speed, 0, 0);
+    ImGui::SameLine(0, 5);
+    ImGui::SetNextItemWidth(50.0f);
+    ImGui::InputInt("##Slowness", &state.slowness, 0, 0);
+
+    if(state.coordType == IF::Cartesian)
+        cartesianGUI(state);
+    else
+        polarGUI(state);
+
+    ImGui::Spacing();
+    if (ImGui::CollapsingHeader("Engine Setting")) {
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("Max Depth:");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(60.0f);
+        ImGui::InputInt("##MaxDepth", &state.maxDepth, 0, 0);
+
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("Max Ticks:");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(60.0f);
+        ImGui::InputInt("##MaxTicks", &state.maxTicks, 0, 0);
+
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("Max Transition:");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(60.0f);
+        ImGui::InputInt("##MaxTransition", &state.maxTransTick, 0, 0);
+
+        ImGui::Checkbox("Allow Non-Empty Bridge", &state.allowNonEmptyBridge);
+        ImGui::Checkbox("Risky Lerp (Recommended)", &state.riskyLerp);
+    }
+
+    ImGui::Spacing();
+    if (ImGui::Button("Crack Inputs!", ImVec2(-1.0f, 0.0f))) {
+        crack(state);
+    }
+
+
     ImGui::PopFont();
     ImGui::EndChild();
 }
 
-void outputPanel(GuiState& state) {
+void cartesianGUI(GuiState& state){
+    ImGui::Spacing();
+    ImGui::Checkbox("Enable X", &state.enableX);
+    ImGui::SameLine();
+    ImGui::Checkbox("Enable Z", &state.enableZ);
 
+    if(state.enableX){
+        ImGui::SeparatorText("X Conditions");
+        drawLabeledTextInput("Vel Lowerbound:", "##xLower", 180.0f, state.xLbText);
+        drawLabeledTextInput("Vel Upperbound:", "##xUpper", 180.0f, state.xUbText);
+        drawLabeledTextInput("MM:", "##xMm", 80.0f, state.xMmText);
+        ImGui::SameLine();
+        if(ImGui::Button(state.xWalled ? "Walled##x" : "Normal##x")){
+            state.xWalled = !state.xWalled;
+        }
+    }
+
+    if(state.enableZ){
+        ImGui::SeparatorText("Z Conditions");
+        drawLabeledTextInput("Vel Lowerbound:", "##zLower", 180.0f, state.zLbText);
+        drawLabeledTextInput("Vel Upperbound:", "##zUpper", 180.0f, state.zUbText);
+        drawLabeledTextInput("MM:", "##zMm", 80.0f, state.zMmText);
+        ImGui::SameLine();
+        ImGui::SameLine();
+        if(ImGui::Button(state.zWalled ? "Walled##z" : "Normal##z")){
+            state.zWalled = !state.zWalled;
+        }
+    }
+}
+
+void polarGUI(GuiState& state){
+    
+}
+
+void outputPanel(GuiState& state) {
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(24.0f, 10.0f));
+    ImGui::BeginChild("OutputPanel", ImVec2(0, 0), true);
+    ImGui::PopStyleVar();
+
+    ImGui::PushFont(uiFont);
+
+    ImGui::SeparatorText("Result");
+
+    ImGui::PopFont();
+    ImGui::EndChild();
 }
 
 } // namespace
@@ -276,6 +446,13 @@ int main() {
 
         const float minLeft = 260.0f;
         const float minRight = 320.0f;
+        const float splitterWidth = 8.0f;
+        const float availableWidth = ImGui::GetContentRegionAvail().x;
+        const float maxLeft = std::max(minLeft, availableWidth - minRight - splitterWidth);
+        if (!state.leftWidthInitialized) {
+            state.leftWidth = std::clamp(availableWidth * kDefaultSplitRatio, minLeft, maxLeft);
+            state.leftWidthInitialized = true;
+        }
 
         ImGui::BeginChild("InputPanel", ImVec2(state.leftWidth, 0.0f), true);
         inputPanel(state);

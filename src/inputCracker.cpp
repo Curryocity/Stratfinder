@@ -256,10 +256,19 @@ std::vector<IC::Solution> IC::matchSpeed(const condition& cond, int airtime){
         return {};
     }
 
+    condition searchCond = cond;
+
+    // When symmetric:
+    // A/D gives the same outcome, thus wlog ignore assume a>=0
+    const bool symmetric = (rotation == 0.0f || rotation == 180.0f) && (!searchCond.x.enabled);
+    if(symmetric && searchCond.allowKeys.a && searchCond.allowKeys.d){
+        searchCond.allowKeys.d = false;
+    }
+
     std::vector<IC::Solution> result;
-    initHeuristics(airtime, std::abs(cond.z.mm) + 0.6f, std::abs(cond.x.mm) + 0.6f);
+    initHeuristics(airtime, std::abs(searchCond.z.mm) + 0.6f, std::abs(searchCond.x.mm) + 0.6f);
     lerpUpdater.setParameters(airtime, speed, slowness, rotation);
-    lerpUpdater.enableAxis(cond.x.enabled, cond.z.enabled);
+    lerpUpdater.enableAxis(searchCond.x.enabled, searchCond.z.enabled);
     lerpUpdater.buildTransform();
 
     // find input sequence via iterative deepening dfs
@@ -270,7 +279,7 @@ std::vector<IC::Solution> IC::matchSpeed(const condition& cond, int airtime){
             : maxResult;
         if (resultBudget == 0) break;
 
-        std::vector<IC::Solution> partialResult = dfsEntry(cond, airtime, limit);
+        std::vector<IC::Solution> partialResult = dfsEntry(searchCond, airtime, limit);
         result.reserve(result.size() + partialResult.size());
         for (auto& sol : partialResult) {
             result.push_back(std::move(sol));
@@ -462,7 +471,6 @@ bool IC::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
     // Main search happens after here, this is for backtracking purposes
     const nodeShapshot baseNode{node.T, node.airDebt, node.lerp0, node.lerp1, node.errX, node.errZ};
 
-    const bool symmetric = (rotation == 0.0f || rotation == 180.0f) && (!careX);
     const bool endingDepth = (depth >= depthLimit - 1);
     const bool penultimateDepth = (depth == depthLimit - 1);
 
@@ -478,15 +486,15 @@ bool IC::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
     }
 
     node.inputs.push_back(IC::input{0, 0, 0});
+    const bool symmetric = (rotation == 0.0f || rotation == 180.0f) && (!careX);
 
     for (int w = -1; w <= 1; w++) {
         for (int a = -1; a <= 1; a++) { 
 
             if(!isKeyAllowed(w, a, cond.allowKeys)) continue;
 
-            if(symmetric && (a < 0 || (w == 0 && a != 0))) continue; 
+            if(symmetric && (w == 0 && a != 0)) continue; 
             // When symmetric:
-            // A/D gives the same outcome, thus wlog ignore assume a>=0
             // Pressing either A/D does nothing when W/S is not held
    
             bool inputExtension = (w == prevW) && (a == prevA);

@@ -1,4 +1,4 @@
-#include "inputFinder.hpp"
+#include "inputCracker.hpp"
 #include "segLerp.hpp"
 #include "util.hpp"
 #include "zEngine.hpp"
@@ -13,15 +13,19 @@
 #include <utility>
 #include <vector>
 
-using IF = inputFinder;
+using IC = inputCracker;
 
 namespace {
 
-bool isKeyAllowed(int w, int a, const IF::WASD& rule){
+bool cancelRequested(const std::atomic_bool* flag) {
+    return flag != nullptr && flag->load(std::memory_order_relaxed);
+}
+
+bool isKeyAllowed(int w, int a, const IC::WASD& rule){
     return !((!rule.w && w == 1) || (!rule.a && a == 1) || (!rule.s && w == -1) || (!rule.d && a == -1));
 }
 
-std::string keysToString(const IF::WASD& keys) {
+std::string keysToString(const IC::WASD& keys) {
     std::string out;
     if (keys.w) out += "W";
     if (keys.a) out += "A";
@@ -30,41 +34,41 @@ std::string keysToString(const IF::WASD& keys) {
     return out.empty() ? "-" : out;
 }
 
-bool inputEmpty(const IF::input& in){
+bool inputEmpty(const IC::input& in){
     return in.w == 0 && in.a == 0;
 }
 
-bool startWithEmpty(const IF::sequence& seq){
+bool startWithEmpty(const IC::sequence& seq){
     if(seq.inputs.empty()) throw std::runtime_error{"Expected non empty inputs vector"};
     return inputEmpty(seq.inputs.back());
 }
 
-bool equalWASD(const IF::WASD& lhs, const IF::WASD& rhs){
+bool equalWASD(const IC::WASD& lhs, const IC::WASD& rhs){
     return (lhs.w == rhs.w) && (lhs.a == rhs.a) && (lhs.s == rhs.s) && (lhs.d == rhs.d);
 }
 
-IF::WASD toWASD(const IF::input& in){
+IC::WASD toWASD(const IC::input& in){
     return {in.w == 1, in.a == 1, in.w == -1, in.a == -1};
 }
 
-IF::WASD overlap(const IF::WASD& lhs, const IF::WASD& rhs) {
+IC::WASD overlap(const IC::WASD& lhs, const IC::WASD& rhs) {
     return {(lhs.w && rhs.w ), (lhs.a && rhs.a ), (lhs.s && rhs.s), (lhs.d && rhs.d)};
 }
 
 // Refund when the middle bridge state equals the overlap of the surrounding inputs,
 // or when the sequence starts with an empty bridge before the first real input.
-bool transitionRefund(const IF::sequence& seq, int maxTransTick, bool generalBridgeQ){
+bool transitionRefund(const IC::sequence& seq, int maxTransTick, bool generalBridgeQ){
     const int n = seq.inputs.size();
     if(maxTransTick == 0 || n <= 1 || startWithEmpty(seq)) return false;
-    IF::WASD cur = toWASD(seq.inputs[n-1]);
-    IF::WASD bridge = toWASD(seq.inputs[n-2]);
+    IC::WASD cur = toWASD(seq.inputs[n-1]);
+    IC::WASD bridge = toWASD(seq.inputs[n-2]);
 
     // non general transition: only accept "stop" as valid bridge
     if(!generalBridgeQ && !inputEmpty(seq.inputs[n-2])) return false;
     int transitionTime = seq.inputs[n-2].t;
 
     for(int i = n - 3; i >= 0; i--){
-        IF::WASD prev = toWASD(seq.inputs[i]);
+        IC::WASD prev = toWASD(seq.inputs[i]);
         if(!equalWASD(bridge, prev))
             return equalWASD(overlap(prev, cur), bridge) && (maxTransTick < 0 || transitionTime <= maxTransTick);
         transitionTime += seq.inputs[i].t;
@@ -105,9 +109,13 @@ void updatePolarBox(double angleDeg, double radius, double& xLb, double& xUb, do
     zUb = std::max(zUb, z);
 }
 
+bool reachedResultLimit(std::size_t size, int limit) {
+    return limit > 0 && size >= static_cast<std::size_t>(limit);
 }
 
-void IF::setCondWithBound(axisCond& cond, double bound1, double bound2){
+}
+
+void IC::setCondWithBound(axisCond& cond, double bound1, double bound2){
     cond.lb = std::min(bound1, bound2);
     cond.ub = std::max(bound1, bound2);
     cond.enabled = true;
@@ -115,7 +123,7 @@ void IF::setCondWithBound(axisCond& cond, double bound1, double bound2){
 
 // TODO: improve/revisit this
 // heuristics
-void IF::initHeuristics(int airtime, double zDis, double xDis){
+void IC::initHeuristics(int airtime, double zDis, double xDis){
 
     zEngine e(speed, slowness);
     e.s45(1);
@@ -233,7 +241,7 @@ void IF::initHeuristics(int airtime, double zDis, double xDis){
 
 }
 
-std::vector<IF::sequence> IF::matchSpeed(const condition& cond, int airtime){
+std::vector<IC::Solution> IC::matchSpeed(const condition& cond, int airtime){
     searchStats = {};
 
     if( (!cond.x.enabled) && (!cond.z.enabled) ){
@@ -248,7 +256,7 @@ std::vector<IF::sequence> IF::matchSpeed(const condition& cond, int airtime){
         return {};
     }
 
-    std::vector<IF::sequence> result;
+    std::vector<IC::Solution> result;
     initHeuristics(airtime, std::abs(cond.z.mm) + 0.6f, std::abs(cond.x.mm) + 0.6f);
     lerpUpdater.setParameters(airtime, speed, slowness, rotation);
     lerpUpdater.enableAxis(cond.x.enabled, cond.z.enabled);
@@ -256,17 +264,24 @@ std::vector<IF::sequence> IF::matchSpeed(const condition& cond, int airtime){
 
     // find input sequence via iterative deepening dfs
     for(int limit = 1; limit <= maxDepth; limit ++){
-        std::vector<IF::sequence> partialResult = dfsEntry(cond, airtime, limit);
+        if (cancelRequested(cancelFlag)) break;
+        resultBudget = (maxResult > 0)
+            ? std::max(0, maxResult - static_cast<int>(result.size()))
+            : maxResult;
+        if (resultBudget == 0) break;
+
+        std::vector<IC::Solution> partialResult = dfsEntry(cond, airtime, limit);
         result.reserve(result.size() + partialResult.size());
-        for (auto& seq : partialResult) {
-            result.push_back(std::move(seq));
+        for (auto& sol : partialResult) {
+            result.push_back(std::move(sol));
         }
+        if (reachedResultLimit(result.size(), maxResult)) break;
     }
 
     return result;
 }
 
-std::vector<IF::sequence> IF::matchSpeed(const polorCond& cond, int airtime){
+std::vector<IC::Solution> IC::matchSpeed(const polorCond& cond, int airtime){
     const double angleSpan = shortArcSpan(cond.angle1, cond.angle2);
     if (angleSpan > 90.0) {
         writeLog("Exception: polorCond angle span must be <= 90 degrees\n");
@@ -309,13 +324,13 @@ std::vector<IF::sequence> IF::matchSpeed(const polorCond& cond, int airtime){
     setCondWithBound(rectCond.x, xLb, xUb);
     setCondWithBound(rectCond.z, zLb, zUb);
 
-    std::vector<sequence> rectResult = matchSpeed(rectCond, airtime);
-    std::vector<sequence> result;
+    std::vector<Solution> rectResult = matchSpeed(rectCond, airtime);
+    std::vector<Solution> result;
     result.reserve(rectResult.size());
 
     for (auto& seq : rectResult) {
-        const double vx = seq.finalVx;
-        const double vz = seq.finalVz;
+        const double vx = seq.vx;
+        const double vz = seq.vz;
         const double norm = std::sqrt(vx * vx + vz * vz);
         const double angle = std::atan2(-vx, vz) * 180.0 / util::PId;
 
@@ -328,10 +343,10 @@ std::vector<IF::sequence> IF::matchSpeed(const polorCond& cond, int airtime){
     return result;
 }
 
-std::vector<IF::sequence> IF::dfsEntry(const condition& cond, int airtime, int depthLimit){
+std::vector<IC::Solution> IC::dfsEntry(const condition& cond, int airtime, int depthLimit){
     writeLog("-------------------------------------------------\n");
     writeLog("Try searching depth = " + std::to_string(depthLimit) + " inputs\n");
-    std::vector<IF::sequence> result;
+    std::vector<IC::Solution> result;
     sequence node(airtime);
     node.inputs.reserve(depthLimit);
     node.T = 0;
@@ -342,8 +357,11 @@ std::vector<IF::sequence> IF::dfsEntry(const condition& cond, int airtime, int d
 }
 
 // return true for hardPrune, false for softPrune
-bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition& cond, std::vector<sequence>& result) {
+bool IC::dfsRecursive(int depth, int depthLimit, sequence& node, const condition& cond, std::vector<Solution>& result) {
     searchStats.inputDfsRecCalls++;
+
+    if (cancelRequested(cancelFlag)) return true;
+    if (reachedResultLimit(result.size(), resultBudget)) return true;
 
     if(node.T > maxTicks) {
         searchStats.maxTickPrunes++;
@@ -419,7 +437,15 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                 writeLog("\n");
                 writeLog("Found Seqeunce: " + seq2Mothball(node) 
                 + "\nt = " + std::to_string(node.T) + "(+" + std::to_string(std::max(0, node.airDebt)) + ")" + vxStr + vzStr + "\n");
-                result.push_back(node);
+                result.push_back(Solution{
+                    .mothball = seq2Mothball(node),
+                    .depth = depth,
+                    .T = node.T,
+                    .airDebt = node.airDebt,
+                    .vx = vx,
+                    .vz = vz,
+                });
+                if (reachedResultLimit(result.size(), resultBudget)) return true;
             }
         }
 
@@ -451,7 +477,7 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
         baseErrorZ = careZ? std::max(0.0, std::abs(eVz - cond.z.mid()) - cond.z.tol() - approxErr) : 0;
     }
 
-    node.inputs.push_back(IF::input{0, 0, 0});
+    node.inputs.push_back(IC::input{0, 0, 0});
 
     for (int w = -1; w <= 1; w++) {
         for (int a = -1; a <= 1; a++) { 
@@ -651,7 +677,7 @@ bool IF::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
     return false;
 }
 
-void IF::backTrack(sequence& node, const nodeShapshot& snapShot){
+void IC::backTrack(sequence& node, const nodeShapshot& snapShot){
     node.T = snapShot.T;
     node.airDebt = snapShot.airDebt;
     node.lerp0 = snapShot.lerp0;
@@ -662,7 +688,7 @@ void IF::backTrack(sequence& node, const nodeShapshot& snapShot){
 
 // Output false if condition is not satisfied
 // The final velocity is stored in player& p
-bool IF::exeSeq(player& p, const sequence& seq, const condition& cond, const bool mmCheck){
+bool IC::exeSeq(player& p, const sequence& seq, const condition& cond, const bool mmCheck){
     searchStats.exeSeqCalls++;
 
     int tick = seq.T;
@@ -704,6 +730,7 @@ bool IF::exeSeq(player& p, const sequence& seq, const condition& cond, const boo
         const input in = seq.inputs[i];
         const bool sprintQ = (in.w == 1);
         for (int t = 0; t < in.t; t++) {
+            if (cancelRequested(cancelFlag)) return false;
             bool jumpQ = (in.type == segLerp::Jump) && (t == 0);
 
             airborne = airClock > 0;
@@ -772,7 +799,7 @@ bool IF::exeSeq(player& p, const sequence& seq, const condition& cond, const boo
 }
 
 // v_end = alpha * v_init + beta (assuming v were ground speed)
-void IF::alphaBetaUpdate(player& p, sequence& seq){
+void IC::alphaBetaUpdate(player& p, sequence& seq){
     searchStats.alphaBetaUpdateCalls++;
 
     if(seq.inputs.empty()) return;
@@ -781,7 +808,7 @@ void IF::alphaBetaUpdate(player& p, sequence& seq){
     lerpUpdater.updateLerp(seq.lerp0, seq.lerp1,lastInput.w, lastInput.a, lastInput.t, lastInput.type);
 }
 
-double IF::estimateVx(sequence& seq, bool endedAirborne, double initVx, bool prevSprint){
+double IC::estimateVx(sequence& seq, bool endedAirborne, double initVx, bool prevSprint){
     searchStats.estimateSpeedCalls++;
 
     double vx;
@@ -797,7 +824,7 @@ double IF::estimateVx(sequence& seq, bool endedAirborne, double initVx, bool pre
     return vx;
 }
 
-double IF::estimateVz(sequence& seq, bool endedAirborne, double initVz, bool prevSprint){
+double IC::estimateVz(sequence& seq, bool endedAirborne, double initVz, bool prevSprint){
     searchStats.estimateSpeedCalls++;
 
     double vz;
@@ -812,19 +839,19 @@ double IF::estimateVz(sequence& seq, bool endedAirborne, double initVz, bool pre
     return vz;
 }
 
-double IF::terminalVxToSeq(int w, int a, sequence& seq, bool endedAirborne){
+double IC::terminalVxToSeq(int w, int a, sequence& seq, bool endedAirborne){
     double initVx = wasdTerminalVx[3*(a+1) + (w+1)];
 
     return estimateVx(seq, endedAirborne, initVx, true);
 }
 
-double IF::terminalVzToSeq(int w, int a, sequence& seq, bool endedAirborne){
+double IC::terminalVzToSeq(int w, int a, sequence& seq, bool endedAirborne){
     double initVz = wasdTerminalVz[3*(a+1) + (w+1)];
 
     return estimateVz(seq, endedAirborne, initVz, true);
 }
 
-std::string IF::seq2Mothball(const sequence& seq) const {
+std::string IC::seq2Mothball(const sequence& seq) const {
     std::string desc;
 
     int tick = seq.T;
@@ -900,21 +927,22 @@ std::string IF::seq2Mothball(const sequence& seq) const {
     return desc;
 }
 
-std::string IF::showSolutions(const std::vector<sequence>& solutions, ConditionForm format) const {
+std::string IC::showSolutions(const std::vector<Solution>& solutions, ConditionForm format) const {
     std::string out;
 
     for (const auto& seq : solutions) {
-        out += seq2Mothball(seq);
+        out += seq.mothball;
         out += "\n";
 
         if (format == Cartesian) {
-            out += "Vx: " + util::df(seq.finalVx) + ", Vz: " + util::df(seq.finalVz);
+            out += "Vx: " + util::df(seq.vx) + ", Vz: " + util::df(seq.vz);
         } else {
-            const double norm = std::sqrt(seq.finalVx * seq.finalVx + seq.finalVz * seq.finalVz);
-            const double angle = std::atan2(-seq.finalVx, seq.finalVz) * 180.0 / util::PId;
+            const double norm = std::sqrt(seq.vx * seq.vx + seq.vz * seq.vz);
+            const double angle = std::atan2(-seq.vx, seq.vz) * 180.0 / util::PId;
             out += "Norm: " + util::df(norm) + ", Angle: " + util::df(angle);
         }
 
+        out += ", depth = " + std::to_string(seq.depth);
         out += ", t = " + std::to_string(seq.T);
         out += "(+" + std::to_string(std::max(0, seq.airDebt)) + ")";
         out += "\n\n";
@@ -923,27 +951,32 @@ std::string IF::showSolutions(const std::vector<sequence>& solutions, ConditionF
     return out;
 }
 
-void IF::setRotation(double rot){ rotation = rot;}
+void IC::setRotation(double rot){ rotation = rot;}
 
-void IF::setEffect(int speed, int slowness){
+void IC::setCancelFlag(std::atomic_bool* cancelFlag) {
+    this->cancelFlag = cancelFlag;
+}
+
+void IC::setEffect(int speed, int slowness){
     this->speed = speed;
     this->slowness = slowness;
 }
 
-void IF::changeSettings(int maxDepth, int maxTicks, int maxTransitionTime, bool generalBridgeQ){
+void IC::changeSettings(int maxDepth, int maxTicks, int maxTransitionTime, bool generalBridgeQ, int maxResult){
     this->maxDepth = maxDepth;
     this->maxTicks = maxTicks;
     this->maxTransTick = maxTransitionTime;
     this->allowNonEmptyBridge = generalBridgeQ;
+    this->maxResult = maxResult;
 }
 
-void IF::riskyPrune(bool riskQ){
+void IC::riskyPrune(bool riskQ){
     if(riskQ) approxErr = floatErr;
     else approxErr = inertiaErr;
 }
 
-void IF::logSearch(std::ostream& out, const condition& cond, int airtime) const {
-    out << "Input Finder:\n\n";
+void IC::logSearch(std::ostream& out, const condition& cond, int airtime) const {
+    out << "Input Cracker:\n\n";
     if (cond.x.enabled) {
         out << "TargetVx: (" << util::df(cond.x.lb) << ", " << util::df(cond.x.ub)
             << "), Interval Size: " << (cond.x.ub - cond.x.lb)
@@ -962,11 +995,12 @@ void IF::logSearch(std::ostream& out, const condition& cond, int airtime) const 
     out << "MaxDepth: " << maxDepth
         << ", MaxTicks: " << maxTicks
         << ", MaxTransitionTime: " << maxTransTick
-        << ", GeneralBridge: " << allowNonEmptyBridge << "\n";
+        << ", GeneralBridge: " << allowNonEmptyBridge
+        << ", MaxResult: " << maxResult << "\n";
 }
 
-void IF::logSearch(std::ostream& out, const polorCond& cond, int airtime) const {
-    out << "Polar Input Finder:\n\n";
+void IC::logSearch(std::ostream& out, const polorCond& cond, int airtime) const {
+    out << "Polar Input Cracker:\n\n";
     out << "Norm: (" << util::df(cond.normLb) << ", " << util::df(cond.normUb)
         << "), Angle: (" << util::df(cond.angle1) << ", " << util::df(cond.angle2) << ")\n";
     out << "XMM: " << util::fmt(cond.xmm)
@@ -979,32 +1013,33 @@ void IF::logSearch(std::ostream& out, const polorCond& cond, int airtime) const 
     out << "MaxDepth: " << maxDepth
         << ", MaxTicks: " << maxTicks
         << ", MaxTransitionTime: " << maxTransTick
-        << ", GeneralBridge: " << allowNonEmptyBridge << "\n";
+        << ", GeneralBridge: " << allowNonEmptyBridge
+        << ", MaxResult: " << maxResult << "\n";
 }
 
-player& IF::getDummy(){
+player& IC::getDummy(){
     dummy.resetAll();
     dummy.setEffect(speed, slowness);
     dummy.setF(rotation);
     return dummy;
 }
 
-void IF::writeLog(std::string str){
+void IC::writeLog(std::string str){
     logger.write(str);
 }
 
-void IF::printLog(){
+void IC::printLog(){
     logger.print();
 }
 
-void IF::clearLog(){
+void IC::clearLog(){
     logger.clear();
 }
 
-void IF::toggleLog(bool on){
+void IC::toggleLog(bool on){
     logger.toggle(on);
 }
 
-IF::SearchStats IF::getSearchStats() const{
+IC::SearchStats IC::getSearchStats() const{
     return searchStats;
 }

@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cmath>
 #include <iostream>
-#include "inputFinder.hpp"
+#include "inputCracker.hpp"
 #include "util.hpp"
 
 namespace {
@@ -18,7 +18,7 @@ struct BenchmarkStats {
     double maxUs = 0;
     std::size_t resultCount = 0;
     int runs = 0;
-    inputFinder::SearchStats searchStats;
+    inputCracker::SearchStats searchStats;
 };
 
 template<typename Func, typename StatsFunc>
@@ -83,12 +83,12 @@ int main() {
     const int airtime = 12;
     const int runs = 100;
 
-    inputFinder::condition cond;
+    inputCracker::condition cond;
     cond.endAirborne = false;
     cond.x.enabled = false;
     cond.z.enabled = true;
     cond.z.mm = -1.5;
-    inputFinder::setCondWithBound(cond.z, -0.1276844242999637, -0.1276846279184921);
+    inputCracker::setCondWithBound(cond.z, -0.1276844242999637, -0.1276846279184921);
 
     auto printHeader = [&](bool riskIt) {
         std::cout << "------------------------------\n";
@@ -97,26 +97,26 @@ int main() {
     };
 
     for (bool riskIt : {false, true}) {
-        inputFinder f;
-        f.toggleLog(false);
-        f.changeSettings(depth, maxTick, -1);
-        f.riskyPrune(riskIt);
-        f.setEffect(0, 1);
-        f.setRotation(0.015);
+        inputCracker cracker;
+        cracker.toggleLog(false);
+        cracker.changeSettings(depth, maxTick, -1);
+        cracker.riskyPrune(riskIt);
+        cracker.setEffect(0, 1);
+        cracker.setRotation(0.015);
 
         BenchmarkStats inputStats = benchmarkUs(
             [&]() {
-                return f.matchSpeed(cond, airtime);
+                return cracker.matchSpeed(cond, airtime);
             },
             [&]() {
-                return f.getSearchStats();
+                return cracker.getSearchStats();
             },
             runs
         );
 
         printHeader(riskIt);
-        f.logSearch(std::cout, cond, airtime);
-        std::cout << "InputFinder:\n";
+        cracker.logSearch(std::cout, cond, airtime);
+        std::cout << "InputCracker:\n";
         printBenchmark(inputStats);
     }
 

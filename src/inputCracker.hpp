@@ -1,4 +1,5 @@
 #pragma once
+#include <atomic>
 #include <cstdint>
 #include <iosfwd>
 #include <vector>
@@ -7,7 +8,7 @@
 #include "util.hpp"
 #include "player.hpp"
 
-class inputFinder {
+class inputCracker {
 
     // IMPORTANT: I ASSUMED TOGGLESPRINT FOR EFFICIENCY
     public:
@@ -97,15 +98,24 @@ class inputFinder {
         std::uint64_t monotonicPrunesAirExtend = 0;
     };
 
+    struct Solution{
+        std::string mothball;
+        int depth = 0;
+        int T = 0;
+        int airDebt = 0;
+        double vx = 0;
+        double vz = 0;
+    };
+
     static void setCondWithBound(axisCond& cond, double bound1, double bound2);
 
     void initHeuristics(int airtime, double zDis, double xDis);
 
-    std::vector<sequence> matchSpeed(const condition& cond, int airtime);
-    std::vector<sequence> matchSpeed(const polorCond& cond, int airtime);
-    std::vector<sequence> dfsEntry(const condition& cond, int airtime, int depthLimit);
+    std::vector<Solution> matchSpeed(const condition& cond, int airtime);
+    std::vector<Solution> matchSpeed(const polorCond& cond, int airtime);
+    std::vector<Solution> dfsEntry(const condition& cond, int airtime, int depthLimit);
 
-    bool dfsRecursive(int depth, int depthLimit, sequence& node, const condition& cond, std::vector<sequence>& result);
+    bool dfsRecursive(int depth, int depthLimit, sequence& node, const condition& cond, std::vector<Solution>& result);
 
     void backTrack(sequence& node, const nodeShapshot& snapShot);
 
@@ -120,12 +130,13 @@ class inputFinder {
     double terminalVzToSeq(int w, int a, sequence& seq, bool endedAirborne);
 
     std::string seq2Mothball(const sequence& seq) const;
-    std::string showSolutions(const std::vector<sequence>& solutions, ConditionForm format = Cartesian) const;
+    std::string showSolutions(const std::vector<Solution>& solutions, ConditionForm format = Cartesian) const;
 
     void setEffect(int speed = 0, int slowness = 0);
     void setRotation(double rot = 0);
+    void setCancelFlag(std::atomic_bool* cancelFlag);
 
-    void changeSettings(int maxDepth, int maxTicks, int maxTransitionTime = -1, bool generalBridgeQ = false);
+    void changeSettings(int maxDepth, int maxTicks, int maxTransitionTime = -1, bool generalBridgeQ = false, int maxResult = 1024);
     void riskyPrune(bool riskIt); 
     // Faster when on, it may skip inputs that requires inertia
 
@@ -159,10 +170,13 @@ class inputFinder {
     int maxTicks = 40;
     int maxTransTick = -1;
     bool allowNonEmptyBridge = false;
+    int maxResult = 1024;
+    int resultBudget = maxResult;
+    std::atomic_bool* cancelFlag = nullptr;
 
     // constants to account movement approximation error using lerp
     const double floatErr = 1e-5;
-    const double inertiaErr = 0.003; // Tested value, may not be the best
+    const double inertiaErr = 0.005; // Tested value, may not be the best
     double approxErr = inertiaErr;
     SearchStats searchStats;
     Logger logger;

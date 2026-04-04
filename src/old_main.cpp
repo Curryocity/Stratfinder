@@ -1,7 +1,7 @@
 #include <iostream>
 #include <vector>
 #include "util.hpp"
-#include "inputFinder.hpp"
+#include "inputCracker.hpp"
 #include "zSolver.hpp"
 
 namespace {
@@ -36,32 +36,32 @@ int main() {
 
     if(true){
         // Finding input for slowness I 1.5bm 6-1 to ladder (perfect double 45.01)
-        inputFinder f;
-        f.changeSettings(2, 50, -1, false);
-        f.riskyPrune(false);
-        f.setEffect(0, 1);
-        f.setRotation(0.015);
-        inputFinder::condition cond;
+        inputCracker cracker;
+        cracker.changeSettings(2, 50, -1, false);
+        cracker.riskyPrune(false);
+        cracker.setEffect(0, 1);
+        cracker.setRotation(0.015);
+        inputCracker::condition cond;
         cond.endAirborne = false;
         cond.z.enabled = true;
         cond.z.mm = -1.5;
         cond.allowKeys = {1, 1, 1, 1};
-        f.setCondWithBound(cond.z, -0.1276844242999637, -0.1276846279184921);
+        cracker.setCondWithBound(cond.z, -0.1276844242999637, -0.1276846279184921);
         double airtime = 12;
         std::cout << "------------------------------\n";
-        f.logSearch(std::cout, cond, airtime);
+        cracker.logSearch(std::cout, cond, airtime);
 
-        f.matchSpeed(cond, airtime);
-        f.printLog();
+        cracker.matchSpeed(cond, airtime);
+        cracker.printLog();
     }
 
     if(false){
-        inputFinder f;
-        f.changeSettings(4, 30);
-        f.riskyPrune(false);
-        f.setRotation(103.13);
+        inputCracker cracker;
+        cracker.changeSettings(4, 30);
+        cracker.riskyPrune(false);
+        cracker.setRotation(103.13);
 
-        inputFinder::polorCond cond;
+        inputCracker::polorCond cond;
         double targetNorm = 0.236876;
         double normErr = 0.0001;
         double targetAngle = -104.2;
@@ -77,10 +77,10 @@ int main() {
 
         const int airtime = 12;
         std::cout << "------------------------------\n";
-        f.logSearch(std::cout, cond, airtime);
+        cracker.logSearch(std::cout, cond, airtime);
 
-        std::vector<inputFinder::sequence> solutions = f.matchSpeed(cond, airtime);
-        std::cout << f.showSolutions(solutions, inputFinder::Polar);
+        std::vector<inputCracker::Solution> solutions = cracker.matchSpeed(cond, airtime);
+        std::cout << cracker.showSolutions(solutions, inputCracker::Polar);
     }
 
     return 0;

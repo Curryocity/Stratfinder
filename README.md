@@ -8,9 +8,7 @@ The program takes in mm(normal/backwalled) and mm airtime(constant).
 2. Find jumps within offset threshold (picking the best out of delayed and nondelayed strat).
 3. Logs stratfind decision making.
 
-***Feature**: You could set speed/slowness effect via `ZSolver::setEffect(int speed, int slowness)`*
-
-**(Considers inertia)**
+The program could also reverse engineer inputs that matchs some velocity range (See the InputCracker at the below of this README).
 
 ## Examples
 
@@ -99,14 +97,14 @@ t = 15: 6 + 0.000305 b
 t = 17: 6.625 + 0.00072 b
 ```
 
-## Inputfinder(New): Finding inputs that matches the speed and fits in the mm
+## InputCracker: Finding inputs that matches the speed and fits in the mm
 
 ### Slowness I 1.5bm 6-1 to ladder, bwmm strat for facing = 0.015 
 
 **(The full search with settings below took ~9500 micro-seconds on average on my M1 Mac)**
 
 ```
-Input Finder:
+Input Cracker:
 
 TargetVz: (-0.1276846279184921, -0.1276844242999637), Interval Size: 2.03619e-07, ZMM: -1.5
 Airtime: 12, EndAirborne: 0

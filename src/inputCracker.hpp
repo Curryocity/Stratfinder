@@ -141,7 +141,7 @@ class inputCracker {
     void setRotation(double rot = 0);
     void setCancelFlag(std::atomic_bool* cancelFlag);
 
-    void changeSettings(int maxDepth, int maxTicks, int maxTransitionTime = -1, bool generalBridgeQ = false, int maxResult = 1024);
+    void changeSettings(int maxDepth, int maxTicks, int maxTransitionTime = -1, bool generalBridgeQ = false, int resultCap = 1024);
     void riskyPrune(bool riskIt); 
     // Faster when on, it may skip inputs that requires inertia
 
@@ -175,8 +175,8 @@ class inputCracker {
     int maxTicks = 40;
     int maxTransTick = -1;
     bool allowNonEmptyBridge = false;
-    int maxResult = 1024;
-    int resultBudget = maxResult;
+    int resultCap = 1024;
+    int resultBudget = resultCap;
     int minSolDepth = std::numeric_limits<int>::max();
     std::atomic_bool* cancelFlag = nullptr;
 

@@ -325,9 +325,9 @@ std::vector<IC::Solution> IC::matchSpeed(const condition& cond, int airtime){
     // find input sequence via iterative deepening dfs
     for(int limit = 1; limit <= maxDepth; limit ++){
         if (cancelRequested(cancelFlag)) break;
-        resultBudget = (maxResult > 0)
-            ? std::max(0, maxResult - static_cast<int>(result.size()))
-            : maxResult;
+        resultBudget = (resultCap > 0)
+            ? std::max(0, resultCap - static_cast<int>(result.size()))
+            : resultCap;
         if (resultBudget == 0) break;
 
         std::vector<IC::Solution> partialResult = dfsEntry(searchCond, airtime, limit);
@@ -338,7 +338,7 @@ std::vector<IC::Solution> IC::matchSpeed(const condition& cond, int airtime){
         if (!partialResult.empty()) {
             minSolDepth = std::min(minSolDepth, limit);
         }
-        if (reachedResultLimit(result.size(), maxResult)) break;
+        if (reachedResultLimit(result.size(), resultCap)) break;
     }
 
     return result;
@@ -1040,12 +1040,12 @@ void IC::setEffect(int speed, int slowness){
     this->slowness = slowness;
 }
 
-void IC::changeSettings(int maxDepth, int maxTicks, int maxTransitionTime, bool generalBridgeQ, int maxResult){
+void IC::changeSettings(int maxDepth, int maxTicks, int maxTransitionTime, bool generalBridgeQ, int resultCap){
     this->maxDepth = maxDepth;
     this->maxTicks = maxTicks;
     this->maxTransTick = maxTransitionTime;
     this->allowNonEmptyBridge = generalBridgeQ;
-    this->maxResult = maxResult;
+    this->resultCap = resultCap;
 }
 
 void IC::riskyPrune(bool riskQ){

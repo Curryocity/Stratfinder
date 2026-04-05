@@ -43,24 +43,36 @@ struct CrackResult {
     double elapsedMs = 0.0;
 };
 
-struct GuiState {
-    float leftWidth = 0.0f;
-    bool leftWidthInitialized = false;
-    IC::ConditionForm coordType = IC::Cartesian;
+struct CartesianFormState {
     bool enableX = false;
     bool enableZ = true;
     bool xWalled = false;
     bool zWalled = false;
-    std::string normLbText = "0.236";
-    std::string normUbText = "0.238";
-    std::string angle1Text = "-103.5";
-    std::string angle2Text = "-104.5";
     std::string xLbText = "-0.1";
     std::string xUbText = "0.1";
     std::string xMmText = "0";
     std::string zLbText = "-0.1276846279184921";
     std::string zUbText = "-0.1276844242999637";
     std::string zMmText = "-1.5";
+};
+
+struct PolarFormState {
+    std::string normLbText = "0.236";
+    std::string normUbText = "0.238";
+    std::string angle1Text = "-103.5";
+    std::string angle2Text = "-104.5";
+    std::string xMmText = "1";
+    std::string zMmText = "-1";
+    bool xWalled = false;
+    bool zWalled = true;
+};
+
+struct GuiState {
+    float leftWidth = 0.0f;
+    bool leftWidthInitialized = false;
+    IC::ConditionForm coordType = IC::Cartesian;
+    CartesianFormState cart;
+    PolarFormState polar;
 
     int airtime = 12;
     bool endAirborne = false;
@@ -74,6 +86,7 @@ struct GuiState {
     int maxDepth = 3;
     int maxTicks = 40;
     int maxTransTick = 16;
+    int resultCap = 1024;
     bool allowNonEmptyBridge = false;
 
     bool riskyLerp = true;
@@ -385,20 +398,8 @@ void crack(GuiState& state) {
 
     const auto coordType = state.coordType;
     const auto allowKeys = state.allowKeys;
-    const bool enableX = state.enableX;
-    const bool enableZ = state.enableZ;
-    const bool xWalled = state.xWalled;
-    const bool zWalled = state.zWalled;
-    const auto normLbText = state.normLbText;
-    const auto normUbText = state.normUbText;
-    const auto angle1Text = state.angle1Text;
-    const auto angle2Text = state.angle2Text;
-    const auto xLbText = state.xLbText;
-    const auto xUbText = state.xUbText;
-    const auto xMmText = state.xMmText;
-    const auto zLbText = state.zLbText;
-    const auto zUbText = state.zUbText;
-    const auto zMmText = state.zMmText;
+    const auto cart = state.cart;
+    const auto polar = state.polar;
     const int airtime = state.airtime;
     const bool endAirborne = state.endAirborne;
     const auto rotationText = state.rotationText;
@@ -407,6 +408,7 @@ void crack(GuiState& state) {
     const int maxDepth = state.maxDepth;
     const int maxTicks = state.maxTicks;
     const int maxTransTick = state.maxTransTick;
+    const int resultCap = state.resultCap;
     const bool allowNonEmptyBridge = state.allowNonEmptyBridge;
     const bool riskyLerp = state.riskyLerp;
     
@@ -428,24 +430,24 @@ void crack(GuiState& state) {
     double zLb = 0.0, zUb = 0.0, zMm = 0.0;
 
     if (coordType == IC::Cartesian) {
-        if (enableX) {
-            if (!parseDoubleStrict(xLbText, xLb)) { failParse("Invalid number for Vx Lowerbound"); return; }
-            if (!parseDoubleStrict(xUbText, xUb)) { failParse("Invalid number for Vx Upperbound"); return; }
-            if (!parseDoubleStrict(xMmText, xMm)) { failParse("Invalid number for X MM"); return; }
+        if (cart.enableX) {
+            if (!parseDoubleStrict(cart.xLbText, xLb)) { failParse("Invalid number for Vx Lowerbound"); return; }
+            if (!parseDoubleStrict(cart.xUbText, xUb)) { failParse("Invalid number for Vx Upperbound"); return; }
+            if (!parseDoubleStrict(cart.xMmText, xMm)) { failParse("Invalid number for X MM"); return; }
         }
 
-        if (enableZ) {
-            if (!parseDoubleStrict(zLbText, zLb)) { failParse("Invalid number for Vz Lowerbound"); return; }
-            if (!parseDoubleStrict(zUbText, zUb)) { failParse("Invalid number for Vz Upperbound"); return; }
-            if (!parseDoubleStrict(zMmText, zMm)) { failParse("Invalid number for Z MM"); return; }
+        if (cart.enableZ) {
+            if (!parseDoubleStrict(cart.zLbText, zLb)) { failParse("Invalid number for Vz Lowerbound"); return; }
+            if (!parseDoubleStrict(cart.zUbText, zUb)) { failParse("Invalid number for Vz Upperbound"); return; }
+            if (!parseDoubleStrict(cart.zMmText, zMm)) { failParse("Invalid number for Z MM"); return; }
         }
     } else {
-        if (!parseDoubleStrict(normLbText, normLb)) { failParse("Invalid number for Norm Lowerbound"); return; }
-        if (!parseDoubleStrict(normUbText, normUb)) { failParse("Invalid number for Norm Upperbound"); return; }
-        if (!parseDoubleStrict(angle1Text, angle1)) { failParse("Invalid number for Angle 1"); return; }
-        if (!parseDoubleStrict(angle2Text, angle2)) { failParse("Invalid number for Angle 2"); return; }
-        if (!parseDoubleStrict(xMmText, xMm)) { failParse("Invalid number for X MM"); return; }
-        if (!parseDoubleStrict(zMmText, zMm)) { failParse("Invalid number for Z MM"); return; }
+        if (!parseDoubleStrict(polar.normLbText, normLb)) { failParse("Invalid number for Norm Lowerbound"); return; }
+        if (!parseDoubleStrict(polar.normUbText, normUb)) { failParse("Invalid number for Norm Upperbound"); return; }
+        if (!parseDoubleStrict(polar.angle1Text, angle1)) { failParse("Invalid number for Angle 1"); return; }
+        if (!parseDoubleStrict(polar.angle2Text, angle2)) { failParse("Invalid number for Angle 2"); return; }
+        if (!parseDoubleStrict(polar.xMmText, xMm)) { failParse("Invalid number for X MM"); return; }
+        if (!parseDoubleStrict(polar.zMmText, zMm)) { failParse("Invalid number for Z MM"); return; }
         if (shortArcSpan(angle1, angle2) > 10.0) {
             failParse("Polar angle span must be <= 10 degrees");
             return;
@@ -466,7 +468,7 @@ void crack(GuiState& state) {
             const auto start = std::chrono::steady_clock::now();
             inputCracker cracker;
             cracker.setCancelFlag(cancelToken.get());
-            cracker.changeSettings(maxDepth, maxTicks, maxTransTick, allowNonEmptyBridge);
+            cracker.changeSettings(maxDepth, maxTicks, maxTransTick, allowNonEmptyBridge, resultCap);
             cracker.riskyPrune(riskyLerp);
             cracker.setEffect(speed, slowness);
             cracker.setRotation(rotation);
@@ -476,18 +478,18 @@ void crack(GuiState& state) {
                 cond.endAirborne = endAirborne;
                 cond.allowKeys = allowKeys;
 
-                cond.x.enabled = enableX;
-                cond.x.walled = xWalled;
-                cond.z.enabled = enableZ;
-                cond.z.walled = zWalled;
+                cond.x.enabled = cart.enableX;
+                cond.x.walled = cart.xWalled;
+                cond.z.enabled = cart.enableZ;
+                cond.z.walled = cart.zWalled;
 
-                if (enableX) {
+                if (cart.enableX) {
                     cond.x.lb = xLb;
                     cond.x.ub = xUb;
                     cond.x.mm = xMm;
                 }
 
-                if (enableZ) {
+                if (cart.enableZ) {
                     cond.z.lb = zLb;
                     cond.z.ub = zUb;
                     cond.z.mm = zMm;
@@ -509,8 +511,8 @@ void crack(GuiState& state) {
             cond.endAirborne = endAirborne;
             cond.xmm = xMm;
             cond.zmm = zMm;
-            cond.xWalled = xWalled;
-            cond.zWalled = zWalled;
+            cond.xWalled = polar.xWalled;
+            cond.zWalled = polar.zWalled;
 
             result.sols = cracker.matchSpeed(cond, airtime);
             const auto end = std::chrono::steady_clock::now();
@@ -539,17 +541,6 @@ void inputPanel(GuiState& state) {
     ImGui::SeparatorText("Input Cracker");
 
     ImGui::Spacing();
-    ImGui::AlignTextToFramePadding();
-    ImGui::Text("Geometry:");
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(150.0f);
-
-    int coordIdx = (int)state.coordType;
-    if(ImGui::Combo("##coordType", &coordIdx, coordTypes, 2)){
-        state.coordType = (IC::ConditionForm) coordIdx;
-    }
-
-    ImGui::AlignTextToFramePadding();
     ImGui::Text("Speed Type:");
     ImGui::SameLine();
     if(ImGui::Button(state.endAirborne ? "Air" : "Ground")){
@@ -575,7 +566,6 @@ void inputPanel(GuiState& state) {
     ImGui::SameLine();
     drawKeyToggle("D", state.allowKeys.d);
 
-
     ImGui::AlignTextToFramePadding();
     ImGui::Text("Speed/Slowness:");
     ImGui::SameLine();
@@ -584,6 +574,15 @@ void inputPanel(GuiState& state) {
     ImGui::SameLine(0, 5);
     ImGui::SetNextItemWidth(50.0f);
     ImGui::InputInt("##Slowness", &state.slowness, 0, 0);
+
+    ImGui::SeparatorText("Geometry");
+
+    ImGui::SetNextItemWidth(150.0f);
+
+    int coordIdx = (int)state.coordType;
+    if(ImGui::Combo("##coordType", &coordIdx, coordTypes, 2)){
+        state.coordType = (IC::ConditionForm) coordIdx;
+    }
 
     if(state.coordType == IC::Cartesian)
         cartesianGUI(state);
@@ -609,6 +608,12 @@ void inputPanel(GuiState& state) {
         ImGui::SameLine();
         ImGui::SetNextItemWidth(60.0f);
         ImGui::InputInt("##MaxTransition", &state.maxTransTick, 0, 0);
+
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("Result Cap:");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(80.0f);
+        ImGui::InputInt("##ResultCap", &state.resultCap, 0, 0);
 
         ImGui::Checkbox("Allow Non-Empty Bridge", &state.allowNonEmptyBridge);
         ImGui::Checkbox("Risky Lerp (Recommended)", &state.riskyLerp);
@@ -636,30 +641,30 @@ void inputPanel(GuiState& state) {
 
 void cartesianGUI(GuiState& state){
     ImGui::Spacing();
-    ImGui::Checkbox("Enable X", &state.enableX);
+    ImGui::Checkbox("Enable X", &state.cart.enableX);
     ImGui::SameLine();
-    ImGui::Checkbox("Enable Z", &state.enableZ);
+    ImGui::Checkbox("Enable Z", &state.cart.enableZ);
 
-    if(state.enableX){
+    if(state.cart.enableX){
         ImGui::SeparatorText("X Conditions");
-        drawLabeledTextInput("Vel Lowerbound:", "##xLower", 180.0f, state.xLbText);
-        drawLabeledTextInput("Vel Upperbound:", "##xUpper", 180.0f, state.xUbText);
-        drawLabeledTextInput("MM:", "##xMm", 80.0f, state.xMmText);
+        drawLabeledTextInput("Vel Lowerbound:", "##xLower", 180.0f, state.cart.xLbText);
+        drawLabeledTextInput("Vel Upperbound:", "##xUpper", 180.0f, state.cart.xUbText);
+        drawLabeledTextInput("MM:", "##xMm", 80.0f, state.cart.xMmText);
         ImGui::SameLine();
-        if(ImGui::Button(state.xWalled ? "Walled##x" : "Normal##x")){
-            state.xWalled = !state.xWalled;
+        if(ImGui::Button(state.cart.xWalled ? "Walled##x" : "Normal##x")){
+            state.cart.xWalled = !state.cart.xWalled;
         }
     }
 
-    if(state.enableZ){
+    if(state.cart.enableZ){
         ImGui::SeparatorText("Z Conditions");
-        drawLabeledTextInput("Vel Lowerbound:", "##zLower", 180.0f, state.zLbText);
-        drawLabeledTextInput("Vel Upperbound:", "##zUpper", 180.0f, state.zUbText);
-        drawLabeledTextInput("MM:", "##zMm", 80.0f, state.zMmText);
+        drawLabeledTextInput("Vel Lowerbound:", "##zLower", 180.0f, state.cart.zLbText);
+        drawLabeledTextInput("Vel Upperbound:", "##zUpper", 180.0f, state.cart.zUbText);
+        drawLabeledTextInput("MM:", "##zMm", 80.0f, state.cart.zMmText);
         ImGui::SameLine();
         ImGui::SameLine();
-        if(ImGui::Button(state.zWalled ? "Walled##z" : "Normal##z")){
-            state.zWalled = !state.zWalled;
+        if(ImGui::Button(state.cart.zWalled ? "Walled##z" : "Normal##z")){
+            state.cart.zWalled = !state.cart.zWalled;
         }
     }
 }
@@ -667,22 +672,22 @@ void cartesianGUI(GuiState& state){
 void polarGUI(GuiState& state){
     ImGui::Spacing();
     ImGui::SeparatorText("Polar Conditions");
-    drawLabeledTextInput("Norm Lowerbound:", "##normLower", 180.0f, state.normLbText);
-    drawLabeledTextInput("Norm Upperbound:", "##normUpper", 180.0f, state.normUbText);
-    drawLabeledTextInput("Angle 1:", "##angle1", 180.0f, state.angle1Text);
-    drawLabeledTextInput("Angle 2:", "##angle2", 180.0f, state.angle2Text);
+    drawLabeledTextInput("Norm Lowerbound:", "##normLower", 180.0f, state.polar.normLbText);
+    drawLabeledTextInput("Norm Upperbound:", "##normUpper", 180.0f, state.polar.normUbText);
+    drawLabeledTextInput("Angle 1:", "##angle1", 180.0f, state.polar.angle1Text);
+    drawLabeledTextInput("Angle 2:", "##angle2", 180.0f, state.polar.angle2Text);
 
     ImGui::SeparatorText("Momentum");
-    drawLabeledTextInput("X MM:", "##polarXmm", 80.0f, state.xMmText);
+    drawLabeledTextInput("X MM:", "##polarXmm", 80.0f, state.polar.xMmText);
     ImGui::SameLine();
-    if(ImGui::Button(state.xWalled ? "Walled##polarX" : "Normal##polarX")){
-        state.xWalled = !state.xWalled;
+    if(ImGui::Button(state.polar.xWalled ? "Walled##polarX" : "Normal##polarX")){
+        state.polar.xWalled = !state.polar.xWalled;
     }
 
-    drawLabeledTextInput("Z MM:", "##polarZmm", 80.0f, state.zMmText);
+    drawLabeledTextInput("Z MM:", "##polarZmm", 80.0f, state.polar.zMmText);
     ImGui::SameLine();
-    if(ImGui::Button(state.zWalled ? "Walled##polarZ" : "Normal##polarZ")){
-        state.zWalled = !state.zWalled;
+    if(ImGui::Button(state.polar.zWalled ? "Walled##polarZ" : "Normal##polarZ")){
+        state.polar.zWalled = !state.polar.zWalled;
     }
 }
 

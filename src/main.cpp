@@ -101,7 +101,9 @@ struct GuiState {
 
     // Output
     std::vector<IC::Solution> sols;
+    std::vector<std::string> markedMothballs;
     int resultSort = SortByDepth;
+    bool showMarkedOnly = false;
     std::string errorMsg;
     bool returnErrorQ = false;
     bool crackRunning = false;
@@ -125,6 +127,25 @@ ImFont* uiFont = nullptr;
 GLuint copyIconTexture = 0;
 int copyIconWidth = 0;
 int copyIconHeight = 0;
+
+bool mothballMarked(const GuiState& state, const std::string& mothball) {
+    return std::find(state.markedMothballs.begin(), state.markedMothballs.end(), mothball)
+        != state.markedMothballs.end();
+}
+
+void setMothballMarked(GuiState& state, const std::string& mothball, bool marked) {
+    auto it = std::find(state.markedMothballs.begin(), state.markedMothballs.end(), mothball);
+    if (marked) {
+        if (it == state.markedMothballs.end()) {
+            state.markedMothballs.push_back(mothball);
+        }
+        return;
+    }
+
+    if (it != state.markedMothballs.end()) {
+        state.markedMothballs.erase(it);
+    }
+}
 
 void glfwErrorCallback(int error, const char* description) {
     std::fprintf(stderr, "GLFW Error %d: %s\n", error, description);
@@ -755,7 +776,6 @@ void cartesianGUI(GuiState& state){
         drawLabeledTextInput("Vel Upperbound:", "##zUpper", 180.0f, state.cart.zUbText);
         drawLabeledTextInput("MM:", "##zMm", 80.0f, state.cart.zMmText);
         ImGui::SameLine();
-        ImGui::SameLine();
         if(ImGui::Button(state.cart.zWalled ? "Walled##z" : "Normal##z")){
             state.cart.zWalled = !state.cart.zWalled;
         }
@@ -812,6 +832,10 @@ void outputPanel(GuiState& state) {
         ImGui::SameLine();
         ImGui::SetNextItemWidth(240.0f);
         ImGui::Combo("##resultSort", &state.resultSort, kSortItems, IM_ARRAYSIZE(kSortItems));
+        ImGui::SameLine();
+        if (ImGui::Button(state.showMarkedOnly ? "Show All" : "Show Marked")) {
+            state.showMarkedOnly = !state.showMarkedOnly;
+        }
     } else {
         ImGui::Text(
             "Elapse Time: %s",
@@ -851,39 +875,71 @@ void outputPanel(GuiState& state) {
         return lhsIdx < rhsIdx;
     });
 
+    if (state.showMarkedOnly) {
+        order.erase(
+            std::remove_if(order.begin(), order.end(), [&](std::size_t idx) {
+                return !mothballMarked(state, state.sols[idx].mothball);
+            }),
+            order.end()
+        );
+    }
+
+    if (!state.crackRunning && !state.returnErrorQ && state.showMarkedOnly && order.empty()) {
+        ImGui::TextDisabled("No marked results in the current list.");
+    }
+
     for (std::size_t row = 0; row < order.size(); ++row) {
         const std::size_t i = order[row];
         const auto& sol = state.sols[i];
         ImGui::PushID(static_cast<int>(i));
         const float copyButtonSize = 16.0f;
+        const float copyColumnWidth = copyIconTexture != 0
+            ? copyButtonSize + ImGui::GetStyle().FramePadding.x * 2.0f
+            : ImGui::CalcTextSize("Cp").x + ImGui::GetStyle().FramePadding.x * 2.0f;
         const bool showVx = (state.coordType == IC::Polar) || state.cart.enableX;
         const bool showVz = (state.coordType == IC::Polar) || state.cart.enableZ;
 
         bool copyClicked = false;
-        if (copyIconTexture != 0) {
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1, 1, 1, 0.08f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(1, 1, 1, 0.14f));
-            copyClicked = ImGui::ImageButton(
-                "##copyIcon",
-                static_cast<ImTextureID>(copyIconTexture),
-                ImVec2(copyButtonSize, copyButtonSize),
-                ImVec2(0, 0),
-                ImVec2(1, 1),
-                ImVec4(0, 0, 0, 0),
-                ImVec4(1, 1, 1, 1)
-            );
-            ImGui::PopStyleColor(3);
-        } else {
-            copyClicked = ImGui::Button("Cp");
+        bool marked = mothballMarked(state, sol.mothball);
+
+        if (ImGui::BeginTable("##mothballRow", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_NoPadOuterX | ImGuiTableFlags_NoBordersInBody)) {
+            ImGui::TableSetupColumn("Main", ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableSetupColumn("Copy", ImGuiTableColumnFlags_WidthFixed, copyColumnWidth);
+            ImGui::TableNextRow();
+
+            ImGui::TableSetColumnIndex(0);
+            if (ImGui::Checkbox("##marked", &marked)) {
+                setMothballMarked(state, sol.mothball, marked);
+            }
+            ImGui::SameLine();
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextWrapped("%s", sol.mothball.c_str());
+
+            ImGui::TableSetColumnIndex(1);
+            if (copyIconTexture != 0) {
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1, 1, 1, 0.08f));
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(1, 1, 1, 0.14f));
+                copyClicked = ImGui::ImageButton(
+                    "##copyIcon",
+                    static_cast<ImTextureID>(copyIconTexture),
+                    ImVec2(copyButtonSize, copyButtonSize),
+                    ImVec2(0, 0),
+                    ImVec2(1, 1),
+                    ImVec4(0, 0, 0, 0),
+                    ImVec4(1, 1, 1, 1)
+                );
+                ImGui::PopStyleColor(3);
+            } else {
+                copyClicked = ImGui::Button("Cp");
+            }
+
+            ImGui::EndTable();
         }
 
         if (copyClicked) {
             ImGui::SetClipboardText(sol.mothball.c_str());
         }
-        ImGui::SameLine();
-        ImGui::AlignTextToFramePadding();
-        ImGui::TextWrapped("%s", sol.mothball.c_str());
 
         if (showVx && showVz) {
             ImGui::Text(

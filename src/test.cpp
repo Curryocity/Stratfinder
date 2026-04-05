@@ -98,7 +98,6 @@ int main() {
 
     for (bool riskIt : {false, true}) {
         inputCracker cracker;
-        cracker.toggleLog(false);
         cracker.changeSettings(depth, maxTick, -1);
         cracker.riskyPrune(riskIt);
         cracker.setEffect(0, 1);

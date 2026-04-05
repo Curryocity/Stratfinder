@@ -295,14 +295,10 @@ std::vector<IC::Solution> IC::matchSpeed(const condition& cond, int airtime){
     syncDummy();
 
     if( (!cond.x.enabled) && (!cond.z.enabled) ){
-        writeLog("Exception: None of the conditions were enabled\n");
-        writeLog("------EXIT------\n");
         return {};
     } 
 
     if (!(cond.allowKeys.w || cond.allowKeys.a || cond.allowKeys.s || cond.allowKeys.d)) {
-        writeLog("Exception: No movement keys were allowed\n");
-        writeLog("------EXIT------\n");
         return {};
     }
 
@@ -343,7 +339,6 @@ std::vector<IC::Solution> IC::matchSpeed(const condition& cond, int airtime){
 std::vector<IC::Solution> IC::matchSpeed(const polorCond& cond, int airtime){
     const double angleSpan = shortArcSpan(cond.angle1, cond.angle2);
     if (angleSpan > 90.0) {
-        writeLog("Exception: polorCond angle span must be <= 90 degrees\n");
         return {};
     }
 
@@ -403,8 +398,6 @@ std::vector<IC::Solution> IC::matchSpeed(const polorCond& cond, int airtime){
 }
 
 std::vector<IC::Solution> IC::dfsEntry(const condition& cond, int airtime, int depthLimit){
-    writeLog("-------------------------------------------------\n");
-    writeLog("Try searching depth = " + std::to_string(depthLimit) + " inputs\n");
     std::vector<IC::Solution> result;
     sequence node(airtime);
     node.inputs.reserve(depthLimit);
@@ -497,11 +490,6 @@ bool IC::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
             
             if(valid && xSat && zSat){ 
                 node.finalVx = vx, node.finalVz = vz;
-                std::string vxStr = careX? (", Vx: " + util::df(vx)) : "";
-                std::string vzStr = careZ? (", Vz: " + util::df(vz)) : "";
-                writeLog("\n");
-                writeLog("Found Seqeunce: " + seq2Mothball(node) 
-                + "\nt = " + std::to_string(node.T) + "(+" + std::to_string(std::max(0, node.airDebt)) + ")" + vxStr + vzStr + "\n");
                 result.push_back(Solution{
                     .mothball = seq2Mothball(node),
                     .depth = depth,
@@ -1057,68 +1045,10 @@ void IC::riskyPrune(bool riskQ){
     else approxErr = inertiaErr;
 }
 
-void IC::logSearch(std::ostream& out, const condition& cond, int airtime) const {
-    out << "Input Cracker:\n\n";
-    if (cond.x.enabled) {
-        out << "TargetVx: (" << util::df(cond.x.lb) << ", " << util::df(cond.x.ub)
-            << "), Interval Size: " << (cond.x.ub - cond.x.lb)
-            << ", XMM: " << util::fmt(cond.x.mm) << "\n";
-    }
-    if (cond.z.enabled) {
-        out << "TargetVz: (" << util::df(cond.z.lb) << ", " << util::df(cond.z.ub)
-            << "), Interval Size: " << (cond.z.ub - cond.z.lb)
-            << ", ZMM: " << util::fmt(cond.z.mm) << "\n";
-    }
-    out << "Airtime: " << airtime
-        << ", EndAirborne: " << cond.endAirborne << "\n";
-    out << "Facing: " << util::fmt(rotation) << " deg\n";
-    out << "Speed/Slowness: (" << speed << ", " << slowness << ")\n";
-    out << "AllowKeys: " << keysToString(cond.allowKeys) << "\n";
-    out << "MaxDepth: " << maxDepth
-        << ", MaxTicks: " << maxTicks
-        << ", MaxTransitionTime: " << maxTransTick
-        << ", GeneralBridge: " << allowNonEmptyBridge
-        << ", MaxResult: " << maxResult << "\n";
-}
-
-void IC::logSearch(std::ostream& out, const polorCond& cond, int airtime) const {
-    out << "Polar Input Cracker:\n\n";
-    out << "Norm: (" << util::df(cond.normLb) << ", " << util::df(cond.normUb)
-        << "), Angle: (" << util::df(cond.angle1) << ", " << util::df(cond.angle2) << ")\n";
-    out << "XMM: " << util::fmt(cond.xmm)
-        << ", ZMM: " << util::fmt(cond.zmm) << "\n";
-    out << "Airtime: " << airtime
-        << ", EndAirborne: " << cond.endAirborne << "\n";
-    out << "Facing: " << util::fmt(rotation) << " deg\n";
-    out << "Speed/Slowness: (" << speed << ", " << slowness << ")\n";
-    out << "AllowKeys: " << keysToString(cond.allowKeys) << "\n";
-    out << "MaxDepth: " << maxDepth
-        << ", MaxTicks: " << maxTicks
-        << ", MaxTransitionTime: " << maxTransTick
-        << ", GeneralBridge: " << allowNonEmptyBridge
-        << ", MaxResult: " << maxResult << "\n";
-}
-
 void IC::syncDummy(){
     dummy.resetAll();
     dummy.setEffect(speed, slowness);
     dummy.setF(rotation);
-}
-
-void IC::writeLog(std::string str){
-    logger.write(str);
-}
-
-void IC::printLog(){
-    logger.print();
-}
-
-void IC::clearLog(){
-    logger.clear();
-}
-
-void IC::toggleLog(bool on){
-    logger.toggle(on);
 }
 
 IC::SearchStats IC::getSearchStats() const{

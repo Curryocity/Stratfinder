@@ -52,7 +52,6 @@ int main() {
         cracker.logSearch(std::cout, cond, airtime);
 
         cracker.matchSpeed(cond, airtime);
-        cracker.printLog();
     }
 
     if(false){

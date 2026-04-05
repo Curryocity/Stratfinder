@@ -145,14 +145,8 @@ class inputCracker {
     void riskyPrune(bool riskIt); 
     // Faster when on, it may skip inputs that requires inertia
 
-    void logSearch(std::ostream& out, const condition& cond, int airtime) const;
-    void logSearch(std::ostream& out, const polorCond& cond, int airtime) const;
     void syncDummy();
 
-    void writeLog(std::string str);
-    void printLog();
-    void clearLog();
-    void toggleLog(bool on);
     SearchStats getSearchStats() const;
 
     private:
@@ -191,6 +185,5 @@ class inputCracker {
     const double inertiaErr = 0.005; // Tested value, may not be the best
     double approxErr = inertiaErr;
     SearchStats searchStats;
-    Logger logger;
     
 };

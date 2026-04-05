@@ -70,6 +70,7 @@ class inputCracker {
         double errZ = 65536;
         double finalVx = 0;
         double finalVz = 0;
+        std::uint64_t hash = 0;
     };
 
     struct nodeShapshot{
@@ -79,6 +80,7 @@ class inputCracker {
         const segLerp::lerp lerp1;
         const double errX;
         const double errZ;
+        std::uint64_t hash = 0;
     };
 
     struct SearchStats {
@@ -118,6 +120,8 @@ class inputCracker {
 
     bool dfsRecursive(int depth, int depthLimit, sequence& node, const condition& cond, std::vector<Solution>& result);
 
+    void updateHash(std::uint64_t& hash, const input& in);
+    bool hashMatchedKnownSolution(const std::uint64_t hash);
     void backTrack(sequence& node, const nodeShapshot& snapShot);
 
     bool exeSeq(const sequence& seq, const condition& cond, bool mmCheck = true);
@@ -153,6 +157,9 @@ class inputCracker {
 
     private:
 
+    static constexpr std::uint64_t HASH_BASE = 0x9e3779b97f4a7c15ULL;
+    std::vector<std::uint64_t> occupiedHashes;
+
     // dummy's statistics
     player dummy;
     float rotation = 0.0f;
@@ -176,6 +183,7 @@ class inputCracker {
     bool allowNonEmptyBridge = false;
     int maxResult = 1024;
     int resultBudget = maxResult;
+    int minSolDepth = std::numeric_limits<int>::max();
     std::atomic_bool* cancelFlag = nullptr;
 
     // constants to account movement approximation error using lerp

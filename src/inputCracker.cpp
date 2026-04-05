@@ -308,6 +308,8 @@ std::vector<IC::Solution> IC::matchSpeed(const condition& cond, int airtime){
 
     condition searchCond = cond;
 
+    occupiedHashes.clear();
+    minSolDepth = std::numeric_limits<int>::max();
     makeBannedList(searchCond.allowKeys, searchCond.x.enabled, searchCond.z.enabled);
 
     std::vector<IC::Solution> result;
@@ -328,6 +330,9 @@ std::vector<IC::Solution> IC::matchSpeed(const condition& cond, int airtime){
         result.reserve(result.size() + partialResult.size());
         for (auto& sol : partialResult) {
             result.push_back(std::move(sol));
+        }
+        if (!partialResult.empty()) {
+            minSolDepth = std::min(minSolDepth, limit);
         }
         if (reachedResultLimit(result.size(), maxResult)) break;
     }
@@ -422,6 +427,12 @@ bool IC::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
         return true;
     }
 
+    // Do not allow adding useless prefix on top of known solutions
+    if(depth > 0){
+        updateHash(node.hash, node.inputs.back());
+        if(depth >= minSolDepth && hashMatchedKnownSolution(node.hash)) return true;
+    }
+
     alphaBetaUpdate(node);
 
     const bool careZ = cond.z.enabled;
@@ -499,6 +510,10 @@ bool IC::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
                     .vx = vx,
                     .vz = vz,
                 });
+                auto it = std::lower_bound(occupiedHashes.begin(), occupiedHashes.end(), node.hash);
+                if (it == occupiedHashes.end() || *it != node.hash) {
+                    occupiedHashes.insert(it, node.hash);
+                }
                 if (reachedResultLimit(result.size(), resultBudget)) return true;
             }
         }
@@ -514,7 +529,7 @@ bool IC::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
     }
 
     // Main search happens after here, this is for backtracking purposes
-    const nodeShapshot baseNode{node.T, node.airDebt, node.lerp0, node.lerp1, node.errX, node.errZ};
+    const nodeShapshot baseNode{node.T, node.airDebt, node.lerp0, node.lerp1, node.errX, node.errZ, node.hash};
 
     const bool endingDepth = (depth >= depthLimit - 1);
     const bool penultimateDepth = (depth == depthLimit - 1);
@@ -724,6 +739,24 @@ bool IC::dfsRecursive(int depth, int depthLimit, sequence& node, const condition
     return false;
 }
 
+void IC::updateHash(std::uint64_t& hash, const input& in){
+    std::uint64_t x =
+    (static_cast<std::uint64_t>(in.t) << 8) +
+    (static_cast<std::uint64_t>(in.type) << 4) +
+    (static_cast<std::uint64_t>(in.a + 1) << 2) +
+     static_cast<std::uint64_t>(in.w + 1);
+
+    x ^= x >> 33;
+    x *= 0x9e3779b97f4a7c15ULL;
+    x ^= x >> 29;
+
+    hash = hash * HASH_BASE + x;
+}
+
+bool IC::hashMatchedKnownSolution(const std::uint64_t hash){
+    return std::binary_search(occupiedHashes.begin(), occupiedHashes.end(), hash);
+}
+
 void IC::backTrack(sequence& node, const nodeShapshot& snapShot){
     node.T = snapShot.T;
     node.airDebt = snapShot.airDebt;
@@ -731,6 +764,7 @@ void IC::backTrack(sequence& node, const nodeShapshot& snapShot){
     node.lerp1 = snapShot.lerp1;
     node.errX = snapShot.errX;
     node.errZ = snapShot.errZ;
+    node.hash = snapShot.hash;
 }
 
 // Output false if condition is not satisfied

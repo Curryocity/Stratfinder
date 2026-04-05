@@ -114,7 +114,6 @@ int main() {
         );
 
         printHeader(riskIt);
-        cracker.logSearch(std::cout, cond, airtime);
         std::cout << "InputCracker:\n";
         printBenchmark(inputStats);
     }

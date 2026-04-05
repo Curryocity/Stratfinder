@@ -49,7 +49,6 @@ int main() {
         cracker.setCondWithBound(cond.z, -0.1276844242999637, -0.1276846279184921);
         double airtime = 12;
         std::cout << "------------------------------\n";
-        cracker.logSearch(std::cout, cond, airtime);
 
         cracker.matchSpeed(cond, airtime);
     }
@@ -76,7 +75,6 @@ int main() {
 
         const int airtime = 12;
         std::cout << "------------------------------\n";
-        cracker.logSearch(std::cout, cond, airtime);
 
         std::vector<inputCracker::Solution> solutions = cracker.matchSpeed(cond, airtime);
         std::cout << cracker.showSolutions(solutions, inputCracker::Polar);

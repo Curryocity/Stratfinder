@@ -87,17 +87,25 @@ double normalizeDeg(double angle) {
 double shortArcSpan(double angle1, double angle2) {
     const double a1 = normalizeDeg(angle1);
     const double a2 = normalizeDeg(angle2);
-    double span = a2 - a1;
-    if (span < 0) span += 360.0;
-    return span;
+    const double cw = (a2 >= a1) ? (a2 - a1) : (a2 - a1 + 360.0);
+    const double ccw = 360.0 - cw;
+    return std::min(cw, ccw);
 }
 
 bool inArcSpan(double angle, double angle1, double angle2) {
     const double a = normalizeDeg(angle);
     const double start = normalizeDeg(angle1);
-    double offset = a - start;
-    if (offset < 0) offset += 360.0;
-    return offset <= shortArcSpan(angle1, angle2);
+    const double end = normalizeDeg(angle2);
+    const double cw = (end >= start) ? (end - start) : (end - start + 360.0);
+    const double ccw = 360.0 - cw;
+
+    if (cw <= ccw) {
+        const double offset = (a >= start) ? (a - start) : (a - start + 360.0);
+        return offset <= cw;
+    }
+
+    const double offset = (start >= a) ? (start - a) : (start - a + 360.0);
+    return offset <= ccw;
 }
 
 void updatePolarBox(double angleDeg, double radius, double& xLb, double& xUb, double& zLb, double& zUb) {
@@ -338,7 +346,7 @@ std::vector<IC::Solution> IC::matchSpeed(const condition& cond, int airtime){
 
 std::vector<IC::Solution> IC::matchSpeed(const polorCond& cond, int airtime){
     const double angleSpan = shortArcSpan(cond.angle1, cond.angle2);
-    if (angleSpan > 90.0) {
+    if (angleSpan > 10.0) {
         return {};
     }
 

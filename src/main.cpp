@@ -51,6 +51,10 @@ struct GuiState {
     bool enableZ = true;
     bool xWalled = false;
     bool zWalled = false;
+    std::string normLbText = "0.236";
+    std::string normUbText = "0.238";
+    std::string angle1Text = "-103.5";
+    std::string angle2Text = "-104.5";
     std::string xLbText = "-0.1";
     std::string xUbText = "0.1";
     std::string xMmText = "0";
@@ -174,6 +178,20 @@ bool parseDoubleStrict(const std::string& text, double& out) {
 
     out = value;
     return true;
+}
+
+double normalizeDeg(double angle) {
+    double out = std::fmod(angle, 360.0);
+    if (out < 0.0) out += 360.0;
+    return out;
+}
+
+double shortArcSpan(double angle1, double angle2) {
+    const double a1 = normalizeDeg(angle1);
+    const double a2 = normalizeDeg(angle2);
+    const double cw = (a2 >= a1) ? (a2 - a1) : (a2 - a1 + 360.0);
+    const double ccw = 360.0 - cw;
+    return std::min(cw, ccw);
 }
 
 void applyAccent(const RGB& accent) {
@@ -371,6 +389,10 @@ void crack(GuiState& state) {
     const bool enableZ = state.enableZ;
     const bool xWalled = state.xWalled;
     const bool zWalled = state.zWalled;
+    const auto normLbText = state.normLbText;
+    const auto normUbText = state.normUbText;
+    const auto angle1Text = state.angle1Text;
+    const auto angle2Text = state.angle2Text;
     const auto xLbText = state.xLbText;
     const auto xUbText = state.xUbText;
     const auto xMmText = state.xMmText;
@@ -401,6 +423,7 @@ void crack(GuiState& state) {
         return;
     }
 
+    double normLb = 0.0, normUb = 0.0, angle1 = 0.0, angle2 = 0.0;
     double xLb = 0.0, xUb = 0.0, xMm = 0.0;
     double zLb = 0.0, zUb = 0.0, zMm = 0.0;
 
@@ -415,6 +438,17 @@ void crack(GuiState& state) {
             if (!parseDoubleStrict(zLbText, zLb)) { failParse("Invalid number for Vz Lowerbound"); return; }
             if (!parseDoubleStrict(zUbText, zUb)) { failParse("Invalid number for Vz Upperbound"); return; }
             if (!parseDoubleStrict(zMmText, zMm)) { failParse("Invalid number for Z MM"); return; }
+        }
+    } else {
+        if (!parseDoubleStrict(normLbText, normLb)) { failParse("Invalid number for Norm Lowerbound"); return; }
+        if (!parseDoubleStrict(normUbText, normUb)) { failParse("Invalid number for Norm Upperbound"); return; }
+        if (!parseDoubleStrict(angle1Text, angle1)) { failParse("Invalid number for Angle 1"); return; }
+        if (!parseDoubleStrict(angle2Text, angle2)) { failParse("Invalid number for Angle 2"); return; }
+        if (!parseDoubleStrict(xMmText, xMm)) { failParse("Invalid number for X MM"); return; }
+        if (!parseDoubleStrict(zMmText, zMm)) { failParse("Invalid number for Z MM"); return; }
+        if (shortArcSpan(angle1, angle2) > 10.0) {
+            failParse("Polar angle span must be <= 10 degrees");
+            return;
         }
     }
 
@@ -466,8 +500,23 @@ void crack(GuiState& state) {
                 return result;
             }
 
-            result.errorMsg = "Polar crack is not wired yet.";
-            result.returnErrorQ = true;
+            IC::polorCond cond;
+            cond.allowKeys = allowKeys;
+            cond.normLb = normLb;
+            cond.normUb = normUb;
+            cond.angle1 = angle1;
+            cond.angle2 = angle2;
+            cond.endAirborne = endAirborne;
+            cond.xmm = xMm;
+            cond.zmm = zMm;
+            cond.xWalled = xWalled;
+            cond.zWalled = zWalled;
+
+            result.sols = cracker.matchSpeed(cond, airtime);
+            const auto end = std::chrono::steady_clock::now();
+            result.elapsedMs = std::chrono::duration<double, std::milli>(end - start).count();
+            result.cancelled = cancelToken->load(std::memory_order_relaxed);
+            return result;
         } catch (const std::exception& e) {
             result.errorMsg = e.what();
             result.returnErrorQ = true;
@@ -616,7 +665,25 @@ void cartesianGUI(GuiState& state){
 }
 
 void polarGUI(GuiState& state){
-    
+    ImGui::Spacing();
+    ImGui::SeparatorText("Polar Conditions");
+    drawLabeledTextInput("Norm Lowerbound:", "##normLower", 180.0f, state.normLbText);
+    drawLabeledTextInput("Norm Upperbound:", "##normUpper", 180.0f, state.normUbText);
+    drawLabeledTextInput("Angle 1:", "##angle1", 180.0f, state.angle1Text);
+    drawLabeledTextInput("Angle 2:", "##angle2", 180.0f, state.angle2Text);
+
+    ImGui::SeparatorText("Momentum");
+    drawLabeledTextInput("X MM:", "##polarXmm", 80.0f, state.xMmText);
+    ImGui::SameLine();
+    if(ImGui::Button(state.xWalled ? "Walled##polarX" : "Normal##polarX")){
+        state.xWalled = !state.xWalled;
+    }
+
+    drawLabeledTextInput("Z MM:", "##polarZmm", 80.0f, state.zMmText);
+    ImGui::SameLine();
+    if(ImGui::Button(state.zWalled ? "Walled##polarZ" : "Normal##polarZ")){
+        state.zWalled = !state.zWalled;
+    }
 }
 
 void outputPanel(GuiState& state) {

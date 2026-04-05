@@ -17,6 +17,7 @@
 #endif
 
 #if defined(__APPLE__)
+#include <ApplicationServices/ApplicationServices.h>
 #include <OpenGL/gl3.h>
 #else
 #include <GL/gl.h>
@@ -113,6 +114,9 @@ struct RGB {
 ImFont* codeFont = nullptr;
 ImFont* bigCodeFont = nullptr;
 ImFont* uiFont = nullptr;
+GLuint copyIconTexture = 0;
+int copyIconWidth = 0;
+int copyIconHeight = 0;
 
 void glfwErrorCallback(int error, const char* description) {
     std::fprintf(stderr, "GLFW Error %d: %s\n", error, description);
@@ -295,6 +299,82 @@ void initFonts() {
     if (uiFont != nullptr) io.FontDefault = uiFont;
 }
 
+#if defined(__APPLE__)
+bool loadTextureFromPng(const std::filesystem::path& path, GLuint& outTexture, int& outWidth, int& outHeight) {
+    if (!std::filesystem::exists(path)) return false;
+
+    const std::string pathString = path.string();
+    CFURLRef url = CFURLCreateFromFileSystemRepresentation(
+        nullptr,
+        reinterpret_cast<const UInt8*>(pathString.c_str()),
+        static_cast<CFIndex>(pathString.size()),
+        false
+    );
+    if (url == nullptr) return false;
+
+    CGImageSourceRef source = CGImageSourceCreateWithURL(url, nullptr);
+    CFRelease(url);
+    if (source == nullptr) return false;
+
+    CGImageRef image = CGImageSourceCreateImageAtIndex(source, 0, nullptr);
+    CFRelease(source);
+    if (image == nullptr) return false;
+
+    const size_t width = CGImageGetWidth(image);
+    const size_t height = CGImageGetHeight(image);
+    std::vector<std::uint8_t> pixels(width * height * 4);
+
+    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+    CGContextRef context = CGBitmapContextCreate(
+        pixels.data(),
+        width,
+        height,
+        8,
+        width * 4,
+        colorSpace,
+        static_cast<CGBitmapInfo>(kCGImageAlphaPremultipliedLast) | kCGBitmapByteOrder32Big
+    );
+    CGColorSpaceRelease(colorSpace);
+
+    if (context == nullptr) {
+        CGImageRelease(image);
+        return false;
+    }
+
+    CGContextTranslateCTM(context, 0.0, static_cast<CGFloat>(height));
+    CGContextScaleCTM(context, 1.0, -1.0);
+    CGContextDrawImage(context, CGRectMake(0, 0, width, height), image);
+    CGContextRelease(context);
+    CGImageRelease(image);
+
+    GLuint texture = 0;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexImage2D(
+        GL_TEXTURE_2D,
+        0,
+        GL_RGBA,
+        static_cast<GLsizei>(width),
+        static_cast<GLsizei>(height),
+        0,
+        GL_RGBA,
+        GL_UNSIGNED_BYTE,
+        pixels.data()
+    );
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    outTexture = texture;
+    outWidth = static_cast<int>(width);
+    outHeight = static_cast<int>(height);
+    return true;
+}
+#endif
+
 void drawSplitter(float& leftWidth, float minLeft, float minRight) {
     ImGuiStyle& style = ImGui::GetStyle();
     const float splitterWidth = 8.0f;
@@ -430,6 +510,11 @@ void crack(GuiState& state) {
     double zLb = 0.0, zUb = 0.0, zMm = 0.0;
 
     if (coordType == IC::Cartesian) {
+        if (!cart.enableX && !cart.enableZ) {
+            failParse("At least one of Vx or Vz must be enabled");
+            return;
+        }
+
         if (cart.enableX) {
             if (!parseDoubleStrict(cart.xLbText, xLb)) { failParse("Invalid number for Vx Lowerbound"); return; }
             if (!parseDoubleStrict(cart.xUbText, xUb)) { failParse("Invalid number for Vx Upperbound"); return; }
@@ -733,18 +818,62 @@ void outputPanel(GuiState& state) {
     for (std::size_t i = 0; i < state.sols.size(); ++i) {
         const auto& sol = state.sols[i];
         ImGui::PushID(static_cast<int>(i));
+        const float copyButtonSize = 16.0f;
+        const bool showVx = (state.coordType == IC::Polar) || state.cart.enableX;
+        const bool showVz = (state.coordType == IC::Polar) || state.cart.enableZ;
 
+        bool copyClicked = false;
+        if (copyIconTexture != 0) {
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1, 1, 1, 0.08f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(1, 1, 1, 0.14f));
+            copyClicked = ImGui::ImageButton(
+                "##copyIcon",
+                static_cast<ImTextureID>(copyIconTexture),
+                ImVec2(copyButtonSize, copyButtonSize),
+                ImVec2(0, 0),
+                ImVec2(1, 1),
+                ImVec4(0, 0, 0, 0),
+                ImVec4(1, 1, 1, 1)
+            );
+            ImGui::PopStyleColor(3);
+        } else {
+            copyClicked = ImGui::Button("Cp");
+        }
 
+        if (copyClicked) {
+            ImGui::SetClipboardText(sol.mothball.c_str());
+        }
+        ImGui::SameLine();
+        ImGui::AlignTextToFramePadding();
         ImGui::TextWrapped("%s", sol.mothball.c_str());
 
-        ImGui::Text(
-            "depth = %d | t = %d (+%d) | vx = %.15g | vz = %.15g",
-            sol.depth,
-            sol.T,
-            std::max(0, sol.airDebt),
-            sol.vx,
-            sol.vz
-        );
+        if (showVx && showVz) {
+            ImGui::Text(
+                "depth = %d | t = %d (+%d) | vx = %.15g | vz = %.15g",
+                sol.depth,
+                sol.T,
+                std::max(0, sol.airDebt),
+                sol.vx,
+                sol.vz
+            );
+        } else if (showVx) {
+            ImGui::Text(
+                "depth = %d | t = %d (+%d) | vx = %.15g",
+                sol.depth,
+                sol.T,
+                std::max(0, sol.airDebt),
+                sol.vx
+            );
+        } else if (showVz) {
+            ImGui::Text(
+                "depth = %d | t = %d (+%d) | vz = %.15g",
+                sol.depth,
+                sol.T,
+                std::max(0, sol.airDebt),
+                sol.vz
+            );
+        }
 
         if (i + 1 < state.sols.size()) {
             ImGui::Spacing();
@@ -789,6 +918,9 @@ int main() {
     ImGui::CreateContext();
     applyTheme();
     initFonts();
+#if defined(__APPLE__)
+    loadTextureFromPng("asset/icons/copyIcon.png", copyIconTexture, copyIconWidth, copyIconHeight);
+#endif
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glslVersion);
@@ -854,6 +986,9 @@ int main() {
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
+    if (copyIconTexture != 0) {
+        glDeleteTextures(1, &copyIconTexture);
+    }
     glfwDestroyWindow(window);
     glfwTerminate();
     return 0;

@@ -1,9 +1,11 @@
 #include "inputCracker.hpp"
 #include <algorithm>
 #include <atomic>
+#include <cerrno>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <future>
 #include <memory>
@@ -157,6 +159,21 @@ std::string formatElapsedHmsMs(std::chrono::steady_clock::duration elapsed) {
     out += std::to_string(seconds) + "s ";
     out += std::to_string(millis) + "ms";
     return out;
+}
+
+bool parseDoubleStrict(const std::string& text, double& out) {
+    if (text.empty()) return false;
+
+    errno = 0;
+    char* end = nullptr;
+    const double value = std::strtod(text.c_str(), &end);
+
+    if (end == text.c_str()) return false;
+    if (errno == ERANGE) return false;
+    if (end == nullptr || *end != '\0') return false;
+
+    out = value;
+    return true;
 }
 
 void applyAccent(const RGB& accent) {
@@ -347,12 +364,6 @@ void crack(GuiState& state) {
     state.sols.clear();
     state.errorMsg.clear();
     state.returnErrorQ = false;
-    state.crackRunning = true;
-    state.hasSearched = true;
-    state.statusMsg = "Cracking...";
-    state.elapsedMs = 0.0;
-    state.crackStartTime = std::chrono::steady_clock::now();
-    state.cancelToken = std::make_shared<std::atomic_bool>(false);
 
     const auto coordType = state.coordType;
     const auto allowKeys = state.allowKeys;
@@ -376,6 +387,43 @@ void crack(GuiState& state) {
     const int maxTransTick = state.maxTransTick;
     const bool allowNonEmptyBridge = state.allowNonEmptyBridge;
     const bool riskyLerp = state.riskyLerp;
+    
+    auto failParse = [&](const std::string& msg) {
+        state.errorMsg = msg;
+        state.returnErrorQ = true;
+        state.statusMsg = "Search Failed";
+        state.hasSearched = true;
+    };
+
+    double rotation = 0.0;
+    if (!parseDoubleStrict(rotationText, rotation)) {
+        failParse("Invalid number for Facing");
+        return;
+    }
+
+    double xLb = 0.0, xUb = 0.0, xMm = 0.0;
+    double zLb = 0.0, zUb = 0.0, zMm = 0.0;
+
+    if (coordType == IC::Cartesian) {
+        if (enableX) {
+            if (!parseDoubleStrict(xLbText, xLb)) { failParse("Invalid number for Vx Lowerbound"); return; }
+            if (!parseDoubleStrict(xUbText, xUb)) { failParse("Invalid number for Vx Upperbound"); return; }
+            if (!parseDoubleStrict(xMmText, xMm)) { failParse("Invalid number for X MM"); return; }
+        }
+
+        if (enableZ) {
+            if (!parseDoubleStrict(zLbText, zLb)) { failParse("Invalid number for Vz Lowerbound"); return; }
+            if (!parseDoubleStrict(zUbText, zUb)) { failParse("Invalid number for Vz Upperbound"); return; }
+            if (!parseDoubleStrict(zMmText, zMm)) { failParse("Invalid number for Z MM"); return; }
+        }
+    }
+
+    state.crackRunning = true;
+    state.hasSearched = true;
+    state.statusMsg = "Cracking...";
+    state.elapsedMs = 0.0;
+    state.crackStartTime = std::chrono::steady_clock::now();
+    state.cancelToken = std::make_shared<std::atomic_bool>(false);
     const auto cancelToken = state.cancelToken;
 
     state.crackFuture = std::async(std::launch::async, [=]() -> CrackResult {
@@ -387,7 +435,7 @@ void crack(GuiState& state) {
             cracker.changeSettings(maxDepth, maxTicks, maxTransTick, allowNonEmptyBridge);
             cracker.riskyPrune(riskyLerp);
             cracker.setEffect(speed, slowness);
-            cracker.setRotation(std::stod(rotationText));
+            cracker.setRotation(rotation);
 
             if (coordType == IC::Cartesian) {
                 IC::condition cond;
@@ -400,15 +448,15 @@ void crack(GuiState& state) {
                 cond.z.walled = zWalled;
 
                 if (enableX) {
-                    cond.x.lb = std::stod(xLbText);
-                    cond.x.ub = std::stod(xUbText);
-                    cond.x.mm = std::stod(xMmText);
+                    cond.x.lb = xLb;
+                    cond.x.ub = xUb;
+                    cond.x.mm = xMm;
                 }
 
                 if (enableZ) {
-                    cond.z.lb = std::stod(zLbText);
-                    cond.z.ub = std::stod(zUbText);
-                    cond.z.mm = std::stod(zMmText);
+                    cond.z.lb = zLb;
+                    cond.z.ub = zUb;
+                    cond.z.mm = zMm;
                 }
 
                 result.sols = cracker.matchSpeed(cond, airtime);

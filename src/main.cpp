@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <future>
 #include <memory>
+#include <numeric>
 #include <string>
 #include <vector>
 
@@ -68,6 +69,12 @@ struct PolarFormState {
     bool zWalled = true;
 };
 
+enum ResultSort {
+    SortByDepth = 0,
+    SortByTicks = 1,
+    SortByTicksAirDebt = 2,
+};
+
 struct GuiState {
     float leftWidth = 0.0f;
     bool leftWidthInitialized = false;
@@ -94,6 +101,7 @@ struct GuiState {
 
     // Output
     std::vector<IC::Solution> sols;
+    int resultSort = SortByDepth;
     std::string errorMsg;
     bool returnErrorQ = false;
     bool crackRunning = false;
@@ -798,6 +806,12 @@ void outputPanel(GuiState& state) {
                 )).c_str()
             );
         }
+        static const char* kSortItems[] = {"Depth", "Length (without prejump)", "Length (with prejump)"};
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("Sort By:");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(240.0f);
+        ImGui::Combo("##resultSort", &state.resultSort, kSortItems, IM_ARRAYSIZE(kSortItems));
     } else {
         ImGui::Text(
             "Elapse Time: %s",
@@ -815,7 +829,30 @@ void outputPanel(GuiState& state) {
         ImGui::TextDisabled("Search finished with no solutions.");
     }
 
-    for (std::size_t i = 0; i < state.sols.size(); ++i) {
+    std::vector<std::size_t> order(state.sols.size());
+    std::iota(order.begin(), order.end(), 0);
+    std::stable_sort(order.begin(), order.end(), [&](std::size_t lhsIdx, std::size_t rhsIdx) {
+        const auto& lhs = state.sols[lhsIdx];
+        const auto& rhs = state.sols[rhsIdx];
+
+        if (state.resultSort == SortByTicks) {
+            if (lhs.T != rhs.T) return lhs.T < rhs.T;
+        } else if (state.resultSort == SortByTicksAirDebt) {
+            const int lhsCombo = lhs.T + std::max(0, lhs.airDebt);
+            const int rhsCombo = rhs.T + std::max(0, rhs.airDebt);
+            if (lhsCombo != rhsCombo) return lhsCombo < rhsCombo;
+        } else {
+            if (lhs.depth != rhs.depth) return lhs.depth < rhs.depth;
+        }
+
+        if (lhs.depth != rhs.depth) return lhs.depth < rhs.depth;
+        if (lhs.T != rhs.T) return lhs.T < rhs.T;
+        if (lhs.airDebt != rhs.airDebt) return lhs.airDebt < rhs.airDebt;
+        return lhsIdx < rhsIdx;
+    });
+
+    for (std::size_t row = 0; row < order.size(); ++row) {
+        const std::size_t i = order[row];
         const auto& sol = state.sols[i];
         ImGui::PushID(static_cast<int>(i));
         const float copyButtonSize = 16.0f;
@@ -875,7 +912,7 @@ void outputPanel(GuiState& state) {
             );
         }
 
-        if (i + 1 < state.sols.size()) {
+        if (row + 1 < order.size()) {
             ImGui::Spacing();
             ImGui::Separator();
             ImGui::Spacing();

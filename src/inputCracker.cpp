@@ -17,6 +17,13 @@ using IC = inputCracker;
 
 namespace {
 
+std::string trimWhitespace(std::string text) {
+    const std::size_t first = text.find_first_not_of(" \t\n\r\f\v");
+    if (first == std::string::npos) return "";
+    const std::size_t last = text.find_last_not_of(" \t\n\r\f\v");
+    return text.substr(first, last - first + 1);
+}
+
 bool cancelRequested(const std::atomic_bool* flag) {
     return flag != nullptr && flag->load(std::memory_order_relaxed);
 }
@@ -1002,7 +1009,7 @@ std::string IC::seq2Mothball(const sequence& seq) const {
     }
 
     flush();
-    return desc;
+    return trimWhitespace(std::move(desc));
 }
 
 std::string IC::showSolutions(const std::vector<Solution>& solutions, ConditionForm format) const {

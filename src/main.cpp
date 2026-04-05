@@ -104,6 +104,7 @@ struct GuiState {
     std::vector<std::string> markedMothballs;
     int resultSort = SortByDepth;
     bool showMarkedOnly = false;
+    std::string suffixFilter;
     std::string errorMsg;
     bool returnErrorQ = false;
     bool crackRunning = false;
@@ -127,6 +128,13 @@ ImFont* uiFont = nullptr;
 GLuint copyIconTexture = 0;
 int copyIconWidth = 0;
 int copyIconHeight = 0;
+
+std::string trimWhitespace(std::string text) {
+    const std::size_t first = text.find_first_not_of(" \t\n\r\f\v");
+    if (first == std::string::npos) return "";
+    const std::size_t last = text.find_last_not_of(" \t\n\r\f\v");
+    return text.substr(first, last - first + 1);
+}
 
 bool mothballMarked(const GuiState& state, const std::string& mothball) {
     return std::find(state.markedMothballs.begin(), state.markedMothballs.end(), mothball)
@@ -817,25 +825,12 @@ void outputPanel(GuiState& state) {
     if (state.returnErrorQ) {
         ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.45f, 1.0f), "%s", state.errorMsg.c_str());
     } else if (!state.crackRunning) {
-        ImGui::Text("Solution(s): %zu", state.sols.size());
-        if (state.hasSearched) {
-            ImGui::Text(
-                "Elapse Time: %s",
-                formatElapsedHmsMs(std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-                    std::chrono::duration<double, std::milli>(state.elapsedMs)
-                )).c_str()
-            );
-        }
-        static const char* kSortItems[] = {"Depth", "Length (without prejump)", "Length (with prejump)"};
-        ImGui::AlignTextToFramePadding();
-        ImGui::Text("Sort By:");
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(240.0f);
-        ImGui::Combo("##resultSort", &state.resultSort, kSortItems, IM_ARRAYSIZE(kSortItems));
-        ImGui::SameLine();
-        if (ImGui::Button(state.showMarkedOnly ? "Show All" : "Show Marked")) {
-            state.showMarkedOnly = !state.showMarkedOnly;
-        }
+        ImGui::Text(
+            "Elapse Time: %s",
+            formatElapsedHmsMs(std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                std::chrono::duration<double, std::milli>(state.elapsedMs)
+            )).c_str()
+        );
     } else {
         ImGui::Text(
             "Elapse Time: %s",
@@ -884,8 +879,46 @@ void outputPanel(GuiState& state) {
         );
     }
 
-    if (!state.crackRunning && !state.returnErrorQ && state.showMarkedOnly && order.empty()) {
-        ImGui::TextDisabled("No marked results in the current list.");
+    const std::string trimmedSuffixFilter = trimWhitespace(state.suffixFilter);
+    if (!trimmedSuffixFilter.empty()) {
+        order.erase(
+            std::remove_if(order.begin(), order.end(), [&](std::size_t idx) {
+                return !state.sols[idx].mothball.ends_with(trimmedSuffixFilter);
+            }),
+            order.end()
+        );
+    }
+
+    if (!state.crackRunning && !state.returnErrorQ && order.empty()) {
+        if (state.showMarkedOnly && !trimmedSuffixFilter.empty()) {
+            ImGui::TextDisabled("No marked results match the current suffix filter.");
+        } else if (state.showMarkedOnly) {
+            ImGui::TextDisabled("No marked results in the current list.");
+        } else if (!trimmedSuffixFilter.empty()) {
+            ImGui::TextDisabled("No results match the current suffix filter.");
+        }
+    }
+
+    if (!state.returnErrorQ && !state.crackRunning) {
+        ImGui::Text("Solution(s): %zu | Shown: %zu", state.sols.size(), order.size());
+        static const char* kSortItems[] = {"Depth", "Length (without prejump)", "Length (with prejump)"};
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("Sort By:");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(240.0f);
+        ImGui::Combo("##resultSort", &state.resultSort, kSortItems, IM_ARRAYSIZE(kSortItems));
+        ImGui::SameLine();
+        if (ImGui::Button(state.showMarkedOnly ? "Show Marked" : "Show All")) {
+            state.showMarkedOnly = !state.showMarkedOnly;
+        }
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("Suffix Filter:");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(260.0f);
+        ImGui::InputText("##suffixFilter", &state.suffixFilter);
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
     }
 
     for (std::size_t row = 0; row < order.size(); ++row) {

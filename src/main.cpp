@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <vector>
+#include <cstdlib>
 
 #if !defined(GL_SILENCE_DEPRECATION)
 #define GL_SILENCE_DEPRECATION
@@ -131,10 +132,61 @@ void applyTheme() {
     applyAccent({0.45f, 0.39f, 0.60f});
 }
 
-void initFonts(gui::AppResources& resources) {
+std::filesystem::path executableDir(const char* argv0) {
+    if (argv0 == nullptr || argv0[0] == '\0') {
+        return std::filesystem::current_path();
+    }
+
+    std::filesystem::path exePath{argv0};
+    if (exePath.is_absolute()) {
+        return exePath.parent_path();
+    }
+
+    if (exePath.has_parent_path()) {
+        return std::filesystem::weakly_canonical(std::filesystem::current_path() / exePath).parent_path();
+    }
+
+    const char* pathEnv = std::getenv("PATH");
+    if (pathEnv != nullptr) {
+        std::string pathString{pathEnv};
+        std::size_t start = 0;
+        while (start <= pathString.size()) {
+            const std::size_t end = pathString.find(':', start);
+            const std::string segment = pathString.substr(start, end == std::string::npos ? std::string::npos : end - start);
+            if (!segment.empty()) {
+                const std::filesystem::path candidate = std::filesystem::path(segment) / exePath;
+                if (std::filesystem::exists(candidate)) {
+                    return std::filesystem::weakly_canonical(candidate).parent_path();
+                }
+            }
+            if (end == std::string::npos) break;
+            start = end + 1;
+        }
+    }
+
+    return std::filesystem::current_path();
+}
+
+std::filesystem::path findAssetRoot(const std::filesystem::path& exeDir) {
+    const std::vector<std::filesystem::path> candidates = {
+        std::filesystem::current_path() / "asset",
+        exeDir / "asset",
+        exeDir.parent_path() / "Resources" / "asset",
+    };
+
+    for (const auto& candidate : candidates) {
+        if (std::filesystem::exists(candidate)) {
+            return candidate;
+        }
+    }
+
+    return std::filesystem::current_path() / "asset";
+}
+
+void initFonts(gui::AppResources& resources, const std::filesystem::path& assetRoot) {
     ImGuiIO& io = ImGui::GetIO();
-    const std::filesystem::path codeFontPath{std::string("asset/fonts/JetBrainsMono-Regular.ttf")};
-    const std::filesystem::path uiFontPath{std::string("asset/fonts/MinecraftRegular.otf")};
+    const std::filesystem::path codeFontPath = assetRoot / "fonts" / "JetBrainsMono-Regular.ttf";
+    const std::filesystem::path uiFontPath = assetRoot / "fonts" / "MinecraftRegular.otf";
 
     if (std::filesystem::exists(codeFontPath)) {
         resources.codeFont = io.Fonts->AddFontFromFileTTF(codeFontPath.string().c_str(), 16.0f);
@@ -223,8 +275,11 @@ bool loadTextureFromPng(const std::filesystem::path& path, GLuint& outTexture) {
 
 } // namespace
 
-int main() {
+int main(int argc, char** argv) {
+    (void)argc;
     util::init();
+    const std::filesystem::path exeDir = executableDir(argv != nullptr ? argv[0] : nullptr);
+    const std::filesystem::path assetRoot = findAssetRoot(exeDir);
     glfwSetErrorCallback(glfwErrorCallback);
     if (!glfwInit()) return 1;
 
@@ -251,11 +306,11 @@ int main() {
     applyTheme();
 
     gui::AppResources resources;
-    initFonts(resources);
+    initFonts(resources, assetRoot);
 
     GLuint copyIconTexture = 0;
 #if defined(__APPLE__)
-    if (loadTextureFromPng(std::filesystem::path{std::string("asset/icons/copyIcon.png")}, copyIconTexture)) {
+    if (loadTextureFromPng(assetRoot / "icons" / "copyIcon.png", copyIconTexture)) {
         resources.copyIconTexture = static_cast<ImTextureID>(copyIconTexture);
     }
 #endif

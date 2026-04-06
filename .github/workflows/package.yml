@@ -1,0 +1,126 @@
+name: Build Packages
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  macos-arm64:
+    name: macOS arm64
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore build cache
+        uses: actions/cache@v4
+        with:
+          path: build
+          key: ${{ runner.os }}-arm64-build-${{ hashFiles('Makefile', 'scripts/package.sh', 'src/**/*.cpp', 'src/**/*.hpp', 'third_party/imgui/**/*.cpp', 'third_party/imgui/**/*.h', 'asset/**') }}
+          restore-keys: |
+            ${{ runner.os }}-arm64-build-
+
+      - name: Install deps
+        run: brew install glfw
+
+      - name: Package
+        run: make package-macos-arm64 VERSION="${GITHUB_REF_NAME}" ENABLE_LTO=1
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: stratfinder-macos-arm64
+          path: dist/*.zip
+
+  macos-x86_64:
+    name: macOS x86_64
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore build cache
+        uses: actions/cache@v4
+        with:
+          path: build
+          key: ${{ runner.os }}-x86_64-build-${{ hashFiles('Makefile', 'scripts/package.sh', 'src/**/*.cpp', 'src/**/*.hpp', 'third_party/imgui/**/*.cpp', 'third_party/imgui/**/*.h', 'asset/**') }}
+          restore-keys: |
+            ${{ runner.os }}-x86_64-build-
+
+      - name: Install deps
+        run: brew install glfw
+
+      - name: Package
+        run: make package-macos-x86_64 VERSION="${GITHUB_REF_NAME}" ENABLE_LTO=1
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: stratfinder-macos-x86_64
+          path: dist/*.zip
+
+  linux-x86_64:
+    name: Linux x86_64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore build cache
+        uses: actions/cache@v4
+        with:
+          path: build
+          key: ${{ runner.os }}-x86_64-build-${{ hashFiles('Makefile', 'scripts/package.sh', 'src/**/*.cpp', 'src/**/*.hpp', 'third_party/imgui/**/*.cpp', 'third_party/imgui/**/*.h', 'asset/**') }}
+          restore-keys: |
+            ${{ runner.os }}-x86_64-build-
+
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libglfw3-dev libgl1-mesa-dev zip unzip
+
+      - name: Package
+        run: make package-linux-x86_64 VERSION="${GITHUB_REF_NAME}" ENABLE_LTO=1
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: stratfinder-linux-x86_64
+          path: dist/*.tar.gz
+
+  windows-x86_64:
+    name: Windows x86_64
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          cache: true
+          install: >-
+            make
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-glfw
+            zip
+            unzip
+
+      - name: Restore build cache
+        uses: actions/cache@v4
+        with:
+          path: build
+          key: ${{ runner.os }}-x86_64-build-${{ hashFiles('Makefile', 'scripts/package.sh', 'src/**/*.cpp', 'src/**/*.hpp', 'third_party/imgui/**/*.cpp', 'third_party/imgui/**/*.h', 'asset/**') }}
+          restore-keys: |
+            ${{ runner.os }}-x86_64-build-
+
+      - name: Package
+        run: make package-windows-x86_64 VERSION="${GITHUB_REF_NAME}" ENABLE_LTO=1
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: stratfinder-windows-x86_64
+          path: dist/*.zip

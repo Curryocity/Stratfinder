@@ -8,6 +8,8 @@ namespace gui {
 
 namespace {
 
+const char* kModeItems[2] = {"Search", "Standard"};
+
 std::string solverStratName(int stratType) {
     return stratType < 0 ? "N/A" : zSolver::strat2string(stratType);
 }
@@ -22,6 +24,7 @@ void ZSolverTab::pump() {
         SolverResult result = solverFuture_.get();
         solverStrat_ = std::move(result.strat);
         jumpList_ = std::move(result.jumpList);
+        standardJump_ = std::move(result.standardJump);
         solverLogText_ = std::move(result.logText);
         solverErrorMsg_ = std::move(result.errorMsg);
         solverReturnErrorQ_ = result.returnErrorQ;
@@ -37,6 +40,7 @@ void ZSolverTab::pump() {
         solverStatusMsg_ = "Solve Failed";
     } catch (...) {
         jumpList_ = {};
+        standardJump_ = {};
         solverLogText_.clear();
         solverErrorMsg_ = "Unknown error";
         solverReturnErrorQ_ = true;
@@ -52,6 +56,7 @@ void ZSolverTab::solve() {
 
     solverStrat_ = {};
     jumpList_ = {};
+    standardJump_ = {};
     solverLogText_.clear();
     solverErrorMsg_.clear();
     solverReturnErrorQ_ = false;
@@ -61,7 +66,9 @@ void ZSolverTab::solve() {
     const int mmAirtime = mmAirtime_;
     const int speed = speed_;
     const int slowness = slowness_;
+    const int mode = mode_;
     const int maxTicks = maxAirtime_;
+    const int jumpAirtime = jumpAirtime_;
     const auto thresholdText = thresholdText_;
     const auto shiftText = shiftText_;
     const bool backwalled = backwalled_;
@@ -95,17 +102,24 @@ void ZSolverTab::solve() {
         failParse("MM must satisfy -0.6 <= MM < 60000000");
         return;
     }
-    if (maxTicks < 2) {
-        failParse("Max Search T must be at least 2");
-        return;
-    }
-    if (!parseDoubleStrict(thresholdText, threshold)) {
-        failParse("Invalid number for Threshold");
-        return;
-    }
-    if (threshold <= 0.0 || threshold > 0.0625) {
-        failParse("Threshold must satisfy 0 < threshold <= 0.0625");
-        return;
+    if (mode == Search) {
+        if (maxTicks < 2) {
+            failParse("Max Airtime must be at least 2");
+            return;
+        }
+        if (!parseDoubleStrict(thresholdText, threshold)) {
+            failParse("Invalid number for Threshold");
+            return;
+        }
+        if (threshold <= 0.0 || threshold > 0.0625) {
+            failParse("Threshold must satisfy 0 < threshold <= 0.0625");
+            return;
+        }
+    } else {
+        if (jumpAirtime < 1) {
+            failParse("Jump Airtime must be at least 1");
+            return;
+        }
     }
     if (!parseFloatStrict(shiftText, shift)) {
         failParse("Invalid number for Shift");
@@ -131,7 +145,11 @@ void ZSolverTab::solve() {
                 ? solver.backwallSolver(mm, mmAirtime)
                 : solver.optimalSolver(mm, mmAirtime);
             result.strat = strat;
-            result.hasJump = solver.poss(result.jumpList, strat, maxTicks, threshold, backwalled, shift);
+            if (mode == Search) {
+                result.hasJump = solver.poss(result.jumpList, strat, maxTicks, threshold, backwalled, shift);
+            } else {
+                result.standardJump = evalStandardJump(strat, jumpAirtime, shift, speed, slowness);
+            }
 
             result.logText = solver.getLog();
             const auto end = std::chrono::steady_clock::now();
@@ -153,7 +171,7 @@ void ZSolverTab::renderInputPanel(const AppResources& resources) {
     const bool pushedUiFont = resources.uiFont != nullptr;
     if (pushedUiFont) ImGui::PushFont(resources.uiFont);
 
-    ImGui::SeparatorText("zSolver");
+    ImGui::SeparatorText("Momentum");
 
     ImGui::Spacing();
     drawLabeledTextInput("MM:", "##solverMm", 120.0f, mmText_);
@@ -177,15 +195,32 @@ void ZSolverTab::renderInputPanel(const AppResources& resources) {
     ImGui::SetNextItemWidth(50.0f);
     ImGui::InputInt("##solverSlowness", &slowness_, 0, 0);
 
-    ImGui::SeparatorText("Search");
+
+
+    ImGui::SeparatorText("Jump");
 
     ImGui::AlignTextToFramePadding();
-    ImGui::Text("Max Airtime:");
+    ImGui::Text("Mode:");
     ImGui::SameLine();
-    ImGui::SetNextItemWidth(70.0f);
-    ImGui::InputInt("##solverMaxAirtime", &maxAirtime_, 0, 0);
+    ImGui::SetNextItemWidth(140.0f);
+    ImGui::Combo("##solverMode", &mode_, kModeItems, IM_ARRAYSIZE(kModeItems));
 
-    drawLabeledTextInput("Threshold:", "##solverThreshold", 100.0f, thresholdText_);
+    if (mode_ == Search) {
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("Max Airtime:");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(70.0f);
+        ImGui::InputInt("##solverMaxAirtime", &maxAirtime_, 0, 0);
+
+        drawLabeledTextInput("Threshold:", "##solverThreshold", 100.0f, thresholdText_);
+    } else {
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("Jump Airtime:");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(70.0f);
+        ImGui::InputInt("##solverJumpAirtime", &jumpAirtime_, 0, 0);
+    }
+
     drawLabeledTextInput("Shift:", "##solverShift", 100.0f, shiftText_);
 
     ImGui::TextDisabled("Tip: 0.0 = blockage, 0.3 = ladder, 0.6 = normal.");
@@ -266,6 +301,24 @@ void ZSolverTab::renderOutputPanel(const AppResources& resources) {
             }
         }
 
+        if (mode_ == Standard && standardJump_.airtime >= 1) {
+            ImGui::Spacing();
+            ImGui::SeparatorText("Jump");
+
+            ImGui::TextDisabled(
+                "Optimal: %s",
+                standardJump_.nondelayedBetter ? "Nondelayed" : "Delayed"
+            );
+
+            ImGui::Text(
+                "t = %d: %.15g + %.15g b",
+                standardJump_.airtime,
+                standardJump_.jumpDistance,
+                standardJump_.landingOffset
+            );
+            
+        }
+
         if (!solverLogText_.empty()) {
             ImGui::Spacing();
             if (ImGui::CollapsingHeader("Solver Log")) {
@@ -279,6 +332,35 @@ void ZSolverTab::renderOutputPanel(const AppResources& resources) {
     ImGui::EndChild();
     if (pushedCodeFont) ImGui::PopFont();
     if (pushedUiFont) ImGui::PopFont();
+}
+
+ZSolverTab::StandardJumpResult ZSolverTab::evalStandardJump(const ZS::fullStrat& strat, int airtime, float shift, int speed, int slowness) {
+    StandardJumpResult result;
+    result.airtime = airtime;
+
+    zEngine dE(speed, slowness);
+    dE.setVz(strat.delaySpeed);
+    dE.sj45(airtime);
+
+    zEngine ndE(speed, slowness);
+    ndE.setVzAir(strat.nondelaySpeed);
+    ndE.sj45(airtime);
+
+    result.nondelayedBetter = false;
+    double zb = dE.Z();
+
+    if(ndE.Z() > zb){
+        result.nondelayedBetter = true;
+        zb = ndE.Z();
+    }
+
+    zb += shift;
+    result.landingOffset = std::fmod(zb, 0.0625);
+    if (result.landingOffset < 0.0) {
+        result.landingOffset += 0.0625;
+    }
+    result.jumpDistance = zb - result.landingOffset;
+    return result;
 }
 
 } // namespace gui

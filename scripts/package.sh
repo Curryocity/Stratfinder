@@ -16,6 +16,7 @@ root_dir="$(cd "$(dirname "$0")/.." && pwd)"
 asset_dir="$root_dir/asset"
 dist_dir="$root_dir/dist"
 mac_icon_icns="$asset_dir/icons/app.icns"
+app_icon_png="$asset_dir/icons/app.png"
 
 if [ ! -f "$binary_path" ]; then
   echo "Binary not found: $binary_path" >&2
@@ -182,6 +183,44 @@ bundle_macos_glfw() {
   install_name_tool -change "$glfw_src" "@executable_path/../Frameworks/libglfw.3.dylib" "$app_bin"
 }
 
+generate_macos_icns_from_png() {
+  local png_path="$1"
+  local out_icns="$2"
+
+  if [ ! -f "$png_path" ]; then
+    return 1
+  fi
+  if ! command -v sips >/dev/null 2>&1; then
+    return 1
+  fi
+  if ! command -v iconutil >/dev/null 2>&1; then
+    return 1
+  fi
+
+  local iconset_dir
+  iconset_dir="$(mktemp -d)"
+  mkdir -p "$iconset_dir/app.iconset"
+  local set_dir="$iconset_dir/app.iconset"
+
+  sips -z 16 16     "$png_path" --out "$set_dir/icon_16x16.png" >/dev/null
+  sips -z 32 32     "$png_path" --out "$set_dir/icon_16x16@2x.png" >/dev/null
+  sips -z 32 32     "$png_path" --out "$set_dir/icon_32x32.png" >/dev/null
+  sips -z 64 64     "$png_path" --out "$set_dir/icon_32x32@2x.png" >/dev/null
+  sips -z 128 128   "$png_path" --out "$set_dir/icon_128x128.png" >/dev/null
+  sips -z 256 256   "$png_path" --out "$set_dir/icon_128x128@2x.png" >/dev/null
+  sips -z 256 256   "$png_path" --out "$set_dir/icon_256x256.png" >/dev/null
+  sips -z 512 512   "$png_path" --out "$set_dir/icon_256x256@2x.png" >/dev/null
+  sips -z 512 512   "$png_path" --out "$set_dir/icon_512x512.png" >/dev/null
+  cp "$png_path" "$set_dir/icon_512x512@2x.png"
+
+  if ! iconutil -c icns "$set_dir" -o "$out_icns" >/dev/null 2>&1; then
+    rm -rf "$iconset_dir"
+    return 1
+  fi
+  rm -rf "$iconset_dir"
+  return 0
+}
+
 case "$platform" in
   macos)
     stage_dir="$dist_dir/${app_name}-${version}-macos-${arch}"
@@ -196,8 +235,14 @@ case "$platform" in
     find "$bundle_dir/Contents/Resources/asset" -name '.DS_Store' -delete
 
     icon_plist=""
+    mac_bundle_icon="$bundle_dir/Contents/Resources/app.icns"
     if [ -f "$mac_icon_icns" ]; then
-      cp "$mac_icon_icns" "$bundle_dir/Contents/Resources/app.icns"
+      cp "$mac_icon_icns" "$mac_bundle_icon"
+    elif generate_macos_icns_from_png "$app_icon_png" "$mac_bundle_icon"; then
+      :
+    fi
+
+    if [ -f "$mac_bundle_icon" ]; then
       icon_plist=$'  <key>CFBundleIconFile</key>\n  <string>app.icns</string>'
     fi
 
@@ -268,7 +313,7 @@ LAUNCH
 Type=Application
 Name=${app_name}
 Exec=./${app_name}
-Icon=asset/icons/app
+Icon=asset/icons/app.png
 Terminal=false
 Categories=Utility;
 DESKTOP

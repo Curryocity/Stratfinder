@@ -7,6 +7,7 @@ UNAME_S := $(shell uname -s)
 ARCH ?= $(shell uname -m)
 BUILD_DIR := build/$(UNAME_S)-$(ARCH)
 PKG_CONFIG ?= pkg-config
+WINDRES ?= windres
 
 SRC := \
 	src/main.cpp \
@@ -28,6 +29,7 @@ SRC := \
 
 OBJ := $(addprefix $(BUILD_DIR)/,$(SRC:.cpp=.o))
 DEP := $(OBJ:.o=.d)
+EXTRA_OBJ :=
 
 CPPFLAGS := -Isrc -Ithird_party/imgui -Ithird_party/imgui/backends
 CXXFLAGS := -std=c++20 -Wall -Wextra -MMD -MP -ffp-contract=off
@@ -63,19 +65,24 @@ endif
 
 ifneq (,$(findstring MINGW,$(UNAME_S)))
 LDLIBS := -lglfw3 -lopengl32 -lgdi32 -lshell32
+EXTRA_OBJ += $(BUILD_DIR)/resources/windows/app_icon.o
 RELEASE_LDFLAGS += -Wl,--gc-sections
 STRIP_CMD = strip --strip-unneeded $(BUILD_DIR)/$(TARGET)
 endif
 ifneq (,$(findstring MSYS,$(UNAME_S)))
 LDLIBS := -lglfw3 -lopengl32 -lgdi32 -lshell32
+EXTRA_OBJ += $(BUILD_DIR)/resources/windows/app_icon.o
 RELEASE_LDFLAGS += -Wl,--gc-sections
 STRIP_CMD = strip --strip-unneeded $(BUILD_DIR)/$(TARGET)
 endif
 ifeq ($(OS),Windows_NT)
 LDLIBS := -lglfw3 -lopengl32 -lgdi32 -lshell32
+EXTRA_OBJ += $(BUILD_DIR)/resources/windows/app_icon.o
 RELEASE_LDFLAGS += -Wl,--gc-sections
 STRIP_CMD = strip --strip-unneeded $(BUILD_DIR)/$(TARGET)
 endif
+
+EXTRA_OBJ := $(sort $(EXTRA_OBJ))
 
 ifeq ($(ENABLE_LTO),1)
 RELEASE_CXXFLAGS += -flto
@@ -97,9 +104,9 @@ ifneq ($(STRIP_CMD),)
 	$(STRIP_CMD)
 endif
 
-$(BUILD_DIR)/$(TARGET): $(OBJ)
+$(BUILD_DIR)/$(TARGET): $(OBJ) $(EXTRA_OBJ)
 	@mkdir -p $(dir $@)
-	$(CXX) $(OBJ) $(LDFLAGS) $(LDLIBS) -o $@
+	$(CXX) $(OBJ) $(EXTRA_OBJ) $(LDFLAGS) $(LDLIBS) -o $@
 	@mkdir -p build
 	cp -f $@ build/$(TARGET)
 
@@ -107,8 +114,12 @@ $(BUILD_DIR)/%.o: %.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
+$(BUILD_DIR)/resources/windows/%.o: resources/windows/%.rc
+	@mkdir -p $(dir $@)
+	$(WINDRES) $< -O coff -o $@
+
 clean:
-	rm -f $(BUILD_DIR)/$(TARGET) $(OBJ) $(DEP)
+	rm -f $(BUILD_DIR)/$(TARGET) $(OBJ) $(DEP) $(EXTRA_OBJ)
 
 clean-artifacts:
 	rm -rf build/*.dSYM dist

@@ -63,7 +63,7 @@ void zEngine::simMove(double moveVec, bool airborne, bool sprintJumpQ, int repea
         float mu = 0.98f;
 
         /* normalize, no 45 on sprintjump tick */
-        float dist = sprintJumpQ ? mu : std::sqrtf(mu * mu + mu * mu);
+        float dist = sprintJumpQ ? mu : static_cast<float>(std::sqrt(mu * mu + mu * mu));
         if (dist > 1.0f)
             accelf /= dist;
 

@@ -265,7 +265,7 @@ void JumpFinderTab::startSearch() {
 
                             for (const auto& shift : selectedShifts) {
                                 ZS::JumpList jumpList;
-                                if (!solver.poss(jumpList, strat, maxJumpAirtime, threshold, backwalled, shift.second)) {
+                                if (!solver.poss(jumpList, strat, maxJumpAirtime, threshold, shift.second)) {
                                     continue;
                                 }
 
@@ -294,7 +294,7 @@ void JumpFinderTab::startSearch() {
                             if (
                                 useFastBreak &&
                                 std::abs(maxi.delaySpeed - strat.delaySpeed) < 1e-3 &&
-                                solver.equalJumpListCheck(mmAirtime, maxJumpAirtime, strat, maxi, comparisonShifts)
+                                solver.equalJumpListCheck(maxJumpAirtime, strat, maxi, comparisonShifts)
                             ) {
                                 const long long skippedMm = maxPixel - mmPixel;
                                 if (skippedMm > 0) {

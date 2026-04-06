@@ -32,15 +32,6 @@ bool isKeyAllowed(int w, int a, const IC::WASD& rule){
     return !((!rule.w && w == 1) || (!rule.a && a == 1) || (!rule.s && w == -1) || (!rule.d && a == -1));
 }
 
-std::string keysToString(const IC::WASD& keys) {
-    std::string out;
-    if (keys.w) out += "W";
-    if (keys.a) out += "A";
-    if (keys.s) out += "S";
-    if (keys.d) out += "D";
-    return out.empty() ? "-" : out;
-}
-
 bool inputEmpty(const IC::input& in){
     return in.w == 0 && in.a == 0;
 }
@@ -776,7 +767,6 @@ bool IC::exeSeq(const sequence& seq, const condition& cond, const bool mmCheck){
     player& p = dummy;
     searchStats.exeSeqCalls++;
 
-    int tick = seq.T;
     int airClock = (seq.airDebt == 0)? 0 : seq.airtime - seq.airDebt;
 
     const double zmm = cond.z.mm;
@@ -846,7 +836,6 @@ bool IC::exeSeq(const sequence& seq, const condition& cond, const bool mmCheck){
             prevAirborne = airborne;
 
             if (airClock > 0) airClock--;
-            tick--;
         }
     }
     
@@ -939,7 +928,6 @@ double IC::terminalVzToSeq(int w, int a, sequence& seq, bool endedAirborne){
 std::string IC::seq2Mothball(const sequence& seq) const {
     std::string desc;
 
-    int tick = seq.T;
     int airClock = (seq.airDebt == 0)? 0 : seq.airtime - seq.airDebt;
 
     bool streakFromJump = false;
@@ -1004,7 +992,6 @@ std::string IC::seq2Mothball(const sequence& seq) const {
             prevGAJ = gaj;
 
             if (airClock > 0) airClock--;
-            tick --;
         }
     }
 

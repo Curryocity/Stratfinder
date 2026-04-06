@@ -146,7 +146,7 @@ void ZSolverTab::solve() {
                 : solver.mmSolver(mm, mmAirtime);
             result.strat = strat;
             if (mode == Search) {
-                result.hasJump = solver.poss(result.jumpList, strat, maxTicks, threshold, backwalled, shift);
+                result.hasJump = solver.poss(result.jumpList, strat, maxTicks, threshold, shift);
             } else {
                 result.standardJump = evalStandardJump(strat, jumpAirtime, shift, speed, slowness);
             }

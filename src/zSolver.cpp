@@ -307,7 +307,6 @@ ZS::Output3 ZS::robo(zEngine& p, double mm, int t, int delayTick, int jumps){
     // Robo could beat boomerang only when it is bwmm into hh1t
     if(hhDis <= mm) return Output3{false, 0};
 
-    double roboSpot1; 
     p.resetAll();
 
     // The border of robo and true robo
@@ -637,7 +636,7 @@ ZS::strat ZS::backwallSolve(double mm, int t, int delayTick){
 
     // Amount of sj45(t)'s the mm could fit
     int jumps = 0;
-    double z0, zOverJump, z1ground, z1air;
+    double z0, z1ground, z1air;
 
     zEngine::State prevJump;
 
@@ -658,7 +657,6 @@ ZS::strat ZS::backwallSolve(double mm, int t, int delayTick){
         } 
 
         if(p.Z() > mm){
-            zOverJump = p.Z();
             p.loadState(prevJump); // Undo a jump
             z0 = p.Z();
             break;
@@ -883,8 +881,6 @@ ZS::fullStrat ZS::backwallSolver(double mm, int t){
     p.s45(1);
     double sprint45Vz = p.Vz();
     double terminalSpeed = sprint45Vz/ 0.454;
-    double bestDelayTick = delayTick;
-
     p.resetAll();
     p.sj45(t);
     p.s45(1);
@@ -965,7 +961,7 @@ const std::string& ZS::getLog() const {
     return logger.str();
 }
 
-bool ZS::poss(JumpList& jumpList, const fullStrat& strat, int max_t, double threshold, bool backwallQ, double shift){
+bool ZS::poss(JumpList& jumpList, const fullStrat& strat, int max_t, double threshold, double shift){
     jumpList.jumps.clear();
     jumpList.firstNondelayedTick = -1;
     jumpList.firstNondelayedIdx = -1;
@@ -1010,7 +1006,7 @@ bool ZS::poss(JumpList& jumpList, const fullStrat& strat, int max_t, double thre
 
 
 
-bool ZS::equalJumpListCheck(int t_mm, int maxt, fullStrat strat1, fullStrat strat2, std::vector<double> shifts){
+bool ZS::equalJumpListCheck(int maxt, fullStrat strat1, fullStrat strat2, std::vector<double> shifts){
 
     constexpr double pixel = 0.0625;
 

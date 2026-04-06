@@ -10,13 +10,6 @@ segLerp::axisLerp composeAxis(const segLerp::axisLerp& outer, const segLerp::axi
     };
 }
 
-segLerp::lerp composeLerp(const segLerp::lerp& outer, const segLerp::lerp& inner) {
-    return {
-        composeAxis(outer.lerpX, inner.lerpX),
-        composeAxis(outer.lerpZ, inner.lerpZ),
-    };
-}
-
 segLerp::lerp identityLerp() {
     return {};
 }

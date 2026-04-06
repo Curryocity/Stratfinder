@@ -109,11 +109,11 @@ class zSolver{
         int firstNondelayedIdx = -1;
     };
 
-    bool poss(JumpList& jumpList, const fullStrat& strat, int max_t, double threshold, bool backwallQ, double shift = normal);
+    bool poss(JumpList& jumpList, const fullStrat& strat, int max_t, double threshold, double shift = normal);
     static constexpr double blockage = 0;
     static constexpr double ladder = 0.30000001192092896f;
     static constexpr double normal = 0.6000000238418579f;
-    bool equalJumpListCheck(int t_mm, int maxt, fullStrat strat1, fullStrat strat2, std::vector<double> shifts = { 0.0, ladder, normal });
+    bool equalJumpListCheck(int maxt, fullStrat strat1, fullStrat strat2, std::vector<double> shifts = { 0.0, ladder, normal });
 
     template<typename movement>
     double inv(zEngine& e, double targetZ, movement&& sampler, bool airspeed = false){

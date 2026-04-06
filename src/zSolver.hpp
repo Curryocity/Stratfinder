@@ -1,5 +1,4 @@
 #pragma once
-#include <optional>
 #include <string>
 #include <vector>
 #include "util.hpp"
@@ -96,8 +95,21 @@ class zSolver{
     void printLog();
     void clearLog();
     void toggleLog(bool on);
+    const std::string& getLog() const;
 
-    bool poss(double mm, int t_mm, int maxt, double threshold, bool backwallQ, std::string& content, double shift = normal, std::optional<fullStrat> provideStrat = std::nullopt);
+    struct JumpEntry {
+        int airtime = 0;
+        double jumpDistance = 0.0;
+        double landingOffset = 0.0;
+    };
+
+    struct JumpList {
+        std::vector<JumpEntry> jumps;
+        int firstNondelayedTick = -1;
+        int firstNondelayedIdx = -1;
+    };
+
+    bool poss(JumpList& jumpList, const fullStrat& strat, int max_t, double threshold, bool backwallQ, double shift = normal);
     static constexpr double blockage = 0;
     static constexpr double ladder = 0.30000001192092896f;
     static constexpr double normal = 0.6000000238418579f;

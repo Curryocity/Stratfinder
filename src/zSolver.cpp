@@ -45,7 +45,7 @@ ZS::fullStrat ZS::maxMMSolver(int t){
 // Finds the optimal speed for delayed and nondelayed strat: Given mm, mm-airtime
 ZS::fullStrat ZS::optimalSolver(double mm, int t)
 {
-    writeLog("\nOptimal Solver ----------------------- \n");
+    writeLog("Optimal Solver ----------------------- \n");
     writeLog("Target mm: " + util::fmt(mm) + ", airtime: " + std::to_string(t) + "\n");
 
     writeLog("\n- Delayed section: \n");
@@ -869,7 +869,7 @@ ZS::strat ZS::backwallSolve(double mm, int t, int delayTick){
 }
 
 ZS::fullStrat ZS::backwallSolver(double mm, int t){
-    writeLog( "\nOptimal Backwalled Solver ----------------------- \n");
+    writeLog( "Optimal Backwalled Solver ----------------------- \n");
     writeLog( "Target mm: " + util::fmt(mm) + ", airtime: " + std::to_string(t) + "\n");
     writeLog( "\n- Delayed section: \n");
 
@@ -925,7 +925,7 @@ std::string ZS::strat2string(int stratType) {
         case ZS::SLINGSHOT:
             return "Slingshot";
         case ZS::TRUE_ROBO:
-            return "True_Robo";
+            return "True Robo";
         case ZS::ROBO:
             return "Robo";
         case ZS::BOOMERANG:
@@ -933,11 +933,11 @@ std::string ZS::strat2string(int stratType) {
         case ZS::PENDULUM:
             return "Pendulum";
         case ZS::ANGLED_JT:
-            return "Angled_JT";
+            return "Angled Sj";
         case ZS::PESSI:
             return "Pessi";
         case ZS::A7RUN:
-            return "A7Run";
+            return "Pessi + Run";
         case ZS::RUN:
             return "Run";
         default:
@@ -961,44 +961,39 @@ void ZS::toggleLog(bool on){
     logger.toggle(on);
 }
 
-bool ZS::poss(double mm, int t_mm, int max_t, double threshold, bool backwallQ, std::string& content, double shift, std::optional<fullStrat> provideStrat){
-    content = "";
+const std::string& ZS::getLog() const {
+    return logger.str();
+}
+
+bool ZS::poss(JumpList& jumpList, const fullStrat& strat, int max_t, double threshold, bool backwallQ, double shift){
+    jumpList.jumps.clear();
+    jumpList.firstNondelayedTick = -1;
+    jumpList.firstNondelayedIdx = -1;
+
     bool hasJump = false;
-    ZS::fullStrat strat;
-    if(!provideStrat){
-        strat = backwallQ ? backwallSolver(mm, t_mm) : optimalSolver(mm, t_mm);
-    }else{
-        strat = provideStrat.value();
-    }
-    
-    double dS = strat.delaySpeed;
-    double ndS = strat.nondelaySpeed;
-    zEngine dP(speed, slowness);
-    dP.setVz(dS);
-    dP.sj45(1);
-    zEngine ndP(speed, slowness);
-    ndP.setVzAir(ndS);
-    ndP.sj45(1);
-    content += "\n-------------------------------------------\n";
-    content += std::string("For") + (backwallQ ? " backwalled " : " ") + "mm = " + util::fmt(mm) + " (airtime = " + util::fmt(t_mm)
-    + "), t <= " + std::to_string(max_t) + ", threshold = " + util::fmt(threshold) + ", offset:" + util::fmt(shift) + "\n";
-    content += "- NonDelayedSpeed: " + util::df(ndS) + ", Type: " + strat2string(strat.nondelayStrat) + "\n";
-    content += "- DelayedSpeed(dt=" + std::to_string(strat.delayTick) + "): " + util::df(dS) + ", Type: " + strat2string(strat.delayStrat) + "\n";
+    zEngine dE(speed, slowness);
+    dE.setVz(strat.delaySpeed);
+    dE.sj45(1);
+    zEngine ndE(speed, slowness);
+    ndE.setVzAir(strat.nondelaySpeed);
+    ndE.sj45(1);
+
     bool delayedBetter = true;
     for(int i = 2; i <= max_t; i++){
-        dP.sa45(1);
-        ndP.sa45(1);
+        ndE.sa45(1);
         double zb;
         if(delayedBetter){
-            zb = dP.Z();
-            double temp = ndP.Z();
+            dE.sa45(1);
+            zb = dE.Z();
+            double temp = ndE.Z();
             if(temp > zb){
                 delayedBetter = false;
                 zb = temp;
-                content += "(Nondelayed is better than Delayed at t = " + std::to_string(i) + ")\n";
+                jumpList.firstNondelayedTick = i;
+                jumpList.firstNondelayedIdx = jumpList.jumps.size();
             } 
-        }else{
-            zb = ndP.Z();
+        }else{ // Once nondelayed is better, it will always be better in higher airtime
+            zb = ndE.Z();
         }
         zb += shift;
         double offset = std::fmod(zb, 0.0625);
@@ -1006,19 +1001,11 @@ bool ZS::poss(double mm, int t_mm, int max_t, double threshold, bool backwallQ, 
         if (offset < threshold && offset >= 0) {
             hasJump = true;
             double jumpDis = zb - offset;
-
-            content += "t = " + std::to_string(i) + ": "
-            + util::fmt(jumpDis) + " + " + util::fmt(offset) + " b\n";
-
+            jumpList.jumps.push_back({i, jumpDis, offset});
         }
     }
 
-    if(!hasJump){
-        content += "No possible jump found.\n";
-    }
-
     return hasJump;
-
 }
 
 

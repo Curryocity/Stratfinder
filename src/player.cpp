@@ -66,7 +66,7 @@ void player::move(float w, float a, bool airborne, int movementType, int repeat)
 
         // Small optimization to save a sqrt() when dist2 <= 1
         float dist2 = foward * foward + strafe * strafe;
-        if (dist2 > 1.0f) accelf /= std::sqrtf(dist2);
+        if (dist2 > 1.0f) accelf /= static_cast<float>(std::sqrt(dist2));
 
         foward *= accelf;
         strafe *= accelf;

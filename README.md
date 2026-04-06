@@ -136,7 +136,6 @@ Found Seqeunce: sa.w(1) s.w(7) st(1) stj(4) wa.s(8) wj.s(10) sta(2) st(1)
 t = 34(+11), Vz: -0.1276844736885106
 ```
 
-### TODOs:
-1. GUI
-2. 45bwmm finder (stratfind with limited turns on mm)
-3. Full distance jump finder
+### TODO?
+1. 45bwmm finder (stratfind with limited turns on mm)
+2. Full distance jump finder

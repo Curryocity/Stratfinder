@@ -265,6 +265,7 @@ void InputCrackerTab::renderInputPanel(const AppResources& resources) {
     ImGui::SeparatorText("Input Cracker");
 
     ImGui::Spacing();
+    ImGui::AlignTextToFramePadding();
     ImGui::Text("Speed Type:");
     ImGui::SameLine();
     if (ImGui::Button(endAirborne_ ? "Air" : "Ground")) {

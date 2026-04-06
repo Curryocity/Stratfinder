@@ -18,7 +18,7 @@ void player::move(float w, float a, bool airborne, int movementType, int repeat)
         if (prev_slip == -1)
             prev_slip = slip;
 
-        vx *=  0.91f * prev_slip;
+        vx *= 0.91f * prev_slip;
         vz *= 0.91f * prev_slip;
 
         if(inertia_on){

@@ -89,12 +89,12 @@ void segLerp::buildTransform() {
             segmentType type = Air;
             p.setVel(0, 0);
             p.setPrevSprint(false);
-            p.move(w, a, true, 0, 1);
+            p.move(w, a, true, 2 * sprintQ, 1);
             vx0 = p.Vx()/0.6; vz0 = p.Vz()/0.6;
 
             p.setVel(1, 1);
             p.setPrevSprint(false);
-            p.move(w, a, true, 0, 1);
+            p.move(w, a, true, 2 * sprintQ, 1);
             vx1 = p.Vx()/0.6; vz1 = p.Vz()/0.6;
 
             l.lerpX.alpha = vx1 - vx0;

@@ -56,8 +56,7 @@ endif
 
 ifeq ($(UNAME_S),Linux)
 CPPFLAGS += $(shell $(PKG_CONFIG) --cflags glfw3 2>/dev/null)
-LDLIBS += $(shell $(PKG_CONFIG) --libs glfw3 2>/dev/null) -lGL -ldl -lpthread
-LDLIBS := $(filter-out -lglfw,$(LDLIBS))
+LDLIBS := $(shell $(PKG_CONFIG) --libs glfw3 2>/dev/null) -lGL -ldl -lpthread
 RELEASE_LDFLAGS += -Wl,--gc-sections
 STRIP_CMD = strip --strip-unneeded $(BUILD_DIR)/$(TARGET)
 endif

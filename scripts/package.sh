@@ -11,6 +11,7 @@ arch="$2"
 binary_path="$3"
 version="${VERSION:-dev}"
 app_name="${APP_NAME:-Stratfinder}"
+archive_output="${PACKAGE_ARCHIVE:-1}"
 root_dir="$(cd "$(dirname "$0")/.." && pwd)"
 asset_dir="$root_dir/asset"
 dist_dir="$root_dir/dist"
@@ -234,11 +235,13 @@ PLIST
       codesign --force --deep --sign - "$bundle_dir" >/dev/null
     fi
 
-    (
-      cd "$dist_dir"
-      zip -qr "${app_name}-${version}-macos-${arch}.zip" "${app_name}-${version}-macos-${arch}"
-    )
-    echo "Created $dist_dir/${app_name}-${version}-macos-${arch}.zip"
+    if [ "$archive_output" != "0" ]; then
+      (
+        cd "$dist_dir"
+        zip -qr "${app_name}-${version}-macos-${arch}.zip" "${app_name}-${version}-macos-${arch}"
+      )
+      echo "Created $dist_dir/${app_name}-${version}-macos-${arch}.zip"
+    fi
     ;;
 
   linux)
@@ -271,8 +274,10 @@ Categories=Utility;
 DESKTOP
     chmod +x "$stage_dir/${app_name}.desktop"
 
-    tar -C "$dist_dir" -czf "$dist_dir/${app_name}-${version}-linux-${arch}.tar.gz" "${app_name}-${version}-linux-${arch}"
-    echo "Created $dist_dir/${app_name}-${version}-linux-${arch}.tar.gz"
+    if [ "$archive_output" != "0" ]; then
+      tar -C "$dist_dir" -czf "$dist_dir/${app_name}-${version}-linux-${arch}.tar.gz" "${app_name}-${version}-linux-${arch}"
+      echo "Created $dist_dir/${app_name}-${version}-linux-${arch}.tar.gz"
+    fi
     ;;
 
   windows)
@@ -285,11 +290,13 @@ DESKTOP
     cp -R "$asset_dir" "$stage_dir/"
     find "$stage_dir/asset" -name '.DS_Store' -delete
 
-    (
-      cd "$dist_dir"
-      zip -qr "${app_name}-${version}-windows-${arch}.zip" "${app_name}-${version}-windows-${arch}"
-    )
-    echo "Created $dist_dir/${app_name}-${version}-windows-${arch}.zip"
+    if [ "$archive_output" != "0" ]; then
+      (
+        cd "$dist_dir"
+        zip -qr "${app_name}-${version}-windows-${arch}.zip" "${app_name}-${version}-windows-${arch}"
+      )
+      echo "Created $dist_dir/${app_name}-${version}-windows-${arch}.zip"
+    fi
     ;;
 
   *)

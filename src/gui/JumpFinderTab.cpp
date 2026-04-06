@@ -1,4 +1,4 @@
-#include "JumpFindingTab.hpp"
+#include "JumpFinderTab.hpp"
 
 #include <chrono>
 #include <cmath>
@@ -34,7 +34,7 @@ std::string formatValue(double value) {
 
 } // namespace
 
-void JumpFindingTab::pump() {
+void JumpFinderTab::pump() {
     if (!searchRunning_ || !searchFuture_.valid()) return;
     if (searchFuture_.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) return;
 
@@ -79,7 +79,7 @@ void JumpFindingTab::pump() {
     cancelToken_.reset();
 }
 
-void JumpFindingTab::startSearch() {
+void JumpFinderTab::startSearch() {
     if (searchRunning_) return;
 
     matches_.clear();
@@ -350,7 +350,7 @@ void JumpFindingTab::startSearch() {
     });
 }
 
-void JumpFindingTab::renderInputPanel(const AppResources& resources) {
+void JumpFinderTab::renderInputPanel(const AppResources& resources) {
     const bool pushedUiFont = resources.uiFont != nullptr;
     if (pushedUiFont) ImGui::PushFont(resources.uiFont);
 
@@ -448,7 +448,7 @@ void JumpFindingTab::renderInputPanel(const AppResources& resources) {
     if (pushedUiFont) ImGui::PopFont();
 }
 
-void JumpFindingTab::renderOutputPanel(const AppResources& resources) {
+void JumpFinderTab::renderOutputPanel(const AppResources& resources) {
     const bool pushedUiFont = resources.uiFont != nullptr;
     const bool pushedCodeFont = resources.codeFont != nullptr;
     if (pushedUiFont) ImGui::PushFont(resources.uiFont);

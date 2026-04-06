@@ -12,7 +12,7 @@
 
 namespace gui {
 
-class JumpFindingTab {
+class JumpFinderTab {
 public:
     void pump();
     void renderInputPanel(const AppResources& resources);

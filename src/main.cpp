@@ -1,6 +1,6 @@
 #include "gui/GuiCommon.hpp"
 #include "gui/InputCrackerTab.hpp"
-#include "gui/JumpFindingTab.hpp"
+#include "gui/JumpFinderTab.hpp"
 #include "gui/ZSolverTab.hpp"
 #include "util.hpp"
 
@@ -265,7 +265,7 @@ int main() {
 
     gui::InputCrackerTab inputCrackerTab;
     gui::ZSolverTab zSolverTab;
-    gui::JumpFindingTab jumpFindingTab;
+    gui::JumpFinderTab jumpFinderTab;
 
     float leftWidth = 0.0f;
     bool leftWidthInitialized = false;
@@ -274,7 +274,7 @@ int main() {
         glfwPollEvents();
         inputCrackerTab.pump();
         zSolverTab.pump();
-        jumpFindingTab.pump();
+        jumpFinderTab.pump();
 
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
@@ -326,8 +326,8 @@ int main() {
                 renderPanels(zSolverTab);
                 ImGui::EndTabItem();
             }
-            if (ImGui::BeginTabItem("Jump Finding")) {
-                renderPanels(jumpFindingTab);
+            if (ImGui::BeginTabItem("jumpFinder")) {
+                renderPanels(jumpFinderTab);
                 ImGui::EndTabItem();
             }
             ImGui::EndTabBar();

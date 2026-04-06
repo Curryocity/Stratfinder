@@ -143,7 +143,7 @@ void ZSolverTab::solve() {
 
             const ZS::fullStrat strat = backwalled
                 ? solver.backwallSolver(mm, mmAirtime)
-                : solver.optimalSolver(mm, mmAirtime);
+                : solver.mmSolver(mm, mmAirtime);
             result.strat = strat;
             if (mode == Search) {
                 result.hasJump = solver.poss(result.jumpList, strat, maxTicks, threshold, backwalled, shift);

@@ -74,7 +74,7 @@ class zSolver{
 
     fullStrat maxMMSolver(int t);
 
-    fullStrat optimalSolver(double mm, int t);
+    fullStrat mmSolver(double mm, int t);
     strat optimalDelayed(double mm, int t, int delayTick = DELAYED);
 
     CoreCtx solverCore(zEngine& p, double mm, int t, int delayTick, double knownBwCap);

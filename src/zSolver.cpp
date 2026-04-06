@@ -43,9 +43,9 @@ ZS::fullStrat ZS::maxMMSolver(int t){
 }
 
 // Finds the optimal speed for delayed and nondelayed strat: Given mm, mm-airtime
-ZS::fullStrat ZS::optimalSolver(double mm, int t)
+ZS::fullStrat ZS::mmSolver(double mm, int t)
 {
-    writeLog("Optimal Solver ----------------------- \n");
+    writeLog("MM Solver ----------------------- \n");
     writeLog("Target mm: " + util::fmt(mm) + ", airtime: " + std::to_string(t) + "\n");
 
     writeLog("\n- Delayed section: \n");
@@ -412,7 +412,7 @@ ZS::Output4 ZS::boomerang(zEngine& p, double mm, int t, int delayTick, Output1& 
     if(p.Z() < 0){
         poss = false;
         boomSpeed = -INFINITY;
-        writeLog( "Even if reqBwSpeed is achievable, a full sj45(t) isn't enough to do a borderline boomerang\n");
+        writeLog( "Even if reqBwSpeed is achievable, chaining sj45(t) isn't enough to do borderline boomerang\n");
     }
 
     return Output4{reqBwSpeed, boomSpeed, poss};

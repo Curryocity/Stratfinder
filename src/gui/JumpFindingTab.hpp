@@ -37,6 +37,7 @@ private:
         std::string errorMsg;
         bool returnErrorQ = false;
         bool cancelled = false;
+        bool capReached = false;
         double elapsedMs = 0.0;
         long long processedCandidates = 0;
         long long totalCandidates = 0;
@@ -84,6 +85,7 @@ private:
     long long processedCandidates_ = 0;
     long long totalCandidates_ = 0;
     int matchesFound_ = 0;
+    int matchCap_ = 1024;
     std::chrono::steady_clock::time_point searchStartTime_{};
     std::shared_ptr<std::atomic_bool> cancelToken_;
     std::shared_ptr<ProgressState> progress_;

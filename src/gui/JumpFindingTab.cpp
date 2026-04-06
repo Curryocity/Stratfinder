@@ -49,6 +49,8 @@ void JumpFindingTab::pump() {
         matchesFound_ = result.matchesFound;
         if (result.cancelled) {
             statusMsg_ = "Halted";
+        } else if (result.capReached) {
+            statusMsg_ = "Match Cap Reached";
         } else {
             statusMsg_ = returnErrorQ_ ? "Search Failed" : "Finished";
         }
@@ -96,6 +98,7 @@ void JumpFindingTab::startSearch() {
     const int maxSpeed = maxSpeed_;
     const int minSlowness = minSlowness_;
     const int maxSlowness = maxSlowness_;
+    const int matchCap = matchCap_;
     const auto thresholdText = thresholdText_;
     const bool useBlockageShift = useBlockageShift_;
     const bool useLadderShift = useLadderShift_;
@@ -163,6 +166,10 @@ void JumpFindingTab::startSearch() {
         failParse("Slowness range must satisfy 0 <= min <= max <= 6");
         return;
     }
+    if (matchCap <= 0) {
+        failParse("Match cap must be positive");
+        return;
+    }
     if (threshold <= 0.0 || threshold > kPixel) {
         failParse("Threshold must satisfy 0 < threshold <= 0.0625");
         return;
@@ -224,10 +231,11 @@ void JumpFindingTab::startSearch() {
             }
 
             bool cancelled = false;
-            for (int speed = minSpeed; speed <= maxSpeed && !cancelled; ++speed) {
+            bool capReached = false;
+            for (int speed = minSpeed; speed <= maxSpeed && !cancelled && !capReached; ++speed) {
                 progress->currentSpeed.store(speed, std::memory_order_relaxed);
 
-                for (int slowness = minSlowness; slowness <= maxSlowness && !cancelled; ++slowness) {
+                for (int slowness = minSlowness; slowness <= maxSlowness && !cancelled && !capReached; ++slowness) {
                     progress->currentSlowness.store(slowness, std::memory_order_relaxed);
                     solver.setEffect(speed, slowness);
 
@@ -236,6 +244,7 @@ void JumpFindingTab::startSearch() {
                             cancelled = true;
                             break;
                         }
+                        if (capReached) break;
 
                         progress->currentMmAirtime.store(mmAirtime, std::memory_order_relaxed);
                         const bool useFastBreak = true;
@@ -246,6 +255,7 @@ void JumpFindingTab::startSearch() {
                                 cancelled = true;
                                 break;
                             }
+                            if (capReached) break;
 
                             progress->currentMmPixel.store(mmPixel, std::memory_order_relaxed);
                             const double mm = static_cast<double>(mmPixel) * kPixel;
@@ -273,6 +283,10 @@ void JumpFindingTab::startSearch() {
                                     static_cast<int>(result.matches.size()),
                                     std::memory_order_relaxed
                                 );
+                                if (static_cast<int>(result.matches.size()) >= matchCap) {
+                                    capReached = true;
+                                    break;
+                                }
                             }
 
                             progress->processedCandidates.fetch_add(1, std::memory_order_relaxed);
@@ -291,6 +305,7 @@ void JumpFindingTab::startSearch() {
                         }
 
                         if (cancelled) break;
+                        if (capReached) break;
 
                         if (useFastBreak && maxi.delayTick == -1) {
                             const long long skippedMmAirtimes =
@@ -311,6 +326,7 @@ void JumpFindingTab::startSearch() {
             result.cancelled = cancelToken->load(std::memory_order_relaxed);
             const long long elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
             progress->frozenElapsedMs.store(elapsedMs, std::memory_order_relaxed);
+            result.capReached = capReached;
             if (!result.cancelled) {
                 progress->phase.store(1, std::memory_order_relaxed);
             }
@@ -411,6 +427,7 @@ void JumpFindingTab::renderInputPanel(const AppResources& resources) {
     ImGui::Checkbox("Ladder (0.3)", &useLadderShift_);
     ImGui::Checkbox("Normal (0.6)", &useNormalShift_);
     ImGui::Checkbox("Water (normal - 0.001)", &useWaterShift_);
+    ImGui::TextDisabled("Match cap: %d", matchCap_);
 
     ImGui::Spacing();
     const ImVec4 searchButton = brighten(ImGui::GetStyle().Colors[ImGuiCol_Button], 1.08f);
@@ -509,11 +526,16 @@ void JumpFindingTab::renderOutputPanel(const AppResources& resources) {
         if (matches_.empty()) {
             if (statusMsg_ == "Halted") {
                 ImGui::TextDisabled("Run halted before any matches were collected.");
+            } else if (statusMsg_ == "Match Cap Reached") {
+                ImGui::TextDisabled("Run stopped after reaching the match cap.");
             } else {
                 ImGui::TextDisabled("Search finished with no matches.");
             }
         } else {
             ImGui::Text("Match(es): %zu", matches_.size());
+            if (statusMsg_ == "Match Cap Reached") {
+                ImGui::TextDisabled("Stopped after reaching the match cap of %d.", matchCap_);
+            }
             for (std::size_t i = 0; i < matches_.size(); ++i) {
                 const SearchMatch& match = matches_[i];
                 std::ostringstream title;

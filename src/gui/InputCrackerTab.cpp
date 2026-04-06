@@ -20,6 +20,7 @@ void InputCrackerTab::pump() {
     try {
         CrackResult result = crackFuture_.get();
         sols_ = std::move(result.sols);
+        crackVer_ = result.ver;
         errorMsg_ = std::move(result.errorMsg);
         returnErrorQ_ = result.returnErrorQ;
         elapsedMs_ = result.elapsedMs;
@@ -45,7 +46,7 @@ void InputCrackerTab::pump() {
     crackRunning_ = false;
 }
 
-void InputCrackerTab::crack() {
+void InputCrackerTab::crack(version ver) {
     if (crackRunning_) return;
 
     sols_.clear();
@@ -119,6 +120,7 @@ void InputCrackerTab::crack() {
     hasSearched_ = true;
     statusMsg_ = "Cracking...";
     elapsedMs_ = 0.0;
+    crackVer_ = ver;
     crackStartTime_ = std::chrono::steady_clock::now();
     cancelToken_ = std::make_shared<std::atomic_bool>(false);
     const auto cancelToken = cancelToken_;
@@ -131,8 +133,10 @@ void InputCrackerTab::crack() {
             cracker.setCancelFlag(cancelToken.get());
             cracker.changeSettings(maxDepth, maxTicks, maxTransTick, allowNonEmptyBridge, resultCap);
             cracker.riskyPrune(riskyLerp);
+            cracker.setVersion(ver);
             cracker.setEffect(speed, slowness);
             cracker.setRotation(rotation);
+            result.ver = ver;
 
             if (coordType == IC::Cartesian) {
                 IC::condition cond;
@@ -265,6 +269,8 @@ void InputCrackerTab::renderInputPanel(const AppResources& resources) {
     ImGui::SeparatorText("Input Cracker");
 
     ImGui::Spacing();
+    drawVersionInput("Version:", "##inputCrackerVersion", selectedVer_);
+
     ImGui::AlignTextToFramePadding();
     ImGui::Text("Speed Type:");
     ImGui::SameLine();
@@ -355,7 +361,7 @@ void InputCrackerTab::renderInputPanel(const AppResources& resources) {
         if (crackRunning_) {
             if (cancelToken_) cancelToken_->store(true, std::memory_order_relaxed);
         } else {
-            crack();
+            crack(selectedVer_);
         }
     }
     ImGui::PopStyleColor(3);
@@ -372,6 +378,7 @@ void InputCrackerTab::renderOutputPanel(const AppResources& resources) {
     if (pushedCodeFont) ImGui::PushFont(resources.codeFont);
 
     ImGui::Text("Status: %s", crackRunning_ ? "Cracking..." : statusMsg_.c_str());
+    ImGui::Text("Version: %s", verName(crackVer_));
 
     if (returnErrorQ_) {
         ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.45f, 1.0f), "%s", errorMsg_.c_str());

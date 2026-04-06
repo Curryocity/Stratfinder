@@ -47,6 +47,7 @@ void JumpFinderTab::pump() {
         processedCandidates_ = result.processedCandidates;
         totalCandidates_ = result.totalCandidates;
         matchesFound_ = result.matchesFound;
+        searchVer_ = result.ver;
         if (result.cancelled) {
             statusMsg_ = "Halted";
         } else if (result.capReached) {
@@ -79,7 +80,7 @@ void JumpFinderTab::pump() {
     cancelToken_.reset();
 }
 
-void JumpFinderTab::startSearch() {
+void JumpFinderTab::startSearch(version ver) {
     if (searchRunning_) return;
 
     matches_.clear();
@@ -203,6 +204,7 @@ void JumpFinderTab::startSearch() {
     hasSearched_ = true;
     statusMsg_ = "Searching...";
     elapsedMs_ = 0.0;
+    searchVer_ = ver;
     searchStartTime_ = std::chrono::steady_clock::now();
     cancelToken_ = std::make_shared<std::atomic_bool>(false);
     progress_ = std::make_shared<ProgressState>();
@@ -223,6 +225,8 @@ void JumpFinderTab::startSearch() {
             ZS solver;
             solver.clearLog();
             solver.toggleLog(false);
+            solver.setVersion(ver);
+            result.ver = ver;
 
             std::vector<double> comparisonShifts;
             comparisonShifts.reserve(selectedShifts.size());
@@ -276,6 +280,7 @@ void JumpFinderTab::startSearch() {
                                     mm,
                                     shift.first,
                                     shift.second,
+                                    ver,
                                     strat,
                                     std::move(jumpList)
                                 });
@@ -357,6 +362,8 @@ void JumpFinderTab::renderInputPanel(const AppResources& resources) {
     ImGui::SeparatorText("Jump Finding");
 
     ImGui::Spacing();
+    drawVersionInput("Version:", "##jumpFindingVersion", selectedVer_);
+
     ImGui::TextWrapped(
         "This tab searches MM+jump combinations across ranges of MM, airtime, speed, slowness, and shift presets."
     );
@@ -440,7 +447,7 @@ void JumpFinderTab::renderInputPanel(const AppResources& resources) {
         if (searchRunning_) {
             if (cancelToken_) cancelToken_->store(true, std::memory_order_relaxed);
         } else {
-            startSearch();
+            startSearch(selectedVer_);
         }
     }
     ImGui::PopStyleColor(3);
@@ -480,6 +487,7 @@ void JumpFinderTab::renderOutputPanel(const AppResources& resources) {
         ImGui::TextDisabled("No jump-finding run yet.");
     } else {
         ImGui::Text("Status: %s", searchRunning_ ? (finalizing ? "Finalizing..." : "Searching...") : statusMsg_.c_str());
+        ImGui::Text("Version: %s", verName(searchVer_));
         if (searchRunning_) {
             if (finalizing) {
                 ImGui::TextDisabled(
@@ -552,6 +560,7 @@ void JumpFinderTab::renderOutputPanel(const AppResources& resources) {
                     ImGui::Text("MM: %s", formatValue(match.mm).c_str());
                     ImGui::Text("MM Airtime: %d", match.mmAirtime);
                     ImGui::Text("Speed/Slowness: %d / %d", match.speed, match.slowness);
+                    ImGui::Text("Version: %s", verName(match.ver));
                     ImGui::Text("Shift: %s (%s)", match.shiftLabel.c_str(), formatValue(match.shiftValue).c_str());
 
                     ImGui::Spacing();

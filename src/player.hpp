@@ -1,5 +1,7 @@
 #pragma once
 
+#include "version.hpp"
+
 /*
  * ============================================================
  *  Movement grammar (compile-time API generation)
@@ -56,9 +58,8 @@ public:
     static constexpr int GROUND = 0, AIR = 1;
 
     static constexpr float GROUND_SLIP = 0.6f;
-    static constexpr double DEFAULT_INERTIA = 0.005;
 
-    player(int speed = 0, int slowness = 0);
+    player(int speed = 0, int slowness = 0, version ver = version::v1_8_9);
 
     //movement types
     static constexpr int NORMAL = 0;
@@ -93,6 +94,8 @@ public:
     void forceInertiaNext();
     void setPrevSprint(bool value);
     void sprintDelay(bool delayQ);
+    void setVersion(version ver);
+    version getVersion() const;
     void setEffect(int speed = 0, int slowness = 0);
 
     void resetAll();
@@ -110,7 +113,9 @@ private:
     bool prev_sprint = false;
 
     bool inertia_on = true; 
-    bool sprint_delay = true; 
+    bool sprint_delay = verSprintDelay(version::v1_8_9);
+    double inertia_threshold = verInertia(version::v1_8_9);
+    version ver = version::v1_8_9;
 
     int speed = 0;
     int slowness = 0;

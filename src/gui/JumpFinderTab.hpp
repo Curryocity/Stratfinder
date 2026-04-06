@@ -28,6 +28,7 @@ private:
         double mm = 0.0;
         std::string shiftLabel;
         double shiftValue = 0.0;
+        version ver = version::v1_8_9;
         ZS::fullStrat strat{};
         ZS::JumpList jumpList;
     };
@@ -42,6 +43,7 @@ private:
         long long processedCandidates = 0;
         long long totalCandidates = 0;
         int matchesFound = 0;
+        version ver = version::v1_8_9;
     };
 
     struct ProgressState {
@@ -86,12 +88,14 @@ private:
     long long totalCandidates_ = 0;
     int matchesFound_ = 0;
     int matchCap_ = 1024;
+    version selectedVer_ = version::v1_8_9;
+    version searchVer_ = version::v1_8_9;
     std::chrono::steady_clock::time_point searchStartTime_{};
     std::shared_ptr<std::atomic_bool> cancelToken_;
     std::shared_ptr<ProgressState> progress_;
     std::future<SearchResult> searchFuture_;
 
-    void startSearch();
+    void startSearch(version ver);
 };
 
 } // namespace gui

@@ -20,11 +20,12 @@ segLerp::sprDel identitySprDel() {
 
 }  // Namespace End
 
-void segLerp::setParameters(int airtime, int speed, int slowness, double rotation) {
+void segLerp::setParameters(int airtime, int speed, int slowness, double rotation, version ver) {
     this->airtime = airtime;
     this->speed = speed;
     this->slowness = slowness;
     this->rotation = rotation;
+    this->ver = ver;
 }
 
 void segLerp::enableAxis(bool x, bool z) {
@@ -71,7 +72,7 @@ void segLerp::buildTransform() {
     lerpTable.assign(entryCount, identityLerp());
     prefixTransform.assign(prefixEntryCount, identitySprDel());
 
-    player p(speed, slowness);
+    player p(speed, slowness, ver);
     p.setF(rotation);
     p.toggleInertia(false);
 

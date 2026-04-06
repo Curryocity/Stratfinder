@@ -25,6 +25,7 @@ void ZSolverTab::pump() {
         solverStrat_ = std::move(result.strat);
         jumpList_ = std::move(result.jumpList);
         standardJump_ = std::move(result.standardJump);
+        solverVer_ = result.ver;
         solverLogText_ = std::move(result.logText);
         solverErrorMsg_ = std::move(result.errorMsg);
         solverReturnErrorQ_ = result.returnErrorQ;
@@ -51,7 +52,7 @@ void ZSolverTab::pump() {
     solverRunning_ = false;
 }
 
-void ZSolverTab::solve() {
+void ZSolverTab::solve(version ver) {
     if (solverRunning_) return;
 
     solverStrat_ = {};
@@ -130,6 +131,7 @@ void ZSolverTab::solve() {
     solverHasRun_ = true;
     solverStatusMsg_ = "Solving...";
     solverElapsedMs_ = 0.0;
+    solverVer_ = ver;
     solverStartTime_ = std::chrono::steady_clock::now();
 
     solverFuture_ = std::async(std::launch::async, [=]() -> SolverResult {
@@ -140,6 +142,8 @@ void ZSolverTab::solve() {
             solver.clearLog();
             solver.toggleLog(true);
             solver.setEffect(speed, slowness);
+            solver.setVersion(ver);
+            result.ver = ver;
 
             const ZS::fullStrat strat = backwalled
                 ? solver.backwallSolver(mm, mmAirtime)
@@ -148,7 +152,7 @@ void ZSolverTab::solve() {
             if (mode == Search) {
                 result.hasJump = solver.poss(result.jumpList, strat, maxTicks, threshold, shift);
             } else {
-                result.standardJump = evalStandardJump(strat, jumpAirtime, shift, speed, slowness);
+                result.standardJump = evalStandardJump(strat, jumpAirtime, shift, speed, slowness, ver);
             }
 
             result.logText = solver.getLog();
@@ -174,6 +178,8 @@ void ZSolverTab::renderInputPanel(const AppResources& resources) {
     ImGui::SeparatorText("Momentum");
 
     ImGui::Spacing();
+    drawVersionInput("Version:", "##solverVersion", selectedVer_);
+
     drawLabeledTextInput("MM:", "##solverMm", 120.0f, mmText_);
     ImGui::SameLine();
     if (ImGui::Button(backwalled_ ? "Backwalled##solverWallMode" : "Normal##solverWallMode")) {
@@ -233,7 +239,7 @@ void ZSolverTab::renderInputPanel(const AppResources& resources) {
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, solveHovered);
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, solveActive);
     if (ImGui::Button(solverRunning_ ? "Solving..." : "Run zSolver", ImVec2(-1.0f, 0.0f)) && !solverRunning_) {
-        solve();
+        solve(selectedVer_);
     }
     ImGui::PopStyleColor(3);
 
@@ -242,6 +248,7 @@ void ZSolverTab::renderInputPanel(const AppResources& resources) {
 
 void ZSolverTab::drawStratSummary() const {
     const ZS::fullStrat& value = solverStrat_;
+    ImGui::Text("Version: %s", verName(solverVer_));
     ImGui::Text("Nondelayed");
     ImGui::Text("- Strat Type: %s", solverStratName(value.nondelayStrat).c_str());
     ImGui::Text("- Vz: %.15g", value.nondelaySpeed);
@@ -334,15 +341,22 @@ void ZSolverTab::renderOutputPanel(const AppResources& resources) {
     if (pushedUiFont) ImGui::PopFont();
 }
 
-ZSolverTab::StandardJumpResult ZSolverTab::evalStandardJump(const ZS::fullStrat& strat, int airtime, float shift, int speed, int slowness) {
+ZSolverTab::StandardJumpResult ZSolverTab::evalStandardJump(
+    const ZS::fullStrat& strat,
+    int airtime,
+    float shift,
+    int speed,
+    int slowness,
+    version ver
+) {
     StandardJumpResult result;
     result.airtime = airtime;
 
-    zEngine dE(speed, slowness);
+    zEngine dE(speed, slowness, ver);
     dE.setVz(strat.delaySpeed);
     dE.sj45(airtime);
 
-    zEngine ndE(speed, slowness);
+    zEngine ndE(speed, slowness, ver);
     ndE.setVzAir(strat.nondelaySpeed);
     ndE.sj45(airtime);
 

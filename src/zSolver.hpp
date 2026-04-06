@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <vector>
+#include "version.hpp"
 #include "util.hpp"
 #include "zEngine.hpp"
 
@@ -22,9 +23,6 @@ class zSolver{
     static constexpr int PESSI = 6;
     static constexpr int A7RUN = 7;
     static constexpr int RUN = 8;
-
-    static constexpr double groundInertia = 0.005/0.6/0.91;
-    static constexpr double airInertia = 0.005/0.91;
 
     struct strat{
         int stratType;
@@ -130,11 +128,17 @@ class zSolver{
 
     void setEffect(int speed, int slowness);
     void clearEffects();
+    void setVersion(version ver);
+    version getVersion() const;
 
     private:
 
+    double inertiaThreshold() const;
+    double groundInertia() const;
+    double airInertia() const;
     
     int speed = 0;
     int slowness = 0;
+    version ver = version::v1_8_9;
     Logger logger;
 };

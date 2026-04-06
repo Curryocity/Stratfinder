@@ -4,6 +4,7 @@
 #include <iosfwd>
 #include <vector>
 #include <string>
+#include "version.hpp"
 #include "segLerp.hpp"
 #include "util.hpp"
 #include "player.hpp"
@@ -139,6 +140,7 @@ class inputCracker {
 
     void setEffect(int speed = 0, int slowness = 0);
     void setRotation(double rot = 0);
+    void setVersion(version ver);
     void setCancelFlag(std::atomic_bool* cancelFlag);
 
     void changeSettings(int maxDepth, int maxTicks, int maxTransitionTime = -1, bool generalBridgeQ = false, int resultCap = 1024);
@@ -159,6 +161,7 @@ class inputCracker {
     float rotation = 0.0f;
     int speed = 0;
     int slowness = 0;
+    version ver = version::v1_8_9;
 
     // heuristics/pruning helper 
     segLerp lerpUpdater = segLerp();
@@ -182,8 +185,9 @@ class inputCracker {
 
     // constants to account movement approximation error using lerp
     const double floatErr = 1e-5;
-    const double inertiaErr = 0.005; // Tested value, may not be the best
-    double approxErr = inertiaErr;
+    double inertiaErr = verInertia(version::v1_8_9);
+    double approxErr = verInertia(version::v1_8_9);
+    bool riskyPruneEnabled = false;
     SearchStats searchStats;
     
 };

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "version.hpp"
 #include <vector>
 struct segLerp{
 
@@ -21,7 +22,7 @@ struct segLerp{
     };
 
 
-    void setParameters(int airtime, int speed, int slowness, double rotation);
+    void setParameters(int airtime, int speed, int slowness, double rotation, version ver);
     void enableAxis(bool x, bool z);
     
     int prefixIdx(int w, int a, segmentType type) const;
@@ -36,6 +37,7 @@ struct segLerp{
     int airtime = 12;
     int speed = 0, slowness = 0;
     double rotation = 0;
+    version ver = version::v1_8_9;
 
     bool enableX = true;
     bool enableZ = true;

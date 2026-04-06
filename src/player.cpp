@@ -3,7 +3,9 @@
 #include "util.hpp"
 
 
-player::player(int speed, int slowness) : speed(speed), slowness(slowness){}
+player::player(int speed, int slowness, version ver) : speed(speed), slowness(slowness){
+    setVersion(ver);
+}
 
 void player::move(float w, float a, bool airborne, int movementType, int repeat) {
     while (repeat--) {
@@ -22,8 +24,8 @@ void player::move(float w, float a, bool airborne, int movementType, int repeat)
         vz *= 0.91f * prev_slip;
 
         if(inertia_on){
-            if (std::abs(vx) < DEFAULT_INERTIA) vx = 0;
-            if (std::abs(vz) < DEFAULT_INERTIA) vz = 0;
+            if (std::abs(vx) < inertia_threshold) vx = 0;
+            if (std::abs(vz) < inertia_threshold) vz = 0;
         }
 
         /* base movement */
@@ -137,6 +139,16 @@ void player::setPrevSprint(bool value){
 
 void player::sprintDelay(bool delayQ){
     sprint_delay = delayQ;
+}
+
+void player::setVersion(version ver){
+    this->ver = ver;
+    sprint_delay = verSprintDelay(ver);
+    inertia_threshold = verInertia(ver);
+}
+
+version player::getVersion() const {
+    return ver;
 }
 
 void player::setEffect(int speed, int slowness){

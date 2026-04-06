@@ -6,7 +6,9 @@
 float zEngine::sin45 = 0.7071745709502395f;
 float zEngine::cos45 = 0.707038984923282f;
 
-zEngine::zEngine(int speed, int slowness) : speed(speed), slowness(slowness){}
+zEngine::zEngine(int speed, int slowness, version ver) : speed(speed), slowness(slowness){
+    setVersion(ver);
+}
 
 /*
  * Used for zSolver, sprinted 45 zAxis movement only
@@ -22,7 +24,7 @@ void zEngine::simMove(double moveVec, bool airborne, bool sprintJumpQ, int repea
 
         vz *= 0.91f * prev_slip;
 
-        if (std::abs(vz) < DEFAULT_INERTIA && vz != 0) {
+        if (std::abs(vz) < inertia_threshold && vz != 0) {
             last_inertia = clock;
             hit_vel_neg = (vz < 0);
             if(inertia_on) vz = 0;
@@ -144,6 +146,14 @@ void zEngine::forceInertiaNext(){
     forceInertia = true;
 }
 
+void zEngine::setVersion(version ver){
+    this->ver = ver;
+    inertia_threshold = verInertia(ver);
+}
+
+version zEngine::getVersion() const {
+    return ver;
+}
 
 void zEngine::setEffect(int speed, int slowness){
     this->speed = speed;

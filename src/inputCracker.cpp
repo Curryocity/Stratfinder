@@ -180,7 +180,7 @@ void IC::makeBannedList(const WASD& allowKeys, const bool careX, const bool care
 // heuristics
 void IC::initHeuristics(int airtime, double zDis, double xDis){
 
-    zEngine e(speed, slowness);
+    zEngine e(speed, slowness, ver);
     e.s45(1);
     double gTerm = e.Vz()/(1.0 - 0.6f * 0.91f);
     e.setVz(0);
@@ -316,7 +316,7 @@ std::vector<IC::Solution> IC::matchSpeed(const condition& cond, int airtime){
 
     std::vector<IC::Solution> result;
     initHeuristics(airtime, std::abs(searchCond.z.mm) + 0.6f, std::abs(searchCond.x.mm) + 0.6f);
-    lerpUpdater.setParameters(airtime, speed, slowness, rotation);
+    lerpUpdater.setParameters(airtime, speed, slowness, rotation, ver);
     lerpUpdater.enableAxis(searchCond.x.enabled, searchCond.z.enabled);
     lerpUpdater.buildTransform();
 
@@ -1034,6 +1034,13 @@ void IC::setEffect(int speed, int slowness){
     this->slowness = slowness;
 }
 
+void IC::setVersion(version ver){
+    this->ver = ver;
+    inertiaErr = verInertia(ver);
+    approxErr = riskyPruneEnabled ? floatErr : inertiaErr;
+    dummy.setVersion(ver);
+}
+
 void IC::changeSettings(int maxDepth, int maxTicks, int maxTransitionTime, bool generalBridgeQ, int resultCap){
     this->maxDepth = maxDepth;
     this->maxTicks = maxTicks;
@@ -1043,12 +1050,14 @@ void IC::changeSettings(int maxDepth, int maxTicks, int maxTransitionTime, bool 
 }
 
 void IC::riskyPrune(bool riskQ){
+    riskyPruneEnabled = riskQ;
     if(riskQ) approxErr = floatErr;
     else approxErr = inertiaErr;
 }
 
 void IC::syncDummy(){
     dummy.resetAll();
+    dummy.setVersion(ver);
     dummy.setEffect(speed, slowness);
     dummy.setF(rotation);
 }

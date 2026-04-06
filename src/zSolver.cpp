@@ -10,7 +10,7 @@
 using ZS = zSolver;
 
 ZS::fullStrat ZS::maxMMSolver(int t){
-    zEngine p(speed, slowness);
+    zEngine p(speed, slowness, ver);
     p.sj45(t);
     double v0 = p.Vz();
     p.setVzAir(1.0);
@@ -57,7 +57,7 @@ ZS::fullStrat ZS::mmSolver(double mm, int t)
     int dT = delayedStrat.stratType;
     double dS = delayedStrat.optimalSpeed;
 
-    zEngine p(speed, slowness);
+    zEngine p(speed, slowness, ver);
     p.s45(1);
     double sprint45Vz = p.Vz();
     double terminalSpeed = sprint45Vz/ (1.0 - 0.6f * 0.91f);
@@ -106,7 +106,7 @@ ZS::fullStrat ZS::mmSolver(double mm, int t)
 ZS::strat ZS::optimalDelayed(double mm, int t, int delayTick)
 {
     writeLog( "delayTick = " + std::to_string(delayTick) + "\n");
-    zEngine p(speed, slowness);
+    zEngine p(speed, slowness, ver);
     mm += 0.6f;
 
     ZS::CoreCtx c = solverCore(p, mm, t, delayTick, 0);
@@ -242,7 +242,7 @@ ZS::Output2 ZS::slingShot(zEngine& p, double mm, int t, int delayTick, Output1& 
     bool poss = false;
     writeLog( "Required BW speed: " + std::to_string(reqBwSpeed) + "\n");
 
-    if(-reqBwSpeed >= groundInertia){
+    if(-reqBwSpeed >= groundInertia()){
         p.resetAll();
         p.setVz(reqBwSpeed);
         p.chained_sj45(t, o1.jumps + 1);
@@ -251,7 +251,7 @@ ZS::Output2 ZS::slingShot(zEngine& p, double mm, int t, int delayTick, Output1& 
     }else{
         // If reqBwSpeed hits inertia, set bwSpeed to just hit inertia barely(has the effect to extend the mm by ~0.0091575), angled the first jump tick.
         writeLog( "This backward speed hits inertia! Fixing... \n");
-        double extendedmm = mm + groundInertia;
+        double extendedmm = mm + groundInertia();
 
         auto getSample = [&](double m, bool falseZtrueVz){
             p.resetAll();
@@ -472,7 +472,7 @@ double ZS::delayedPendulum(zEngine& p, double mm, int t, int jumps, int delayTic
         return p.Vz();
     };
 
-    double inertia = (inertiaTick == 1)? groundInertia : airInertia;
+    double inertia = (inertiaTick == 1) ? groundInertia() : airInertia();
 
     double v00 = ISamp(0,0);
     double v01 = ISamp(0,1);
@@ -588,7 +588,7 @@ double ZS::nondelayedPendulum(zEngine& p, double mm, int t, int jumps, double ma
         return falseZtrueVz? p.Vz() : p.Z();
     };
 
-    double inertia = (inertiaTick == 1)? groundInertia : airInertia;
+    double inertia = (inertiaTick == 1) ? groundInertia() : airInertia();
 
     double v0 = ISamp(0);
     double v1 = ISamp(1);
@@ -630,7 +630,7 @@ double ZS::nondelayedPendulum(zEngine& p, double mm, int t, int jumps, double ma
 
 ZS::strat ZS::backwallSolve(double mm, int t, int delayTick){
     if(delayTick > 0) writeLog( "delayTick = " + util::fmt(delayTick) + "\n");
-    zEngine p(speed, slowness);
+    zEngine p(speed, slowness, ver);
     double bestSpeed = 0;
     int stratType = -1;
 
@@ -736,7 +736,7 @@ ZS::strat ZS::backwallSolve(double mm, int t, int delayTick){
         auto samp = [&](double m, bool falseZtrueVz, bool inertiaQ = false){
             p.resetAll();
             if(inertiaQ){
-                p.setVz(groundInertia);
+                p.setVz(groundInertia());
                 p.sa45(m , 1);
             } else p.sj45(m, 1);
             p.sa45(inertiaQ ? t - 2 : t - 1);
@@ -765,7 +765,7 @@ ZS::strat ZS::backwallSolve(double mm, int t, int delayTick){
 
         auto samp = [&](double ma, bool falseZtrueVz, bool inertiaQ = false){
             p.resetAll();
-            if(inertiaQ) p.setVzAir(airInertia);
+            if(inertiaQ) p.setVzAir(airInertia());
             if(y > 0 || !inertiaQ){
                 p.sa45(ma, 1);
                 p.sa45(inertiaQ ? y - 1 : y);
@@ -819,7 +819,7 @@ ZS::strat ZS::backwallSolve(double mm, int t, int delayTick){
 
         auto samp = [&](double ma, bool falseZtrueVz, bool inertiaQ = false){
             p.resetAll();
-            if(inertiaQ) p.setVzAir(airInertia);
+            if(inertiaQ) p.setVzAir(airInertia());
             if(y > 0 || !inertiaQ){
                 p.sa45(ma, 1);
                 p.sa45(inertiaQ ? y - 1 : y);
@@ -848,7 +848,7 @@ ZS::strat ZS::backwallSolve(double mm, int t, int delayTick){
     {
         auto samp = [&](double m, bool falseZtrueVz, bool inertiaQ = false){
             p.resetAll();
-            if(inertiaQ) p.setVz(groundInertia);
+            if(inertiaQ) p.setVz(groundInertia());
             p.s45(m, 1);
             p.s45(inertiaQ ? x - 1 : x);
             p.chained_sj45(t, jumps);
@@ -877,7 +877,7 @@ ZS::fullStrat ZS::backwallSolver(double mm, int t){
     double dS = delayed.optimalSpeed;
     int dT = delayed.stratType;
 
-    zEngine p(speed, slowness);
+    zEngine p(speed, slowness, ver);
     p.s45(1);
     double sprint45Vz = p.Vz();
     double terminalSpeed = sprint45Vz/ 0.454;
@@ -967,10 +967,10 @@ bool ZS::poss(JumpList& jumpList, const fullStrat& strat, int max_t, double thre
     jumpList.firstNondelayedIdx = -1;
 
     bool hasJump = false;
-    zEngine dE(speed, slowness);
+    zEngine dE(speed, slowness, ver);
     dE.setVz(strat.delaySpeed);
     dE.sj45(1);
-    zEngine ndE(speed, slowness);
+    zEngine ndE(speed, slowness, ver);
     ndE.setVzAir(strat.nondelaySpeed);
     ndE.sj45(1);
 
@@ -1016,11 +1016,11 @@ bool ZS::equalJumpListCheck(int maxt, fullStrat strat1, fullStrat strat2, std::v
 
     auto initEngines = [&](const fullStrat& s, zEngine& dE, zEngine& ndE)
     {
-        dE = zEngine(speed, slowness);
+        dE = zEngine(speed, slowness, ver);
         dE.setVz(s.delaySpeed);
         dE.sj45(1);
 
-        ndE = zEngine(speed, slowness);
+        ndE = zEngine(speed, slowness, ver);
         ndE.setVzAir(s.nondelaySpeed);
         ndE.sj45(1);
     };
@@ -1071,4 +1071,24 @@ void ZS::setEffect(int speed, int slowness){
 void ZS::clearEffects(){
     speed = 0;
     slowness = 0;
+}
+
+void ZS::setVersion(version ver){
+    this->ver = ver;
+}
+
+version ZS::getVersion() const {
+    return ver;
+}
+
+double ZS::inertiaThreshold() const {
+    return verInertia(ver);
+}
+
+double ZS::groundInertia() const {
+    return inertiaThreshold() / 0.6 / 0.91;
+}
+
+double ZS::airInertia() const {
+    return inertiaThreshold() / 0.91;
 }

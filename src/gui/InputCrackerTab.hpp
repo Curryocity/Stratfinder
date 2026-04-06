@@ -23,6 +23,7 @@ private:
 
     struct CrackResult {
         std::vector<IC::Solution> sols;
+        version ver = version::v1_8_9;
         std::string errorMsg;
         bool returnErrorQ = false;
         bool cancelled = false;
@@ -89,11 +90,13 @@ private:
     bool hasSearched_ = false;
     std::string statusMsg_ = "Idle";
     double elapsedMs_ = 0.0;
+    version selectedVer_ = version::v1_8_9;
+    version crackVer_ = version::v1_8_9;
     std::chrono::steady_clock::time_point crackStartTime_{};
     std::shared_ptr<std::atomic_bool> cancelToken_;
     std::future<CrackResult> crackFuture_;
 
-    void crack();
+    void crack(version ver);
     void renderCartesianForm();
     void renderPolarForm();
     bool mothballMarked(const std::string& mothball) const;

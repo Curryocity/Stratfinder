@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <string>
 
+#include "../version.hpp"
 #include "../../third_party/imgui/imgui.h"
 #include "../../third_party/imgui/misc/cpp/imgui_stdlib.h"
 
@@ -106,6 +107,20 @@ inline void drawLabeledTextInput(const char* label, const char* id, float width,
     ImGui::SameLine();
     ImGui::SetNextItemWidth(width);
     ImGui::InputText(id, &text);
+}
+
+inline bool drawVersionInput(const char* label, const char* id, version& ver) {
+    static const char* kVersionItems[] = {"1.8.9", "Modern"};
+    ImGui::AlignTextToFramePadding();
+    ImGui::Text("%s", label);
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(170.0f);
+    int selected = verIdx(ver);
+    const bool changed = ImGui::Combo(id, &selected, kVersionItems, IM_ARRAYSIZE(kVersionItems));
+    if (changed) {
+        ver = verFromIdx(selected);
+    }
+    return changed;
 }
 
 inline void drawKeyToggle(const char* label, bool& enabled) {

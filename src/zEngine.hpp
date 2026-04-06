@@ -1,5 +1,7 @@
 #pragma once
 
+#include "version.hpp"
+
 class zEngine {
 public:
 
@@ -18,9 +20,8 @@ public:
     static constexpr int AIR = 1;
 
     static constexpr float GROUND_SLIP = 0.6f;
-    static constexpr double DEFAULT_INERTIA = 0.005;
 
-    zEngine(int speed = 0, int slowness = 0);
+    zEngine(int speed = 0, int slowness = 0, version ver = version::v1_8_9);
 
     void simMove(double moveVec, bool airborne, bool sprintJumpQ,  int repeat);
 
@@ -49,6 +50,8 @@ public:
     void toggleInertia(bool on);
     void forceInertiaNext();
     void sprintDelay(bool delayQ);
+    void setVersion(version ver);
+    version getVersion() const;
     void setEffect(int speed, int slowness);
     void clearEffects();
 
@@ -79,6 +82,8 @@ private:
 
     int speed = 0;
     int slowness = 0;
+    double inertia_threshold = verInertia(version::v1_8_9);
+    version ver = version::v1_8_9;
 
     State savestate;
 

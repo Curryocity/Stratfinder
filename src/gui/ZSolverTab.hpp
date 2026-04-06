@@ -33,6 +33,7 @@ private:
         ZS::fullStrat strat{};
         ZS::JumpList jumpList;
         StandardJumpResult standardJump;
+        version ver = version::v1_8_9;
         std::string logText;
         std::string errorMsg;
         bool returnErrorQ = false;
@@ -62,12 +63,21 @@ private:
     bool solverHasJump_ = false;
     std::string solverStatusMsg_ = "Idle";
     double solverElapsedMs_ = 0.0;
+    version selectedVer_ = version::v1_8_9;
+    version solverVer_ = version::v1_8_9;
     std::chrono::steady_clock::time_point solverStartTime_{};
     std::future<SolverResult> solverFuture_;
 
-    void solve();
+    void solve(version ver);
     void drawStratSummary() const;
-    static StandardJumpResult evalStandardJump(const ZS::fullStrat& strat, int airtime, float shift, int speed, int slowness);
+    static StandardJumpResult evalStandardJump(
+        const ZS::fullStrat& strat,
+        int airtime,
+        float shift,
+        int speed,
+        int slowness,
+        version ver
+    );
 };
 
 } // namespace gui

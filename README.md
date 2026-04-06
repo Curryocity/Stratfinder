@@ -1,5 +1,7 @@
 # HI
 
+![StratFinder icon](asset/icons/app.png)
+
 Here is a distance jump solver in Minecraft 1.8.9. (inspired by Cantnavet's [BMSolver](https://github.com/cantnavet/BmSolver))
 
 The program takes in mm(normal/backwalled) and mm airtime(constant).
@@ -10,7 +12,11 @@ The program takes in mm(normal/backwalled) and mm airtime(constant).
 
 The program could also reverse engineer inputs that matchs some velocity range (See the InputCracker at the below of this README).
 
-## Examples
+## App Preview?
+
+![InputCracker preview](readmeResource/inputCrackerPreview.png)
+
+## Examples (shown with code block because GUI screenshots are messy)
 
 ### 0.1875bm loop (beats Benja's "optimal loop")
 
@@ -19,7 +25,6 @@ Optimal Solver -----------------------
 Target mm: 0.1875, airtime: 12
 
 - Delayed section: 
-delayTick = 1
 BW speed lowerBound: -0.269265
 Required BW speed: -0.573786
 Inertia triggered at t = 2 during delayed pendulum simulation.

@@ -27,6 +27,15 @@
             "cwd": "${workspaceFolder}",
             "stopAtEntry": false,
             "preLaunchTask": "build-test"
+        },
+        {
+            "name": "Run Sandbox (LLDB)",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/sandbox",
+            "cwd": "${workspaceFolder}",
+            "stopAtEntry": false,
+            "preLaunchTask": "build-sandbox"
         }
     ]
 }

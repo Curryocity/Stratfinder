@@ -34,6 +34,24 @@
                 "mkdir -p build && clang++ -std=c++20 -O3 -g -Isrc src/test.cpp src/zEngine.cpp src/zSolver.cpp src/player.cpp src/inputCracker.cpp src/segLerp.cpp -o build/test -ffp-contract=off"
             ],
             "problemMatcher": ["$gcc"]
+        },
+        {
+            "label": "build-sandbox",
+            "type": "shell",
+            "command": "/bin/zsh",
+            "args": [
+                "-lc",
+                "mkdir -p build && clang++ -std=c++20 -O0 -g -Isrc src/sandbox.cpp src/zEngine.cpp src/zSolver.cpp src/player.cpp src/inputCracker.cpp src/segLerp.cpp -o build/sandbox -ffp-contract=off"
+            ],
+            "problemMatcher": ["$gcc"]
+        },
+        {
+            "label": "run-sandbox",
+            "type": "shell",
+            "command": "${workspaceFolder}/build/sandbox",
+            "dependsOn": "build-sandbox",
+            "dependsOrder": "sequence",
+            "problemMatcher": []
         }
     ]
 }

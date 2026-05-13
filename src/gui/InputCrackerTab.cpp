@@ -82,9 +82,9 @@ void InputCrackerTab::crack(version ver) {
         return;
     }
 
-    double normLb = 0.0, normUb = 0.0, angle1 = 0.0, angle2 = 0.0;
-    double xLb = 0.0, xUb = 0.0, xMm = 0.0;
-    double zLb = 0.0, zUb = 0.0, zMm = 0.0;
+    double normBound1 = 0.0, normBound2 = 0.0, angle1 = 0.0, angle2 = 0.0;
+    double xBound1 = 0.0, xBound2 = 0.0, xMm = 0.0;
+    double zBound1 = 0.0, zBound2 = 0.0, zMm = 0.0;
 
     if (coordType == IC::Cartesian) {
         if (!cart.enableX && !cart.enableZ) {
@@ -93,19 +93,19 @@ void InputCrackerTab::crack(version ver) {
         }
 
         if (cart.enableX) {
-            if (!parseDoubleStrict(cart.xLbText, xLb)) { failParse("Invalid number for Vx Lowerbound"); return; }
-            if (!parseDoubleStrict(cart.xUbText, xUb)) { failParse("Invalid number for Vx Upperbound"); return; }
+            if (!parseDoubleStrict(cart.xBound1Text, xBound1)) { failParse("Invalid number for Vx Bound 1"); return; }
+            if (!parseDoubleStrict(cart.xBound2Text, xBound2)) { failParse("Invalid number for Vx Bound 2"); return; }
             if (!parseDoubleStrict(cart.xMmText, xMm)) { failParse("Invalid number for X MM"); return; }
         }
 
         if (cart.enableZ) {
-            if (!parseDoubleStrict(cart.zLbText, zLb)) { failParse("Invalid number for Vz Lowerbound"); return; }
-            if (!parseDoubleStrict(cart.zUbText, zUb)) { failParse("Invalid number for Vz Upperbound"); return; }
+            if (!parseDoubleStrict(cart.zBound1Text, zBound1)) { failParse("Invalid number for Vz Bound 1"); return; }
+            if (!parseDoubleStrict(cart.zBound2Text, zBound2)) { failParse("Invalid number for Vz Bound 2"); return; }
             if (!parseDoubleStrict(cart.zMmText, zMm)) { failParse("Invalid number for Z MM"); return; }
         }
     } else {
-        if (!parseDoubleStrict(polar.normLbText, normLb)) { failParse("Invalid number for Norm Lowerbound"); return; }
-        if (!parseDoubleStrict(polar.normUbText, normUb)) { failParse("Invalid number for Norm Upperbound"); return; }
+        if (!parseDoubleStrict(polar.normBound1Text, normBound1)) { failParse("Invalid number for Norm Bound 1"); return; }
+        if (!parseDoubleStrict(polar.normBound2Text, normBound2)) { failParse("Invalid number for Norm Bound 2"); return; }
         if (!parseDoubleStrict(polar.angle1Text, angle1)) { failParse("Invalid number for Angle 1"); return; }
         if (!parseDoubleStrict(polar.angle2Text, angle2)) { failParse("Invalid number for Angle 2"); return; }
         if (!parseDoubleStrict(polar.xMmText, xMm)) { failParse("Invalid number for X MM"); return; }
@@ -149,14 +149,12 @@ void InputCrackerTab::crack(version ver) {
                 cond.z.walled = cart.zWalled;
 
                 if (cart.enableX) {
-                    cond.x.lb = xLb;
-                    cond.x.ub = xUb;
+                    IC::setCondWithBound(cond.x, xBound1, xBound2);
                     cond.x.mm = xMm;
                 }
 
                 if (cart.enableZ) {
-                    cond.z.lb = zLb;
-                    cond.z.ub = zUb;
+                    IC::setCondWithBound(cond.z, zBound1, zBound2);
                     cond.z.mm = zMm;
                 }
 
@@ -164,8 +162,8 @@ void InputCrackerTab::crack(version ver) {
             } else {
                 IC::polorCond cond;
                 cond.allowKeys = allowKeys;
-                cond.normLb = normLb;
-                cond.normUb = normUb;
+                cond.normBound1 = normBound1;
+                cond.normBound2 = normBound2;
                 cond.angle1 = angle1;
                 cond.angle2 = angle2;
                 cond.endAirborne = endAirborne;
@@ -219,8 +217,8 @@ void InputCrackerTab::renderCartesianForm() {
 
     if (cart_.enableX) {
         ImGui::SeparatorText("X Conditions");
-        drawLabeledTextInput("Vel Lowerbound:", "##xLower", 180.0f, cart_.xLbText);
-        drawLabeledTextInput("Vel Upperbound:", "##xUpper", 180.0f, cart_.xUbText);
+        drawLabeledTextInput("Vel Bound 1:", "##xBound1", 180.0f, cart_.xBound1Text);
+        drawLabeledTextInput("Vel Bound 2:", "##xBound2", 180.0f, cart_.xBound2Text);
         drawLabeledTextInput("MM:", "##xMm", 80.0f, cart_.xMmText);
         ImGui::SameLine();
         if (ImGui::Button(cart_.xWalled ? "Walled##x" : "Normal##x")) {
@@ -230,8 +228,8 @@ void InputCrackerTab::renderCartesianForm() {
 
     if (cart_.enableZ) {
         ImGui::SeparatorText("Z Conditions");
-        drawLabeledTextInput("Vel Lowerbound:", "##zLower", 180.0f, cart_.zLbText);
-        drawLabeledTextInput("Vel Upperbound:", "##zUpper", 180.0f, cart_.zUbText);
+        drawLabeledTextInput("Vel Bound 1:", "##zBound1", 180.0f, cart_.zBound1Text);
+        drawLabeledTextInput("Vel Bound 2:", "##zBound2", 180.0f, cart_.zBound2Text);
         drawLabeledTextInput("MM:", "##zMm", 80.0f, cart_.zMmText);
         ImGui::SameLine();
         if (ImGui::Button(cart_.zWalled ? "Walled##z" : "Normal##z")) {
@@ -243,8 +241,8 @@ void InputCrackerTab::renderCartesianForm() {
 void InputCrackerTab::renderPolarForm() {
     ImGui::Spacing();
     ImGui::SeparatorText("Polar Conditions");
-    drawLabeledTextInput("Norm Lowerbound:", "##normLower", 180.0f, polar_.normLbText);
-    drawLabeledTextInput("Norm Upperbound:", "##normUpper", 180.0f, polar_.normUbText);
+    drawLabeledTextInput("Norm Bound 1:", "##normBound1", 180.0f, polar_.normBound1Text);
+    drawLabeledTextInput("Norm Bound 2:", "##normBound2", 180.0f, polar_.normBound2Text);
     drawLabeledTextInput("Angle 1:", "##angle1", 180.0f, polar_.angle1Text);
     drawLabeledTextInput("Angle 2:", "##angle2", 180.0f, polar_.angle2Text);
 

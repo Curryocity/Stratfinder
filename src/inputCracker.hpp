@@ -39,8 +39,8 @@ class inputCracker {
 
     struct polorCond{
         WASD allowKeys = {1, 1, 1, 1};
-        double normLb;
-        double normUb;
+        double normBound1;
+        double normBound2;
         double angle1;
         double angle2;
         bool endAirborne = false;

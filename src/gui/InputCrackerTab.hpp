@@ -35,17 +35,17 @@ private:
         bool enableZ = true;
         bool xWalled = false;
         bool zWalled = false;
-        std::string xLbText = "-0.5";
-        std::string xUbText = "0.5";
+        std::string xBound1Text = "-0.5";
+        std::string xBound2Text = "0.5";
         std::string xMmText = "1";
-        std::string zLbText = "-0.2000001";
-        std::string zUbText = "-0.2";
+        std::string zBound1Text = "-0.2";
+        std::string zBound2Text = "-0.2000001";
         std::string zMmText = "-1";
     };
 
     struct PolarFormState {
-        std::string normLbText = "0.25";
-        std::string normUbText = "0.251";
+        std::string normBound1Text = "0.2";
+        std::string normBound2Text = "0.2001";
         std::string angle1Text = "-100";
         std::string angle2Text = "-101";
         std::string xMmText = "1";

@@ -357,8 +357,8 @@ std::vector<IC::Solution> IC::matchSpeed(const polorCond& cond, int airtime){
     rectCond.x.walled = cond.xWalled;
     rectCond.z.walled = cond.zWalled;
 
-    const double normLb = std::max(0.0, cond.normLb);
-    const double normUb = std::max(normLb, cond.normUb);
+    const double normLb = std::max(0.0, std::min(cond.normBound1, cond.normBound2));
+    const double normUb = std::max(0.0, std::max(cond.normBound1, cond.normBound2));
 
     double xLb = std::numeric_limits<double>::infinity();
     double xUb = -std::numeric_limits<double>::infinity();

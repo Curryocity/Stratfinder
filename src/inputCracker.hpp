@@ -1,6 +1,7 @@
 #pragma once
 #include <atomic>
 #include <cstdint>
+#include <limits>
 #include <vector>
 #include <string>
 #include "version.hpp"

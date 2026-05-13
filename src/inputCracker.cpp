@@ -6,7 +6,6 @@
 #include <array>
 #include <cmath>
 #include <cstdlib>
-#include <ostream>
 #include <limits>
 #include <stdexcept>
 #include <string>
@@ -928,77 +927,42 @@ double IC::terminalVzToSeq(int w, int a, sequence& seq, bool endedAirborne){
 std::string IC::seq2Mothball(const sequence& seq) const {
     std::string desc;
 
-    int airClock = (seq.airDebt == 0)? 0 : seq.airtime - seq.airDebt;
-
-
-    int streak = 0;
-
-    int prevW = 0;
-    int prevA = 0;
-    int prevGAJ = 0; // 0 ground, 1 air, 2 jump
-
     int n = seq.inputs.size();
-
-    bool streakFromJump = seq.inputs[n - 1].type == segLerp::Jump;
-
-    auto flush = [&]() {
-        if (streak <= 0) return;
-
-        const bool sprintQ = (prevW == 1);
-        const std::string modifier = sprintQ ? "s" : "w";
-        const bool nothingQ = (prevW == 0 && prevA == 0);
-
-        std::string gajStr;
-        if (prevGAJ == 2 || (prevGAJ == 1 && streakFromJump)) gajStr = "j";
-        else if (prevGAJ == 1) gajStr = "a";
-
-        if (nothingQ) {
-            if (!desc.empty())
-                desc += "st" + gajStr + "(" + std::to_string(streak) + ") ";
-        } else {
-            std::string Wstr = (prevW == 1) ? "w" : "s";
-            std::string Astr = (prevA == 1) ? "a" : "d";
-            if (prevW == 0) Wstr.clear();
-            if (prevA == 0) Astr.clear();
-
-            desc += modifier + gajStr + "." + Wstr + Astr + "(" + std::to_string(streak) + ") ";
-        }
-    };
 
     for (int i = n - 1; i >= 0; i--) {
         const input in = seq.inputs[i];
-        for (int t = 0; t < in.t; t++) {
-            bool jumpQ = false;
-            if(t == 0 && in.type == segLerp::Jump){
-                jumpQ = true;
-            }
 
-            int gaj = (airClock > 0) ? 1 : 0;
-            if (jumpQ) gaj = 2;
+        const bool sprintQ = (in.w == 1);
+        const std::string modifier = sprintQ ? "s" : "w";
+        const bool nothingQ = (in.w == 0 && in.a == 0);
 
-            const bool boundary =
-                (streak > 0) &&
-                (in.w != prevW || in.a != prevA ||
-                 (gaj != prevGAJ && !(prevGAJ == 2 && gaj == 1)));
-
-            if (boundary) {
-                flush();
-                streak = 0;
-                streakFromJump = jumpQ; // first tick of new streak
-            }
-
-            if (jumpQ) airClock = seq.airtime;
-
-            streak++;
-            prevW = in.w;
-            prevA = in.a;
-            prevGAJ = gaj;
-
-            if (airClock > 0) airClock--;
+        std::string gajStr;
+        switch (in.type){
+            case segLerp::Jump:
+                gajStr = "j";
+                break;
+            case segLerp::Air:
+                gajStr = "a";
+                break;
+            default:
+                gajStr = "";
+                break;
         }
+
+        if (nothingQ) {
+            if (!desc.empty())
+                desc += "st" + gajStr + "(" + std::to_string(in.t) + ") ";
+        } else {
+            std::string Wstr = (in.w == 1) ? "w" : "s";
+            std::string Astr = (in.a == 1) ? "a" : "d";
+            if (in.w == 0) Wstr.clear();
+            if (in.a == 0) Astr.clear();
+
+            desc += modifier + gajStr + "." + Wstr + Astr + "(" + std::to_string(in.t) + ") ";
+        }
+
     }
 
-    flush();
     return trimWhitespace(std::move(desc));
 }
 

@@ -1,12 +1,10 @@
 #pragma once
 #include <atomic>
 #include <cstdint>
-#include <iosfwd>
 #include <vector>
 #include <string>
 #include "version.hpp"
 #include "segLerp.hpp"
-#include "util.hpp"
 #include "player.hpp"
 
 class inputCracker {

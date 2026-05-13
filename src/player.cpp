@@ -40,8 +40,10 @@ void player::move(float w, float a, bool airborne, int movementType, int repeat)
         }
 
         bool sprinting = movementType >= player::SPRINT;
-        if( (sprinting && (!airborne || !sprint_delay) ) || (prev_sprint && sprint_delay && airborne) )
-            accel *= 1.300000011920929;  // sprinting multiplier
+        if(!airborne && sprinting)
+            accel *= 1.300000011920929;
+        else if(airborne && ( (sprinting && !sprint_delay)  || (prev_sprint && sprint_delay) ))
+            accel += accel * 0.3;
 
         float accelf = (float) accel;
 

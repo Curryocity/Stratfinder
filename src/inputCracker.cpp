@@ -930,12 +930,16 @@ std::string IC::seq2Mothball(const sequence& seq) const {
 
     int airClock = (seq.airDebt == 0)? 0 : seq.airtime - seq.airDebt;
 
-    bool streakFromJump = false;
+
     int streak = 0;
 
     int prevW = 0;
     int prevA = 0;
     int prevGAJ = 0; // 0 ground, 1 air, 2 jump
+
+    int n = seq.inputs.size();
+
+    bool streakFromJump = seq.inputs[n - 1].type == segLerp::Jump;
 
     auto flush = [&]() {
         if (streak <= 0) return;
@@ -961,7 +965,6 @@ std::string IC::seq2Mothball(const sequence& seq) const {
         }
     };
 
-    int n = seq.inputs.size();
     for (int i = n - 1; i >= 0; i--) {
         const input in = seq.inputs[i];
         for (int t = 0; t < in.t; t++) {

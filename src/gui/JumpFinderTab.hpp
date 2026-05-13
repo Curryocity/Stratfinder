@@ -91,6 +91,7 @@ private:
     long long totalCandidates_ = 0;
     int matchesFound_ = 0;
     int matchCap_ = 1024;
+    int displayPrecision_ = 16;
     version selectedVer_ = version::v1_8_9;
     version searchVer_ = version::v1_8_9;
     int searchF45Type_ = zEngine::F4501;

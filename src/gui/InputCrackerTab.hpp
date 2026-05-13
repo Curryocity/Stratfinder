@@ -35,19 +35,19 @@ private:
         bool enableZ = true;
         bool xWalled = false;
         bool zWalled = false;
-        std::string xLbText = "-0.1";
-        std::string xUbText = "0.1";
-        std::string xMmText = "0";
-        std::string zLbText = "-0.1276846279184921";
-        std::string zUbText = "-0.1276844242999637";
-        std::string zMmText = "-1.5";
+        std::string xLbText = "-0.5";
+        std::string xUbText = "0.5";
+        std::string xMmText = "1";
+        std::string zLbText = "-0.2000001";
+        std::string zUbText = "-0.2";
+        std::string zMmText = "-1";
     };
 
     struct PolarFormState {
-        std::string normLbText = "0.236";
-        std::string normUbText = "0.238";
-        std::string angle1Text = "-103.5";
-        std::string angle2Text = "-104.5";
+        std::string normLbText = "0.25";
+        std::string normUbText = "0.251";
+        std::string angle1Text = "-100";
+        std::string angle2Text = "-101";
         std::string xMmText = "1";
         std::string zMmText = "-1";
         bool xWalled = false;
@@ -70,7 +70,7 @@ private:
 
     std::string rotationText_ = "0.0";
     int speed_ = 0;
-    int slowness_ = 1;
+    int slowness_ = 0;
 
     int maxDepth_ = 3;
     int maxTicks_ = 40;
@@ -82,6 +82,7 @@ private:
     std::vector<IC::Solution> sols_;
     std::vector<std::string> markedMothballs_;
     int resultSort_ = SortByDepth;
+    int displayPrecision_ = 16;
     bool showMarkedOnly_ = false;
     std::string suffixFilter_;
     std::string errorMsg_;

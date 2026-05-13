@@ -79,6 +79,21 @@ inline bool parseFloatStrict(const std::string& text, float& out) {
     return std::isfinite(out);
 }
 
+inline int clampDisplayPrecision(int precision) {
+    return std::clamp(precision, 6, 16);
+}
+
+inline void drawDisplayPrecisionInput(const char* id, int& precision) {
+    ImGui::AlignTextToFramePadding();
+    ImGui::Text("Display Precision:");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(60.0f);
+    if (ImGui::InputInt(id, &precision, 0, 0)) {
+        precision = clampDisplayPrecision(precision);
+    }
+    precision = clampDisplayPrecision(precision);
+}
+
 inline double normalizeDeg(double angle) {
     double out = std::fmod(angle, 360.0);
     if (out < 0.0) out += 360.0;

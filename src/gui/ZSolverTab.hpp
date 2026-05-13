@@ -65,6 +65,7 @@ private:
     bool solverHasJump_ = false;
     std::string solverStatusMsg_ = "Idle";
     double solverElapsedMs_ = 0.0;
+    int displayPrecision_ = 16;
     int solverF45Type_ = zEngine::F4501;
     version selectedVer_ = version::v1_8_9;
     version solverVer_ = version::v1_8_9;

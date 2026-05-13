@@ -26,9 +26,9 @@ long long floorPixelIndex(double mm) {
     return static_cast<long long>(std::floor(mm / kPixel + 1e-12));
 }
 
-std::string formatValue(double value) {
+std::string formatValue(double value, int precision) {
     std::ostringstream out;
-    out << std::setprecision(15) << value;
+    out << std::setprecision(clampDisplayPrecision(precision)) << value;
     return out.str();
 }
 
@@ -473,7 +473,10 @@ void JumpFinderTab::renderOutputPanel(const AppResources& resources) {
     if (pushedUiFont) ImGui::PushFont(resources.uiFont);
 
     ImGui::SeparatorText("Result");
+    drawDisplayPrecisionInput("##jumpFindingDisplayPrecision", displayPrecision_);
+    ImGui::Spacing();
     if (pushedCodeFont) ImGui::PushFont(resources.codeFont);
+    const int displayPrecision = clampDisplayPrecision(displayPrecision_);
 
     ImGui::BeginChild("JumpFindingResultList", ImVec2(0.0f, 0.0f), false);
 
@@ -535,7 +538,7 @@ void JumpFinderTab::renderOutputPanel(const AppResources& resources) {
                 currentSpeed,
                 currentSlowness,
                 currentMmAirtime,
-                formatValue(static_cast<double>(currentMmPixel) * kPixel).c_str()
+                formatValue(static_cast<double>(currentMmPixel) * kPixel, displayPrecision).c_str()
             );
         } else if (finalizing) {
             ImGui::TextDisabled("Collecting final results...");
@@ -563,7 +566,7 @@ void JumpFinderTab::renderOutputPanel(const AppResources& resources) {
                 title << "Sp-" << match.speed
                       << " Sl-" << match.slowness
                       << " | MM t=" << match.mmAirtime
-                      << " | MM=" << formatValue(match.mm)
+                      << " | MM=" << formatValue(match.mm, displayPrecision)
                       << " | " << f45TypeName(match.f45Type)
                       << " | " << match.shiftLabel
                       << " | " << match.jumpList.jumps.size() << " jump";
@@ -571,19 +574,19 @@ void JumpFinderTab::renderOutputPanel(const AppResources& resources) {
                 ImGui::Spacing();
                 ImGui::PushID(static_cast<int>(i));
                 if (ImGui::CollapsingHeader(title.str().c_str())) {
-                    ImGui::Text("MM: %s", formatValue(match.mm).c_str());
+                    ImGui::Text("MM: %s", formatValue(match.mm, displayPrecision).c_str());
                     ImGui::Text("MM Airtime: %d", match.mmAirtime);
                     ImGui::Text("Speed/Slowness: %d / %d", match.speed, match.slowness);
                     ImGui::Text("Version: %s", verName(match.ver));
-                    ImGui::Text("Shift: %s (%s)", match.shiftLabel.c_str(), formatValue(match.shiftValue).c_str());
+                    ImGui::Text("Shift: %s (%s)", match.shiftLabel.c_str(), formatValue(match.shiftValue, displayPrecision).c_str());
 
                     ImGui::Spacing();
                     ImGui::Text("Nondelayed");
                     ImGui::Text("- Strat Type: %s", solverStratName(match.strat.nondelayStrat).c_str());
-                    ImGui::Text("- Vz: %s", formatValue(match.strat.nondelaySpeed).c_str());
+                    ImGui::Text("- Vz: %s", formatValue(match.strat.nondelaySpeed, displayPrecision).c_str());
                     ImGui::Text("Delayed (%dt)", match.strat.delayTick);
                     ImGui::Text("- Strat Type: %s", solverStratName(match.strat.delayStrat).c_str());
-                    ImGui::Text("- Vz: %s", formatValue(match.strat.delaySpeed).c_str());
+                    ImGui::Text("- Vz: %s", formatValue(match.strat.delaySpeed, displayPrecision).c_str());
 
                     ImGui::Spacing();
                     ImGui::Text("Jump List");
@@ -599,8 +602,8 @@ void JumpFinderTab::renderOutputPanel(const AppResources& resources) {
                         ImGui::Text(
                             "t = %d: %s + %s b",
                             jump.airtime,
-                            formatValue(jump.jumpDistance).c_str(),
-                            formatValue(jump.landingOffset).c_str()
+                            formatValue(jump.jumpDistance, displayPrecision).c_str(),
+                            formatValue(jump.landingOffset, displayPrecision).c_str()
                         );
                     }
                 }

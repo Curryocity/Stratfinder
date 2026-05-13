@@ -263,10 +263,10 @@ void ZSolverTab::drawStratSummary() const {
     ImGui::Text("45 Type: %s", f45TypeName(solverF45Type_));
     ImGui::Text("Nondelayed");
     ImGui::Text("- Strat Type: %s", solverStratName(value.nondelayStrat).c_str());
-    ImGui::Text("- Vz: %.15g", value.nondelaySpeed);
+    ImGui::Text("- Vz: %.*g", clampDisplayPrecision(displayPrecision_), value.nondelaySpeed);
     ImGui::Text("Delayed (%dt)", value.delayTick);
     ImGui::Text("- Strat Type: %s", solverStratName(value.delayStrat).c_str());
-    ImGui::Text("- Vz: %.15g", value.delaySpeed);
+    ImGui::Text("- Vz: %.*g", clampDisplayPrecision(displayPrecision_), value.delaySpeed);
 }
 
 void ZSolverTab::renderOutputPanel(const AppResources& resources) {
@@ -275,7 +275,10 @@ void ZSolverTab::renderOutputPanel(const AppResources& resources) {
     if (pushedUiFont) ImGui::PushFont(resources.uiFont);
 
     ImGui::SeparatorText("Result");
+    drawDisplayPrecisionInput("##zSolverDisplayPrecision", displayPrecision_);
+    ImGui::Spacing();
     if (pushedCodeFont) ImGui::PushFont(resources.codeFont);
+    const int displayPrecision = clampDisplayPrecision(displayPrecision_);
 
     ImGui::BeginChild("ZSolverResultList", ImVec2(0.0f, 0.0f), false);
     if (solverReturnErrorQ_) {
@@ -312,9 +315,11 @@ void ZSolverTab::renderOutputPanel(const AppResources& resources) {
                     ImGui::TextDisabled("Nondelayed becomes better at t = %d", jumpList_.firstNondelayedTick);
                 }
                 ImGui::Text(
-                    "t = %d: %.15g + %.15g b",
+                    "t = %d: %.*g + %.*g b",
                     jump.airtime,
+                    displayPrecision,
                     jump.jumpDistance,
+                    displayPrecision,
                     jump.landingOffset
                 );
             }
@@ -330,9 +335,11 @@ void ZSolverTab::renderOutputPanel(const AppResources& resources) {
             );
 
             ImGui::Text(
-                "t = %d: %.15g + %.15g b",
+                "t = %d: %.*g + %.*g b",
                 standardJump_.airtime,
+                displayPrecision,
                 standardJump_.jumpDistance,
+                displayPrecision,
                 standardJump_.landingOffset
             );
             

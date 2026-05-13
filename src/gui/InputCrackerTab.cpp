@@ -375,7 +375,10 @@ void InputCrackerTab::renderOutputPanel(const AppResources& resources) {
     if (pushedUiFont) ImGui::PushFont(resources.uiFont);
 
     ImGui::SeparatorText("Result");
+    drawDisplayPrecisionInput("##inputCrackerDisplayPrecision", displayPrecision_);
+    ImGui::Spacing();
     if (pushedCodeFont) ImGui::PushFont(resources.codeFont);
+    const int displayPrecision = clampDisplayPrecision(displayPrecision_);
 
     ImGui::Text("Status: %s", crackRunning_ ? "Cracking..." : statusMsg_.c_str());
     ImGui::Text("Version: %s", verName(crackVer_));
@@ -531,27 +534,31 @@ void InputCrackerTab::renderOutputPanel(const AppResources& resources) {
 
         if (showVx && showVz) {
             ImGui::Text(
-                "depth = %d | t = %d (+%d) | vx = %.15g | vz = %.15g",
+                "depth = %d | t = %d (+%d) | vx = %.*g | vz = %.*g",
                 sol.depth,
                 sol.T,
                 std::max(0, sol.airDebt),
+                displayPrecision,
                 sol.vx,
+                displayPrecision,
                 sol.vz
             );
         } else if (showVx) {
             ImGui::Text(
-                "depth = %d | t = %d (+%d) | vx = %.15g",
+                "depth = %d | t = %d (+%d) | vx = %.*g",
                 sol.depth,
                 sol.T,
                 std::max(0, sol.airDebt),
+                displayPrecision,
                 sol.vx
             );
         } else if (showVz) {
             ImGui::Text(
-                "depth = %d | t = %d (+%d) | vz = %.15g",
+                "depth = %d | t = %d (+%d) | vz = %.*g",
                 sol.depth,
                 sol.T,
                 std::max(0, sol.airDebt),
+                displayPrecision,
                 sol.vz
             );
         }

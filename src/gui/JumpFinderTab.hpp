@@ -29,6 +29,7 @@ private:
         std::string shiftLabel;
         double shiftValue = 0.0;
         version ver = version::v1_8_9;
+        int f45Type = zEngine::F4501;
         ZS::fullStrat strat{};
         ZS::JumpList jumpList;
     };
@@ -44,6 +45,7 @@ private:
         long long totalCandidates = 0;
         int matchesFound = 0;
         version ver = version::v1_8_9;
+        int f45Type = zEngine::F4501;
     };
 
     struct ProgressState {
@@ -69,6 +71,7 @@ private:
     int maxSpeed_ = 255;
     int minSlowness_ = 0;
     int maxSlowness_ = 6;
+    int f45Type_ = zEngine::F4501;
 
     std::string thresholdText_ = "1e-9";
     bool useBlockageShift_ = true;
@@ -90,6 +93,7 @@ private:
     int matchCap_ = 1024;
     version selectedVer_ = version::v1_8_9;
     version searchVer_ = version::v1_8_9;
+    int searchF45Type_ = zEngine::F4501;
     std::chrono::steady_clock::time_point searchStartTime_{};
     std::shared_ptr<std::atomic_bool> cancelToken_;
     std::shared_ptr<ProgressState> progress_;

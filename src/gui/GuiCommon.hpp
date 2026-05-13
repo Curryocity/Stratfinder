@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <string>
 
+#include "../zEngine.hpp"
 #include "../version.hpp"
 #include "../../third_party/imgui/imgui.h"
 #include "../../third_party/imgui/misc/cpp/imgui_stdlib.h"
@@ -121,6 +122,31 @@ inline bool drawVersionInput(const char* label, const char* id, version& ver) {
         ver = verFromIdx(selected);
     }
     return changed;
+}
+
+inline const char* f45TypeName(int type) {
+    static const char* kF45TypeItems[] = {"45", "45.01", "Small HA", "Large HA"};
+    if (type < 0 || type >= static_cast<int>(IM_ARRAYSIZE(kF45TypeItems))) return "Unknown";
+    return kF45TypeItems[type];
+}
+
+inline zEngine::F45Type f45TypeFromIdx(int type) {
+    switch (type) {
+        case zEngine::F45: return zEngine::F45;
+        case zEngine::F4501: return zEngine::F4501;
+        case zEngine::SMALL_HA: return zEngine::SMALL_HA;
+        case zEngine::LARGE_HA: return zEngine::LARGE_HA;
+        default: return zEngine::F4501;
+    }
+}
+
+inline bool draw45TypeInput(const char* label, const char* id, int& type) {
+    static const char* kF45TypeItems[] = {"45", "45.01", "Small HA", "Large HA"};
+    ImGui::AlignTextToFramePadding();
+    ImGui::Text("%s", label);
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(120.0f);
+    return ImGui::Combo(id, &type, kF45TypeItems, IM_ARRAYSIZE(kF45TypeItems));
 }
 
 inline void drawKeyToggle(const char* label, bool& enabled) {

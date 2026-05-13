@@ -31,6 +31,7 @@ void ZSolverTab::pump() {
         solverReturnErrorQ_ = result.returnErrorQ;
         solverHasJump_ = result.hasJump;
         solverElapsedMs_ = result.elapsedMs;
+        solverF45Type_ = result.f45Type;
         solverStatusMsg_ = solverReturnErrorQ_ ? "Solve Failed" : "Finished";
     } catch (const std::exception& e) {
         jumpList_ = {};
@@ -38,6 +39,7 @@ void ZSolverTab::pump() {
         solverErrorMsg_ = e.what();
         solverReturnErrorQ_ = true;
         solverElapsedMs_ = 0.0;
+        solverF45Type_ = f45Type_;
         solverStatusMsg_ = "Solve Failed";
     } catch (...) {
         jumpList_ = {};
@@ -46,6 +48,7 @@ void ZSolverTab::pump() {
         solverErrorMsg_ = "Unknown error";
         solverReturnErrorQ_ = true;
         solverElapsedMs_ = 0.0;
+        solverF45Type_ = f45Type_;
         solverStatusMsg_ = "Solve Failed";
     }
 
@@ -67,6 +70,7 @@ void ZSolverTab::solve(version ver) {
     const int mmAirtime = mmAirtime_;
     const int speed = speed_;
     const int slowness = slowness_;
+    const int f45Type = f45Type_;
     const int mode = mode_;
     const int maxTicks = maxAirtime_;
     const int jumpAirtime = jumpAirtime_;
@@ -131,6 +135,7 @@ void ZSolverTab::solve(version ver) {
     solverHasRun_ = true;
     solverStatusMsg_ = "Solving...";
     solverElapsedMs_ = 0.0;
+    solverF45Type_ = f45Type;
     solverVer_ = ver;
     solverStartTime_ = std::chrono::steady_clock::now();
 
@@ -138,12 +143,14 @@ void ZSolverTab::solve(version ver) {
         SolverResult result;
         try {
             const auto start = std::chrono::steady_clock::now();
+            zEngine::set45Type(f45TypeFromIdx(f45Type));
             ZS solver;
             solver.clearLog();
             solver.toggleLog(true);
             solver.setEffect(speed, slowness);
             solver.setVersion(ver);
             result.ver = ver;
+            result.f45Type = f45Type;
 
             const ZS::fullStrat strat = backwalled
                 ? solver.backwallSolver(mm, mmAirtime)
@@ -201,6 +208,10 @@ void ZSolverTab::renderInputPanel(const AppResources& resources) {
     ImGui::SetNextItemWidth(50.0f);
     ImGui::InputInt("##solverSlowness", &slowness_, 0, 0);
 
+    if (draw45TypeInput("45 Type:", "##solver45Type", f45Type_)) {
+        zEngine::set45Type(f45TypeFromIdx(f45Type_));
+    }
+
 
 
     ImGui::SeparatorText("Jump");
@@ -249,6 +260,7 @@ void ZSolverTab::renderInputPanel(const AppResources& resources) {
 void ZSolverTab::drawStratSummary() const {
     const ZS::fullStrat& value = solverStrat_;
     ImGui::Text("Version: %s", verName(solverVer_));
+    ImGui::Text("45 Type: %s", f45TypeName(solverF45Type_));
     ImGui::Text("Nondelayed");
     ImGui::Text("- Strat Type: %s", solverStratName(value.nondelayStrat).c_str());
     ImGui::Text("- Vz: %.15g", value.nondelaySpeed);

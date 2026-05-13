@@ -48,6 +48,7 @@ void JumpFinderTab::pump() {
         totalCandidates_ = result.totalCandidates;
         matchesFound_ = result.matchesFound;
         searchVer_ = result.ver;
+        searchF45Type_ = result.f45Type;
         if (result.cancelled) {
             statusMsg_ = "Halted";
         } else if (result.capReached) {
@@ -63,6 +64,7 @@ void JumpFinderTab::pump() {
         processedCandidates_ = 0;
         totalCandidates_ = 0;
         matchesFound_ = 0;
+        searchF45Type_ = f45Type_;
         statusMsg_ = "Search Failed";
     } catch (...) {
         matches_.clear();
@@ -72,6 +74,7 @@ void JumpFinderTab::pump() {
         processedCandidates_ = 0;
         totalCandidates_ = 0;
         matchesFound_ = 0;
+        searchF45Type_ = f45Type_;
         statusMsg_ = "Search Failed";
     }
 
@@ -99,6 +102,7 @@ void JumpFinderTab::startSearch(version ver) {
     const int maxSpeed = maxSpeed_;
     const int minSlowness = minSlowness_;
     const int maxSlowness = maxSlowness_;
+    const int f45Type = f45Type_;
     const int matchCap = matchCap_;
     const auto thresholdText = thresholdText_;
     const bool useBlockageShift = useBlockageShift_;
@@ -205,6 +209,7 @@ void JumpFinderTab::startSearch(version ver) {
     statusMsg_ = "Searching...";
     elapsedMs_ = 0.0;
     searchVer_ = ver;
+    searchF45Type_ = f45Type;
     searchStartTime_ = std::chrono::steady_clock::now();
     cancelToken_ = std::make_shared<std::atomic_bool>(false);
     progress_ = std::make_shared<ProgressState>();
@@ -222,11 +227,13 @@ void JumpFinderTab::startSearch(version ver) {
         SearchResult result;
         try {
             const auto start = std::chrono::steady_clock::now();
+            zEngine::set45Type(f45TypeFromIdx(f45Type));
             ZS solver;
             solver.clearLog();
             solver.toggleLog(false);
             solver.setVersion(ver);
             result.ver = ver;
+            result.f45Type = f45Type;
 
             std::vector<double> comparisonShifts;
             comparisonShifts.reserve(selectedShifts.size());
@@ -281,6 +288,7 @@ void JumpFinderTab::startSearch(version ver) {
                                     shift.first,
                                     shift.second,
                                     ver,
+                                    f45Type,
                                     strat,
                                     std::move(jumpList)
                                 });
@@ -418,6 +426,10 @@ void JumpFinderTab::renderInputPanel(const AppResources& resources) {
     ImGui::SetNextItemWidth(55.0f);
     ImGui::InputInt("##jumpFindingMaxSlowness", &maxSlowness_, 0, 0);
 
+    if (draw45TypeInput("45 Type:", "##jumpFinding45Type", f45Type_)) {
+        zEngine::set45Type(f45TypeFromIdx(f45Type_));
+    }
+
     ImGui::SeparatorText("Jump");
     ImGui::AlignTextToFramePadding();
     ImGui::Text("Max Jump Airtime:");
@@ -488,6 +500,7 @@ void JumpFinderTab::renderOutputPanel(const AppResources& resources) {
     } else {
         ImGui::Text("Status: %s", searchRunning_ ? (finalizing ? "Finalizing..." : "Searching...") : statusMsg_.c_str());
         ImGui::Text("Version: %s", verName(searchVer_));
+        ImGui::Text("45 Type: %s", f45TypeName(searchF45Type_));
         if (searchRunning_) {
             if (finalizing) {
                 ImGui::TextDisabled(
@@ -551,6 +564,7 @@ void JumpFinderTab::renderOutputPanel(const AppResources& resources) {
                       << " Sl-" << match.slowness
                       << " | MM t=" << match.mmAirtime
                       << " | MM=" << formatValue(match.mm)
+                      << " | " << f45TypeName(match.f45Type)
                       << " | " << match.shiftLabel
                       << " | " << match.jumpList.jumps.size() << " jump";
                 if (match.jumpList.jumps.size() != 1) title << "s";
